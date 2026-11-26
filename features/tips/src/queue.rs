@@ -57,9 +57,9 @@ impl Tip {
     /// What its button opens.
     pub fn url(self) -> &'static str {
         match self {
-            Tip::Browse => "https://chromewebstore.google.com/detail/mfnicocicmmlkpjnaffgihfjhdgjkdjg?utm_source=opencode-desktop&utm_campaign=tip-browse",
+            Tip::Browse => "https://chromewebstore.google.com/detail/mfnicocicmmlkpjnaffgihfjhdgjkdjg?utm_source=brocode-desktop&utm_campaign=tip-browse",
             // anoma.ly/hex 404s with a query string; the trailing slash is required.
-            Tip::Hex => "https://anoma.ly/hex/?utm_source=opencode-desktop&utm_campaign=tip-hex",
+            Tip::Hex => "https://anoma.ly/hex/?utm_source=brocode-desktop&utm_campaign=tip-hex",
         }
     }
 

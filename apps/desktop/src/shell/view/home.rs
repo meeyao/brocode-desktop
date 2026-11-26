@@ -580,8 +580,8 @@ pub(super) fn avatar(s: &App, p: &Pal, project: Option<&model::Project>, name: &
     crate::icons::session_avatar(s, p, project, name, open, unread).key("avatar")
 }
 /// `--service` writes the server's address and password to `service.json`, where the app finds them;
-/// a plain `opencode serve` (2.x) makes up a password the app can't know, and shows Signed out.
-const SERVE_CMD: &str = "opencode serve --service";
+/// a plain `brocode serve` (2.x) makes up a password the app can't know, and shows Signed out.
+const SERVE_CMD: &str = "brocode serve --service";
 
 fn no_server_home(s: &App, p: &Pal) -> El {
     let addr = match (&s.launch.story_addr, &*s.source) {
