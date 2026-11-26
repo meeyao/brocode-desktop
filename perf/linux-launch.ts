@@ -1,4 +1,4 @@
-// The launch of OpenCode (Rune) on a Linux desktop, in one command, for pasting back:
+// The launch of Brocode on a Linux desktop, in one command, for pasting back:
 //
 //   bun perf/linux-launch.ts [path to opencode-rune] [launches per case, 5]
 //

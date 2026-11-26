@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Fast edit-compile-run loop for OpenCode (Rune) on Windows.
+  Fast edit-compile-run loop for Brocode on Windows.
 
 .DESCRIPTION
   Runs `opencode-desktop` with the `dev-fast` profile (no PDB, 64 codegen units),
@@ -21,7 +21,7 @@ $features = if ($Office -or $env:OPENCODE_DEV_OFFICE -eq '1') { 'knobs,office' }
 
 Push-Location $root
 try {
-  & cargo run --profile dev-fast -p opencode-desktop --no-default-features --features $features '--' --live --plugin-hot @Args
+  & cargo run --profile dev-fast -p brocode-desktop --no-default-features --features $features '--' --live --plugin-hot @Args
   exit $LASTEXITCODE
 } finally {
   Pop-Location

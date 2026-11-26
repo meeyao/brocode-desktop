@@ -1,6 +1,6 @@
 //! The engines as a library beside the app (`crates/office-library`), loaded when the first file
 //! opens: `libopencode_office.dylib` in the bundle's `Frameworks`, `opencode_office.dll` beside
-//! the exe, `libopencode_office.so` beside it or in `../lib/opencode-rune`. Loaded once and
+//! the exe, `libopencode_office.so` beside it or in `../lib/brocode`. Loaded once and
 //! kept: scenes hold font and image bytes whose drop code is the library's.
 //!
 //! A library that is missing, cannot load or is another build's is a file that fails to open,
@@ -77,7 +77,7 @@ fn path() -> Option<PathBuf> {
     } else if cfg!(windows) {
         &["opencode_office.dll"]
     } else {
-        &["libopencode_office.so", "../lib/opencode-rune/libopencode_office.so"]
+        &["libopencode_office.so", "../lib/brocode/libopencode_office.so"]
     };
     places.iter().map(|place| dir.join(place)).find(|path| path.is_file())
 }

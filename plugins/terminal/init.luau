@@ -145,7 +145,7 @@ return plugin.defineWindow(function(ctx)
     -- Shows the session's terminal for the agent, answering with the terminal it shows.
     ctx:AddMcpTool({
         name = "open_terminal",
-        description = "Show the integrated terminal dock in OpenCode (Rune) for this session's workspace.",
+        description = "Show the integrated terminal dock in Brocode for this session's workspace.",
         inputSchema = {
             type = "object",
             properties = {

@@ -1,4 +1,4 @@
-//! `opencode-rune-setup.exe`: OpenCode (Rune)'s Windows setup. One click installs the app for
+//! `brocode-setup.exe`: Brocode's Windows setup. One click installs the app for
 //! the user, with no administrator, where the updater expects it (`win_install`):
 //!
 //! 1. Install (with "Create a desktop shortcut") on the first page.
@@ -7,18 +7,18 @@
 //!    folder and takes its place with a rename, the way the updater swaps versions, so a failed
 //!    install leaves the previous version as it was.
 //! 4. The Start menu shortcut (and the desktop one), the Apps & features entry, the app's URL
-//!    scheme (`opencode-rune://`, never `opencode://`) and the toasts' name and icon are
+//!    scheme (`brocode://`, never `opencode://`) and the toasts' name and icon are
 //!    registered (`win_install::register`).
 //! 5. A process is made from the installed exe and ended before it runs, while the last page
 //!    shows: Windows Defender's check of the new file is over before the person's own first
 //!    start (`install::first_start`).
-//! 6. "Launch OpenCode (Rune)" on the last page starts it.
+//! 6. "Launch Brocode" on the last page starts it.
 //!
 //! The browser engine isn't in the setup: the app downloads it in the background once it's idle
-//! (`browser_pane::prefetch`), into the engine folder every OpenCode (Rune) build shares.
+//! (`browser_pane::prefetch`), into the engine folder every Brocode build shares.
 //!
 //! ```text
-//! opencode-rune-setup.exe [--silent | /S] [--desktop-shortcut] [--launch] [--dir <install folder>] [--log <file>]
+//! brocode-setup.exe [--silent | /S] [--desktop-shortcut] [--launch] [--dir <install folder>] [--log <file>]
 //! ```
 //!
 //! `--silent` installs without a window, with the desktop shortcut and launch only when asked.
@@ -38,5 +38,5 @@ fn main() {
     #[cfg(target_os = "windows")]
     std::process::exit(install::run());
     #[cfg(not(target_os = "windows"))]
-    eprintln!("opencode-rune-setup installs OpenCode (Rune) on Windows; other systems use their own packages.");
+    eprintln!("brocode-setup installs Brocode on Windows; other systems use their own packages.");
 }

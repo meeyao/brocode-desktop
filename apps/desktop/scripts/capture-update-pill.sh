@@ -8,9 +8,9 @@ case "$(hostname)" in *Studio*) echo "refusing on $(hostname)" >&2; exit 75;; es
 TAG=${1:-after}
 OUT=${2:-captures/update-pill}
 mkdir -p "$OUT"
-cargo build --locked -p opencode-desktop
+cargo build --locked -p brocode-desktop
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-BIN="$TARGET/debug/opencode-desktop"
+BIN="$TARGET/debug/brocode-desktop"
 COMMON="--fixture apps/desktop/assets/fixture.json --playground Components/Update\ pill --script apps/desktop/scripts/update-pill.json --pointer --size 1100x640 --scale 2"
 for theme in dark light; do
   eval "$BIN" $COMMON --theme $theme --fps 120 --video "$OUT/$TAG-$theme.mp4" --trace "$OUT/$TAG-$theme.jsonl" --trace-all

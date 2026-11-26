@@ -794,7 +794,7 @@
       "summary": "Detect if desktop drafts.sqlite was symlinked/copied from the CLI opencode.db and move it aside instead of corrupting it.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Electron-only drafts.sqlite guard; Rune stores its SQLite database in its own `rune-opencode` app-data directory with explicit schema validation and damaged-DB recovery (`crates/opencode-storage/src/native/boot/damaged.rs`).",
+      "status_evidence": "Electron-only drafts.sqlite guard; Rune stores its SQLite database in its own `brocode` app-data directory with explicit schema validation and damaged-DB recovery (`crates/opencode-storage/src/native/boot/damaged.rs`).",
       "depends_on": "none",
       "risks": "Saved data / DB path separation (already protected in opencode-storage).",
       "workstream": "none"
@@ -4771,7 +4771,7 @@
       "summary": "An unpackaged (local) run gets its own AppUserModelID, ai.opencode.desktop.local, instead of the installed dev channel's, so its taskbar button and toasts never merge with an installed copy; a start-menu Electron.lnk that claims the installed dev AUMID for a dev Electron is recognised as colliding.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "crates/win-install/src/product.rs Product::from_build: a local build (no channel or `local`) takes id anomaly.opencode-rune.dev and scheme opencode-rune-dev, while every release build (release.yml sets OPENCODE_RUNE_BUILD_CHANNEL, no OPENCODE_RUNE_BUNDLE_ID) takes anomaly.opencode-rune; harness runs take a scratch id (Product::with_id). Ours has no Electron shortcut to repair.",
+      "status_evidence": "crates/win-install/src/product.rs Product::from_build: a local build (no channel or `local`) takes id com.apibrother.brocode.dev and scheme opencode-rune-dev, while every release build (release.yml sets OPENCODE_RUNE_BUILD_CHANNEL, no OPENCODE_RUNE_BUNDLE_ID) takes com.apibrother.brocode; harness runs take a scratch id (Product::with_id). Ours has no Electron shortcut to repair.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -6652,7 +6652,7 @@
       "summary": "Patches Electron's app-builder-lib NSIS Windows installer to smooth the 7-Zip extraction progress bar with live status and throughput readouts.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Electron NSIS / app-builder-lib patch only (installer.nsh + patches/app-builder-lib@26.15.7.patch). OpenCode (Rune) ships its own custom Rust Win32 TaskDialog setup bootstrapper in apps/installer/src/{install,pages}.rs that unpacks an embedded payload.zip in a few seconds with a Win32 marquee bar.",
+      "status_evidence": "Electron NSIS / app-builder-lib patch only (installer.nsh + patches/app-builder-lib@26.15.7.patch). Brocode ships its own custom Rust Win32 TaskDialog setup bootstrapper in apps/installer/src/{install,pages}.rs that unpacks an embedded payload.zip in a few seconds with a Win32 marquee bar.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPDATER"
@@ -6844,7 +6844,7 @@
       "summary": "Adds a Linux-only Settings > General > Smooth scrolling switch (off by default, applies after restart) controlling Electron's Chromium --disable-smooth-scrolling command-line switch so mouse-wheel scrolling matches native Linux apps.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Electron/Chromium Linux command-line switch workaround (app.commandLine.appendSwitch('disable-smooth-scrolling') in packages/desktop/src/main/native/smooth-scrolling.ts). OpenCode (Rune) is a native GPU desktop app, not an Electron/Chromium shell, so the Chromium smooth-scrolling flag does not apply.",
+      "status_evidence": "Electron/Chromium Linux command-line switch workaround (app.commandLine.appendSwitch('disable-smooth-scrolling') in packages/desktop/src/main/native/smooth-scrolling.ts). Brocode is a native GPU desktop app, not an Electron/Chromium shell, so the Chromium smooth-scrolling flag does not apply.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"

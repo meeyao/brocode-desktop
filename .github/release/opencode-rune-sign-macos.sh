@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# opencode-rune-sign-macos.sh <unsigned app zip> <out dir> <arch>: signs "OpenCode (Rune).app"
+# opencode-rune-sign-macos.sh <unsigned app zip> <out dir> <arch>: signs "Brocode.app"
 # inside-out (each Contents/Frameworks/*.dylib, then the app) with Anomaly's Developer ID identity
 # (hardened runtime, secure timestamp, microphone entitlement on the app), notarizes and staples
 # it, then writes:
-#   OpenCode-Rune-<version>-macos-<arch>.zip  (root "OpenCode (Rune).app", for the auto-updater)
+#   OpenCode-Rune-<version>-macos-<arch>.zip  (root "Brocode.app", for the auto-updater)
 #   OpenCode-Rune-<version>-macos-<arch>.dmg  (signed, notarized, stapled, with /Applications link)
 #
 # Optional overrides for side-by-side PR builds:
-#   OPENCODE_RUNE_APP_NAME    (default: "OpenCode (Rune)")
-#   OPENCODE_RUNE_BUNDLE_ID   (default: "anomaly.opencode-rune")
+#   OPENCODE_RUNE_APP_NAME    (default: "Brocode")
+#   OPENCODE_RUNE_BUNDLE_ID   (default: "com.apibrother.brocode")
 #   OPENCODE_RUNE_FILE_STEM   (default: "OpenCode-Rune-$OPENCODE_RUNE_VERSION")
 . "$(dirname "$0")/lib.sh"
 
 input=$1
 out=$2
 release=$(cd "$(dirname "$0")" && pwd)
-app_name=${OPENCODE_RUNE_APP_NAME:-OpenCode (Rune)}
-bundle_id=${OPENCODE_RUNE_BUNDLE_ID:-anomaly.opencode-rune}
+app_name=${OPENCODE_RUNE_APP_NAME:-Brocode}
+bundle_id=${OPENCODE_RUNE_BUNDLE_ID:-com.apibrother.brocode}
 stem=${OPENCODE_RUNE_FILE_STEM:-OpenCode-Rune-$OPENCODE_RUNE_VERSION}
 
 work=$(mktemp -d)

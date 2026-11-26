@@ -1,4 +1,4 @@
-//! Workspace tooling subsystems for OpenCode (Rune):
+//! Workspace tooling subsystems for Brocode:
 //! - [`new_worktree`]: new-session worktree selection, location cycling, and branch typeahead picker.
 //! - [`rune_mcp`]: per-folder `rune` client MCP WebSocket lifecycle, multi-window hub, and session call routing.
 //! - [`home_search`]: Home session search state machine, exact session-ID lookup, list hold, and key handling.

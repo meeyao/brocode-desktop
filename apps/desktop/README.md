@@ -1,8 +1,8 @@
-# OpenCode (Rune) (`apps/desktop`)
+# Brocode (`apps/desktop`)
 
 - `cargo run -p opencode-desktop -- --live` runs against a local OpenCode server (`http://127.0.0.1:4096` or `~/.config/opencode/service.json`; override with `--server URL` or `OPENCODE_SERVER_URL`).
 - For fast local iteration (`scripts/dev-fast.sh` / `pwsh scripts/dev-fast.ps1` with Luau `--plugin-hot`), see [`docs/fast-builds.md`](../../docs/fast-builds.md).
-- `apps/desktop/scripts/dev.sh` builds (dev profile with optimized dependencies; `--release` for release), installs `~/Applications/OpenCode (Rune).app`, and relaunches it with `--live` when the binary changes.
+- `apps/desktop/scripts/dev.sh` builds (dev profile with optimized dependencies; `--release` for release), installs `~/Applications/Brocode.app`, and relaunches it with `--live` when the binary changes.
 - `cargo run -p opencode-desktop -- --fixture apps/desktop/assets/fixture.json --scene session` runs offline against the bundled fixture.
 
 ## Shared parts

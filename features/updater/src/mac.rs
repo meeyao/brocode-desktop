@@ -1,9 +1,9 @@
-//! macOS: team builds (`anomaly.opencode-rune`) update from Anomaly's release feed. A download is
+//! macOS: team builds (`com.apibrother.brocode`) update from Anomaly's release feed. A download is
 //! verified (size, SHA-256, code signature, signing team, Gatekeeper) and unpacked into a private
-//! folder under `~/Library/Caches/anomaly.opencode-rune/Updates`; Restart to update or quitting
+//! folder under `~/Library/Caches/com.apibrother.brocode/Updates`; Restart to update or quitting
 //! with a ready update checks the staged bundle again and swaps it in atomically (the old bundle
 //! comes back when the move fails), and Restart to update starts the app again from it as the app
-//! menu's Restart does (`Tx::relaunch`). Local dev bundles (`anomaly.opencode-rune.dev`) and bare
+//! menu's Restart does (`Tx::relaunch`). Local dev bundles (`com.apibrother.brocode.dev`) and bare
 //! `cargo` binaries never update. A bundle this user can't replace (translocated, read-only) keeps
 //! checking and links to the DMG; `DisableUpdates` in the app's defaults domain turns updates off.
 
@@ -21,10 +21,10 @@ use super::feed;
 use super::platform::Platform;
 
 /// Team release bundle ID installed from the release feed (the dev channel's, the only one).
-pub const TEAM_BUNDLE_ID: &str = "anomaly.opencode-rune";
+pub const TEAM_BUNDLE_ID: &str = "com.apibrother.brocode";
 
 /// Only the bundle the team release feed publishes updates (never local dev builds,
-/// `anomaly.opencode-rune.dev`, or a pull request's). A staged update must carry the running
+/// `com.apibrother.brocode.dev`, or a pull request's). A staged update must carry the running
 /// bundle's own id (`verify_bundle`).
 pub fn is_updatable_bundle_id(bundle_id: &str) -> bool {
     bundle_id == TEAM_BUNDLE_ID
@@ -303,7 +303,7 @@ fn check_replaceable(app: &Path) -> Result<(), String> {
         return Err(format!("Move {} to Applications so it can update itself.", super::build_info().product_name));
     }
     let parent = app.parent().ok_or_else(|| "App bundle has no parent folder.".to_owned())?;
-    let probe = parent.join(format!(".opencode-rune-update-probe-{}", std::process::id()));
+    let probe = parent.join(format!(".brocode-update-probe-{}", std::process::id()));
     std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)

@@ -444,11 +444,11 @@ let appFieldStats = { direct: 0, wrappers: 0, wrapperSubfields: 0, effective: 0 
     const webNode = nodeById.get(web.id);
     const hasDesktopNormal = webNode.deps.some(
       (d) =>
-        wsMeta.get(d.pkg)?.name === "opencode-desktop" &&
+        wsMeta.get(d.pkg)?.name === "brocode-desktop" &&
         d.dep_kinds.some((k) => k.kind === null),
     );
     if (!hasDesktopNormal) {
-      errors.push(`${web.manifestRel}: must have a normal dependency on opencode-desktop`);
+      errors.push(`${web.manifestRel}: must have a normal dependency on brocode-desktop`);
     }
     const dupFeatures = webNode.deps
       .filter((d) => wsMeta.get(d.pkg)?.tier === "feature" && d.dep_kinds.some((k) => k.kind === null || k.kind === "build"))
@@ -456,7 +456,7 @@ let appFieldStats = { direct: 0, wrappers: 0, wrapperSubfields: 0, effective: 0 
       .sort();
     if (dupFeatures.length > 0) {
       errors.push(
-        `${web.manifestRel}: duplicates features/* dependencies (${dupFeatures.join(", ")}); depend on opencode-desktop instead`,
+        `${web.manifestRel}: duplicates features/* dependencies (${dupFeatures.join(", ")}); depend on brocode-desktop instead`,
       );
     }
   }

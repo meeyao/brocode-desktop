@@ -5,7 +5,7 @@
 //! assistant turns (Markdown, `genui`, Mermaid diagrams, reasoning, folded tool groups, subagent
 //! cards, question rows, inline images, turn errors/retries, compactions, notices, streamed line
 //! reveal, Working/Copy/Interrupted tail), linear bottom fade, two-layer live overlay scroll bar,
-//! and "Jump to latest", with no OpenCode (Rune)-only shell or side-panel assumptions inside.
+//! and "Jump to latest", with no Brocode-only shell or side-panel assumptions inside.
 
 pub use opencode_runtime::detail;
 pub use opencode_ui::keymap::base as keymap;
@@ -459,7 +459,7 @@ pub trait TimelineHost: Sized + 'static {
         item.text.clone()
     }
     /// What sits beside the status line in a turn's lane, 8 after its words and centred on it
-    /// (OpenCode (Rune)'s "Move to background" hint).
+    /// (Brocode's "Move to background" hint).
     fn turn_tail_extra(&self, _p: &palette::Pal, _session: &str, _busy: bool) -> Option<El> {
         None
     }

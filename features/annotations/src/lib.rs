@@ -1,5 +1,5 @@
 //! Timeline and terminal quoting, composer comment cards, floating quote-comment editor, and
-//! inline code/diff line comments for OpenCode (Rune).
+//! inline code/diff line comments for Brocode.
 //!
 //! Both [`quote`] and [`line_comments`] share the compact comment field machine
 //! (`quote::comment::Field`), `@` path search, and the composer's pending comment cards inside

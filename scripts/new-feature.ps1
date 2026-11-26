@@ -285,7 +285,7 @@ $cargoToml = @'
 [package]
 name = "opencode-feature-__ID__"
 version = "0.0.1"
-description = "__TITLE_ESC__ feature crate for OpenCode (Rune)"
+description = "__TITLE_ESC__ feature crate for Brocode"
 edition.workspace = true
 license.workspace = true
 publish = false

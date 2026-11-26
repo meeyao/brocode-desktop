@@ -311,7 +311,7 @@ pub(super) fn try_start(
         "heap.compare" => Some(exec_heap_compare(att, app, cmd)),
         "lighthouse" => Some(StepOutcome::Done(Outcome::fail(
             failure_code::UNSUPPORTED,
-            "browser.lighthouse is unavailable in OpenCode (Rune): Node.js Lighthouse is not bundled in the native Rust desktop app. Use browser.trace.*, browser.cpu.*, browser.heap.*, and browser.snapshot instead.",
+            "browser.lighthouse is unavailable in Brocode: Node.js Lighthouse is not bundled in the native Rust desktop app. Use browser.trace.*, browser.cpu.*, browser.heap.*, and browser.snapshot instead.",
         ))),
         _ => None,
     }

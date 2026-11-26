@@ -505,7 +505,7 @@ pub(super) fn ensure(opts: &EnsureOptions<'_>, disposed: &AtomicBool) -> Result<
             if count >= 3 {
                 if !announced {
                     announced = true;
-                    eprintln!("opencode-rune: background service is unresponsive; replacing it");
+                    eprintln!("brocode: background service is unresponsive; replacing it");
                 }
                 pty_handoff::clear(opts.file);
                 terminate(opts.file, info, opts.timing)?;
@@ -529,7 +529,7 @@ pub(super) fn ensure(opts: &EnsureOptions<'_>, disposed: &AtomicBool) -> Result<
                     if !announced {
                         announced = true;
                         eprintln!(
-                            "opencode-rune: replacing background service (version {:?} -> {:?})",
+                            "brocode: replacing background service (version {:?} -> {:?})",
                             svc.version, opts.version
                         );
                     }
@@ -548,7 +548,7 @@ pub(super) fn ensure(opts: &EnsureOptions<'_>, disposed: &AtomicBool) -> Result<
             if pool.should_recruit(live_reg) {
                 if !announced {
                     announced = true;
-                    eprintln!("opencode-rune: starting local OpenCode background service");
+                    eprintln!("brocode: starting local brocode background service");
                 }
                 let child_env = pty_handoff::environment(opts.file, opts.env);
                 pool.add(Contender::spawn(opts.command, &child_env)?);

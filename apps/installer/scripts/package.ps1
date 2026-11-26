@@ -1,4 +1,4 @@
-# Builds OpenCode (Rune)'s Windows artifacts into -Out:
+# Builds Brocode's Windows artifacts into -Out:
 #
 #   OpenCode-Rune-<version>-windows-<arch>.zip        the install folder (opencode-desktop.exe, opencode-desktop.dll,
 #                                                     the toasts' icon, the licences), the updater's windows-<arch> target
@@ -15,9 +15,9 @@
 #
 # Environment, as the macOS build reads it (every artifact of a build gets the same):
 #   OPENCODE_RUNE_VERSION, OPENCODE_RUNE_BUILD_CHANNEL   required; `opencode-desktop --version` must report them
-#   OPENCODE_RUNE_WINDOW_TITLE                           default "OpenCode (Rune)"
-#   OPENCODE_RUNE_BUNDLE_ID                              default "anomaly.opencode-rune"
-#   OPENCODE_RUNE_URL_SCHEME                             default "opencode-rune"
+#   OPENCODE_RUNE_WINDOW_TITLE                           default "Brocode"
+#   OPENCODE_RUNE_BUNDLE_ID                              default "com.apibrother.brocode"
+#   OPENCODE_RUNE_URL_SCHEME                             default "brocode"
 #
 # -Cargo runs cargo another way, such as a build throttle ("pwsh tools/cargo.ps1 +1.99.1").
 #
@@ -100,7 +100,7 @@ if ($Payload) {
     }
     if (-not $cross) {
         $reported = (& $exe --version | Out-String).Trim()
-        if ($reported -ne "opencode-rune $version ($channel)") { throw "opencode-desktop --version reported '$reported', expected 'opencode-rune $version ($channel)'" }
+        if ($reported -ne "brocode $version ($channel)") { throw "opencode-desktop --version reported '$reported', expected 'brocode $version ($channel)'" }
     }
     if ($env:OPENCODE_RUNE_BUNDLE_CLI -ne '0') {
         $js = if (Get-Command bun -ErrorAction SilentlyContinue) { 'bun' } elseif (Get-Command node -ErrorAction SilentlyContinue) { 'node' } else { throw 'Need bun or node on PATH to fetch bundled opencode-cli.' }
@@ -120,12 +120,12 @@ if ($Payload) {
 
 $env:OPENCODE_RUNE_SETUP_PAYLOAD = $zip
 try {
-    Invoke-Cargo (@('build', '-p', 'opencode-rune-setup') + $flags)
+    Invoke-Cargo (@('build', '-p', 'brocode-setup') + $flags)
 } finally {
     Remove-Item Env:OPENCODE_RUNE_SETUP_PAYLOAD
 }
 $setup = Join-Path $Out "$stem-setup.exe"
-Copy-Item (Join-Path $bin 'opencode-rune-setup.exe') $setup -Force
+Copy-Item (Join-Path $bin 'brocode-setup.exe') $setup -Force
 
 foreach ($file in @(if (-not $Payload) { $zip }) + $setup) {
     $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant()

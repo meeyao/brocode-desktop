@@ -11,7 +11,7 @@ use opencode_kit::{client::Server, model::{self, Message}};
 use rune::Waker;
 use serde_json::Value;
 
-const STILL_TRYING: &str = "OpenCode isn't answering. Still trying.";
+const STILL_TRYING: &str = "Brocode isn't answering. Still trying.";
 const ENTRIES: usize = 12;
 const MEMORY_BYTES: usize = 64 << 20;
 pub const WARM: usize = 6;
@@ -244,7 +244,7 @@ impl Pages {
                 let (q, fetch, out, wake) = (shared.clone(), fetch.clone(), out.clone(), wake.clone());
                 let name = format!("session-{}", if foreground { "open" } else { "prefetch" });
                 if let Err(e) = std::thread::Builder::new().name(name.clone()).spawn(move || worker(q, fetch, out, wake, foreground)) {
-                    eprintln!("opencode-rune: couldn't spawn {name} thread: {e}");
+                    eprintln!("brocode: couldn't spawn {name} thread: {e}");
                 }
             }
             Self { shared, results, wake: Some(wake), server: String::new() }
@@ -412,7 +412,7 @@ fn read(q: &Shared, fetch: &Fetch, out: &Sender<PageResult>, wake: &Waker, image
         for attempt in 0.. {
             let Err(error) = &answer else { break };
             if !foreground || !error.transient() { break; }
-            eprintln!("opencode-rune: session read failed, retrying: {error}");
+            eprintln!("brocode: session read failed, retrying: {error}");
             q.0.lock().unwrap_or_else(PoisonError::into_inner).step(QueueEvent::Health(LaneHealthEvent::TransientFailure(now())));
             wake();
             if !pause(q, backoff(attempt)) { return false; }
@@ -727,7 +727,7 @@ impl crate::App {
                     // A failure while its older page loads fails that page (its cooldown, then a retry).
                     changed |= self.step_history(&key.id, HistoryEvent::Failed { now: Instant::now() }, tx);
                     // A busy server is waited out; only silence that lasts is told (below).
-                    if error.transient() { eprintln!("opencode-rune: session read failed: {error}"); continue; }
+                    if error.transient() { eprintln!("brocode: session read failed: {error}"); continue; }
                     crate::status_toast::failed_wire(self, "Couldn't load this session", &error);
                     changed = true;
                 }

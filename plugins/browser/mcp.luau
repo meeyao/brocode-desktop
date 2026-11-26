@@ -7,7 +7,7 @@
 local mcp = {}
 
 local MAX_TEXT_BYTES = 32 * 1024
-local UNSUPPORTED = "The browser isn't available on this platform yet in OpenCode (Rune)"
+local UNSUPPORTED = "The browser isn't available on this platform yet in Brocode"
 
 local ACTIONABLE: { [string]: boolean } = {
     button = true,
@@ -135,7 +135,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         if eng.state == "starting" then
             error("Browser engine is still starting; try again in a moment", 0)
         end
-        error("Browser engine isn't installed yet in OpenCode (Rune)", 0)
+        error("Browser engine isn't installed yet in Brocode", 0)
     end
 
     -- Answer once the page says where it went (it changed address and stopped loading, was refused
@@ -207,7 +207,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         end
     end
 
-    tool("browser_tabs", "List browser tabs in this session's OpenCode (Rune) side panel and which tab is focused.", {}, nil, function(_, sid)
+    tool("browser_tabs", "List browser tabs in this session's Brocode side panel and which tab is focused.", {}, nil, function(_, sid)
         local tabs = {}
         for _, tab in Browser:Tabs(sid) do
             table.insert(tabs, { tabID = id(tab), url = tab:Url(), title = tab:Title(), loading = tab:Loading(), canGoBack = tab:CanGoBack(), canGoForward = tab:CanGoForward() })
@@ -216,7 +216,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return { open = Layout:RegionOpen(sid), focusedTabID = if focused then id(focused) else nil, tabs = tabs }
     end)
 
-    tool("browser_open", "Open a URL or local ':port' in a new browser tab in the OpenCode (Rune) side panel.", {
+    tool("browser_open", "Open a URL or local ':port' in a new browser tab in the Brocode side panel.", {
         url = { type = "string", description = "URL or ':port' address to open (defaults to 'about:blank')." },
     }, nil, function(args, sid)
         checkEngine()
@@ -237,7 +237,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return { tabID = id(tab), url = tab:Url() }
     end)
 
-    tool("browser_navigate", "Navigate a browser tab in OpenCode (Rune) to a URL or ':port', opening a tab if none exists.", {
+    tool("browser_navigate", "Navigate a browser tab in Brocode to a URL or ':port', opening a tab if none exists.", {
         url = { type = "string", description = "URL or ':port' address to navigate to." },
         tabID = tabSchema("Target browser tab ID (defaults to this session's active browser tab)."),
     }, { "url" }, function(args, sid)
@@ -280,7 +280,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return { tabID = id(tab), url = tab:Url() }
     end)
 
-    tool("browser_focus", "Show and focus an existing browser tab in the OpenCode (Rune) side panel.", {
+    tool("browser_focus", "Show and focus an existing browser tab in the Brocode side panel.", {
         tabID = { type = "integer", minimum = 1, description = "Browser tab ID from browser_tabs." },
     }, { "tabID" }, function(args, sid)
         if args.tabID == nil then
@@ -294,7 +294,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return page(tab)
     end)
 
-    tool("browser_close", "Close a browser tab in the OpenCode (Rune) side panel.", {
+    tool("browser_close", "Close a browser tab in the Brocode side panel.", {
         tabID = tabSchema("Browser tab ID to close (defaults to this session's active browser tab)."),
     }, nil, function(args, sid)
         local tab = target(args, sid)
@@ -302,7 +302,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return { closedTabID = id(tab) }
     end)
 
-    tool("browser_snapshot", "Read the accessibility tree of a browser tab in OpenCode (Rune) with '@eN' refs on actionable elements.", {
+    tool("browser_snapshot", "Read the accessibility tree of a browser tab in Brocode with '@eN' refs on actionable elements.", {
         tabID = tabSchema(DEFAULT_TAB),
         depth = { type = "integer", minimum = 1, maximum = 32, description = "Maximum accessibility tree depth (default 8)." },
     }, nil, function(args, sid)
@@ -338,7 +338,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return out
     end)
 
-    tool("browser_highlight", "Highlight an '@eN' accessibility ref in a browser tab in OpenCode (Rune), or omit 'ref' to clear.", {
+    tool("browser_highlight", "Highlight an '@eN' accessibility ref in a browser tab in Brocode, or omit 'ref' to clear.", {
         ref = { type = "string", description = "Element ref from browser_snapshot (e.g. '@e3'); omit or pass '' to clear." },
         tabID = tabSchema(DEFAULT_TAB),
     }, nil, function(args, sid)
@@ -357,7 +357,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return { tabID = id(tab), ref = key, backendNodeId = node }
     end)
 
-    tool("browser_evaluate", "Evaluate a JavaScript expression in a browser tab in OpenCode (Rune) and return its value.", {
+    tool("browser_evaluate", "Evaluate a JavaScript expression in a browser tab in Brocode and return its value.", {
         expression = { type = "string", description = "JavaScript expression to evaluate (promises are awaited)." },
         tabID = tabSchema(DEFAULT_TAB),
     }, { "expression" }, function(args, sid)
@@ -386,7 +386,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
         return { tabID = id(tab), value = value }
     end)
 
-    tool("browser_screenshot", "Capture a screenshot of a browser tab in OpenCode (Rune), returning compact metadata and the image.", {
+    tool("browser_screenshot", "Capture a screenshot of a browser tab in Brocode, returning compact metadata and the image.", {
         tabID = tabSchema(DEFAULT_TAB),
         format = { type = "string", enum = { "png", "jpeg", "webp" }, description = "Image format (default 'png')." },
     }, nil, function(args, sid)
@@ -409,14 +409,14 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
             return
         end
         filesAdded = true
-    tool("browser_files", "List the files a browser tab in OpenCode (Rune) downloaded (a click on a download link keeps the file for these tools until the tab closes; over 5 MiB is cancelled, at most 64 a tab), with each file's id, name, MIME type, size and state.", {
+    tool("browser_files", "List the files a browser tab in Brocode downloaded (a click on a download link keeps the file for these tools until the tab closes; over 5 MiB is cancelled, at most 64 a tab), with each file's id, name, MIME type, size and state.", {
         tabID = tabSchema(DEFAULT_TAB),
     }, nil, function(args, sid)
         local tab = target(args, sid)
         return { tabID = id(tab), files = tab:Files() }
     end)
 
-    tool("browser_file", "Read a completed download of a browser tab in OpenCode (Rune) by its id from browser_files: its text when it's UTF-8, else its bytes in base64. At most 5 MiB.", {
+    tool("browser_file", "Read a completed download of a browser tab in Brocode by its id from browser_files: its text when it's UTF-8, else its bytes in base64. At most 5 MiB.", {
         tabID = tabSchema(DEFAULT_TAB),
         fileID = { type = "string", description = "File id from browser_files, e.g. 'file_1'." },
     }, { "fileID" }, function(args, sid)
@@ -430,7 +430,7 @@ function mcp.add(ctx: WindowContext, Browser: BrowserService, Layout: LayoutServ
     end
     addFileTools()
     Browser.Changed:Connect(addFileTools)
-    tool("browser_cdp", "Send an allow-listed Chrome DevTools Protocol command to a browser tab in OpenCode (Rune).", {
+    tool("browser_cdp", "Send an allow-listed Chrome DevTools Protocol command to a browser tab in Brocode.", {
         method = { type = "string", description = "Allow-listed CDP method name, e.g. 'Input.dispatchMouseEvent' or 'DOM.getDocument'." },
         params = { type = "object", description = "CDP method parameters." },
         tabID = tabSchema(DEFAULT_TAB),

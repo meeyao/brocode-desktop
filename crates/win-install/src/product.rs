@@ -1,17 +1,17 @@
 //! The identity a build installs under: what people see, and the ids Windows keys it by.
 
 /// The app's executable in the install root.
-pub const EXE: &str = "opencode-desktop.exe";
+pub const EXE: &str = "brocode-desktop.exe";
 /// Who Apps & features and the exe's version resource (CompanyName) say made the app: `OpenCode`,
 /// as OpenCode Desktop shows in both. A display name only; the signature the updater trusts is
 /// the certificate's (`updater::windows::EXPECTED_PUBLISHER` in the app).
-pub const PUBLISHER: &str = "OpenCode";
-pub const HOMEPAGE: &str = "https://opencode.ai";
+pub const PUBLISHER: &str = "API Brother";
+pub const HOMEPAGE: &str = "https://apibrother.com";
 /// The scheme OpenCode Desktop registers. The install takes it too, so `opencode://open?project=…`
 /// opens the project here; OpenCode Desktop takes it back each time it starts.
 pub const OPENCODE_SCHEME: &str = "opencode";
-/// The id every build's own id starts with (`anomaly.opencode-rune.dev`, `….pr.12`).
-pub(crate) const FAMILY: &str = "anomaly.opencode-rune";
+/// The id every build's own id starts with (`com.apibrother.brocode.dev`, `….pr.12`).
+pub(crate) const FAMILY: &str = "com.apibrother.brocode";
 
 /// The release channel `channel` names when it is an app of its own beside dev's: `stable` or
 /// `beta`, as OpenCode Desktop ships Dev, Beta and its production app side by side, each under
@@ -26,14 +26,14 @@ pub fn side_by_side(channel: Option<&str>) -> Option<&'static str> {
     }
 }
 
-/// The name a build of `channel` shows when its title isn't set: `OpenCode (Rune)` for dev and
+/// The name a build of `channel` shows when its title isn't set: `Brocode` for dev and
 /// local builds, with the channel after it for stable and beta, so their Start menu entries,
 /// install folders and Apps & features entries differ from dev's.
 pub fn default_name(channel: Option<&str>) -> &'static str {
     match side_by_side(channel) {
-        Some("stable") => "OpenCode (Rune) Stable",
-        Some(_) => "OpenCode (Rune) Beta",
-        None => "OpenCode (Rune)",
+        Some("stable") => "Brocode Stable",
+        Some(_) => "Brocode Beta",
+        None => "Brocode",
     }
 }
 
@@ -66,7 +66,7 @@ impl Product {
         Product {
             name: set(title).unwrap_or(default_name(channel)).to_owned(),
             id: set(bundle_id).map_or_else(|| own(FAMILY, '.'), str::to_owned),
-            scheme: set(scheme).map_or_else(|| own("opencode-rune", '-'), str::to_owned).to_ascii_lowercase(),
+            scheme: set(scheme).map_or_else(|| own("brocode", '-'), str::to_owned).to_ascii_lowercase(),
             version: version.to_owned(),
         }
     }
@@ -86,7 +86,7 @@ impl Product {
         &self.scheme
     }
 
-    /// What every build of the app shares in its id (`anomaly.opencode-rune`), as they share
+    /// What every build of the app shares in its id (`com.apibrother.brocode`), as they share
     /// the app's data folders.
     pub fn family(&self) -> &str {
         FAMILY

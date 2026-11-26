@@ -3,9 +3,9 @@
 set -u
 OUT=captures/gallery/${1:-shots}
 mkdir -p "$OUT"
-cargo build -p opencode-desktop || exit 1
+cargo build -p brocode-desktop || exit 1
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-BIN="$TARGET/debug/opencode-desktop"
+BIN="$TARGET/debug/brocode-desktop"
 shot() { # name variant at theme
   "$BIN" --playground 'Timeline/Image gallery' --variant "$2" --whole-window --size 1440x900 --scale 2 --theme "$4" --at "$3" --snap "$OUT/$1-$4.png" >"$OUT/$1-$4.log" 2>&1 || echo "FAILED $1 $4"
 }

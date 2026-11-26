@@ -1,4 +1,4 @@
-name: OpenCode (Rune) Web Build
+name: Brocode Web Build
 
 # Builds the browser build (apps/web: the desktop app as wasm with WebGPU) and uploads the
 # static folder as an artifact, to keep dev's web build honest and to give a bundle to try. It

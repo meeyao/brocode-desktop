@@ -1,4 +1,4 @@
-name: OpenCode (Rune) Linux Build
+name: Brocode Linux Build
 
 # Builds the Linux desktop packages (AppImage, deb, rpm) of a branch or commit the way release.yml's
 # build-linux does (`cargo build --profile release-quick`, then package-linux.sh), unsigned, and

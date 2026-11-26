@@ -1,4 +1,4 @@
-//! One-time, non-destructive migration of the per-server files OpenCode (Rune) kept while a
+//! One-time, non-destructive migration of the per-server files Brocode kept while a
 //! window held one server at a time, to the mixed-server shape a window keeps once every server
 //! is live at once (Desktop's, `shell/tabs/schema.ts`, `runtime/server/persistence.ts`):
 //!

@@ -1,4 +1,4 @@
-//! OpenCode (Rune)'s per-user Windows install, shared by the setup (`apps/installer`) and the
+//! Brocode's per-user Windows install, shared by the setup (`apps/installer`) and the
 //! app, which uninstalls itself (`--uninstall`) and refreshes its uninstall entry after an
 //! update (`--apply-update`).
 //!
@@ -6,8 +6,8 @@
 //! %LOCALAPPDATA%\Programs\OpenCode Rune\               the install root (the updater swaps it whole)
 //!   opencode-desktop.exe                               icon, version and manifest resources inside
 //!   install.json                                       the setup's receipt: the updater replaces only this install
-//! Start menu\Programs\OpenCode (Rune).lnk              AppUserModelID set, so a pin and the
-//! Desktop\OpenCode (Rune).lnk (optional)               window share one taskbar button
+//! Start menu\Programs\Brocode.lnk              AppUserModelID set, so a pin and the
+//! Desktop\Brocode.lnk (optional)               window share one taskbar button
 //! HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<app id>    Apps & features
 //! HKCU\Software\Classes\<app scheme>                   the app's links and toast clicks (never `opencode`)
 //! HKCU\Software\Classes\AppUserModelId\<app id>       the toasts' name and icon

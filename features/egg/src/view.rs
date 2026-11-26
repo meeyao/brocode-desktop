@@ -45,7 +45,7 @@ fn wordmark_parts(s: &dyn EggHost, p: &Pal, width: f32, top: Option<f32>, dark: 
         Some(l) => still.opacity(if l.page.flat == super::Flat::Page { 1.0 } else { 0.0 }).opacity_motion(Anim::INSTANT),
     });
     if live.is_some() {
-        boxed = boxed.child(el().key("egg-mid").transition(Transition::none()).absolute(at[0], at[1]).size(234.0 * k, 42.0 * k).effect(gpu::MID).a11y_hidden());
+        boxed = boxed.child(el().key("egg-mid").transition(Transition::none()).absolute(at[0], at[1]).size(204.0 * k, 42.0 * k).effect(gpu::MID).a11y_hidden());
     }
     let state = live.map_or(State::Hidden, |l| l.state);
     // The eyes peek when the pointer comes within 24 units of the hole: a box around that reach,
@@ -61,7 +61,7 @@ fn wordmark_parts(s: &dyn EggHost, p: &Pal, width: f32, top: Option<f32>, dark: 
     });
     let grip = wordmark::grip(state);
     let grip = (grip != Grip::None).then(|| {
-        let (gx, gy, gw, gh) = if grip == Grip::Hidden { (213.0, 8.0, 18.0, 14.0) } else { (234.0, 18.0, 24.0, 24.0) };
+        let (gx, gy, gw, gh) = if grip == Grip::Hidden { (183.0, 8.0, 18.0, 14.0) } else { (204.0, 18.0, 24.0, 24.0) };
         let el = el()
             .key("egg-grip")
             .absolute(at[0] + gx as f32 * k, at[1] + gy as f32 * k)
@@ -94,7 +94,7 @@ fn wordmark_row(boxed: El, lifted: bool) -> El {
 }
 
 /// The new-session wordmark (`view.tsx:105-113`): its box spans 80% of up to 720 pt at the logo's
-/// 234:42; the logo inside is 78x14 whole-point pitches, `max(3, round(box / 78))`, its origin
+/// 204:42; the logo inside is 68x14 whole-point pitches, `max(3, round(box / 68))`, its origin
 /// rounded in the panel (`fitStage`). `width` and `height` are the panel's, from the last layout;
 /// `top` is the box's top in the panel.
 pub fn wordmark<H: EggHost + 'static>(s: &H, p: &Pal, width: f32, top: Option<f32>, dark: bool) -> El {
@@ -131,22 +131,28 @@ pub fn wordmark<H: EggHost + 'static>(s: &H, p: &Pal, width: f32, top: Option<f3
     wordmark_row(boxed, lifted)
 }
 
-/// The logo's blocks at `k` points a unit (234 x 42 units): letters in `stem`, the counters'
+/// The logo's blocks at `k` points a unit (204 x 42 units): letters in `stem`, the counters'
 /// lower halves in `weak`.
 pub fn logo_at(k: f32, stem: rune::Color, weak: rune::Color) -> El {
-    // x, y, w, h in the logo's 234x42 units; `true` for a counter's lower half.
-    const RECTS: [(f32, f32, f32, f32, bool); 40] = [
-        (0., 6., 24., 6., false), (0., 12., 6., 24., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true),
-        (30., 6., 24., 6., false), (30., 12., 6., 30., false), (48., 12., 6., 24., false), (36., 30., 12., 6., false), (36., 18., 12., 12., true),
-        (60., 6., 24., 6., false), (60., 12., 6., 24., false), (78., 12., 6., 12., false), (66., 18., 12., 6., false), (66., 30., 18., 6., false), (66., 24., 18., 6., true),
-        (90., 6., 18., 6., false), (90., 12., 6., 24., false), (108., 12., 6., 24., false), (96., 18., 12., 18., true),
-        (120., 6., 24., 6., false), (120., 12., 6., 18., false), (120., 30., 24., 6., false), (126., 18., 18., 12., true),
-        (150., 6., 24., 6., false), (150., 12., 6., 24., false), (168., 12., 6., 24., false), (156., 30., 12., 6., false), (156., 18., 12., 12., true),
-        (180., 6., 18., 6., false), (198., 0., 6., 36., false), (180., 12., 6., 24., false), (186., 30., 12., 6., false), (186., 18., 12., 12., true),
-        (210., 6., 24., 6., false), (210., 12., 6., 24., false), (228., 12., 6., 12., false), (216., 18., 12., 6., false), (216., 30., 18., 6., false), (216., 24., 18., 6., true),
+    // x, y, w, h in the logo's 204x42 units; `true` for a counter's lower half.
+    const RECTS: [(f32, f32, f32, f32, bool); 33] = [
+        // b
+        (6., 6., 18., 6., false), (0., 0., 6., 36., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true),
+        // r
+        (30., 6., 24., 6., false), (30., 12., 6., 24., false), (48., 12., 6., 12., false),
+        // o
+        (60., 6., 24., 6., false), (60., 12., 6., 24., false), (78., 12., 6., 24., false), (66., 30., 12., 6., false), (66., 18., 12., 12., true),
+        // c
+        (90., 6., 24., 6., false), (90., 12., 6., 18., false), (90., 30., 24., 6., false), (96., 18., 18., 12., true),
+        // o
+        (120., 6., 24., 6., false), (120., 12., 6., 24., false), (138., 12., 6., 24., false), (126., 30., 12., 6., false), (126., 18., 12., 12., true),
+        // d
+        (150., 6., 18., 6., false), (168., 0., 6., 36., false), (150., 12., 6., 24., false), (156., 30., 12., 6., false), (156., 18., 12., 12., true),
+        // e
+        (180., 6., 24., 6., false), (180., 12., 6., 24., false), (198., 12., 6., 12., false), (186., 18., 12., 6., false), (186., 30., 18., 6., false), (186., 24., 18., 6., true),
     ];
     // A picture, as Desktop's SVG and canvas are: right to left doesn't mirror it.
-    let mut logo = el().size(78.0 * 3.0 * k, 14.0 * 3.0 * k).dir(rune::Direction::Ltr);
+    let mut logo = el().size(68.0 * 3.0 * k, 14.0 * 3.0 * k).dir(rune::Direction::Ltr);
     for (x, y, w, h, counter) in RECTS {
         logo = logo.child(el().absolute(x * k, y * k).size(w * k, h * k).fill(if counter { weak } else { stem }));
     }
@@ -161,7 +167,7 @@ fn rest_geo(width: f32, top: Option<f32>, dark: bool) -> Geo {
     let content = (width - 48.0).min(880.0);
     let x = 24.0 + (width - 48.0 - content) / 2.0 + (content - span) / 2.0;
     let y = f64::from(top.unwrap_or(0.0));
-    Geo { panel: [0.0, 0.0, width, 0.0], logo: [x, y, span, span * 42.0 / 234.0], composer: None, wrap: None, radius: f64::from(opencode_ui::style::COMPOSER_RADIUS), dark }
+    Geo { panel: [0.0, 0.0, width, 0.0], logo: [x, y, span, span * 42.0 / 204.0], composer: None, wrap: None, radius: f64::from(opencode_ui::style::COMPOSER_RADIUS), dark }
 }
 
 /// The geometry the last layout put on screen, read while the egg is out (each read re-runs

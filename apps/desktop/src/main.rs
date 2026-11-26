@@ -1,4 +1,4 @@
-//! Thin native binary entrypoint for OpenCode (Rune) Desktop.
+//! Thin native binary entrypoint for Brocode Desktop.
 //!
 //! All shared application logic lives in [`opencode_desktop`] (`src/lib.rs`) so both the native
 //! desktop binary and `apps/web` (`wasm32`) compile the same library target without manifest

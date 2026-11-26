@@ -50,7 +50,7 @@ impl Lodger {
         c.pin_rot = (c.x - REST[0]) * 2.5;
         c.pin_scale = 1.0 + stress * 0.35;
         let (x, y) = (c.x, c.y);
-        let p = &mut self.poses[7];
+        let p = &mut self.poses[6];
         p.x = (x - REST[0]) * 0.12;
         p.y = (y - REST[1]) * 0.12;
         p.sx = 1.0 + stress * 0.05;
@@ -83,7 +83,7 @@ impl Lodger {
         }
         s.send(Event::Settled { phase: Phase::Snap });
         self.rest_hidden();
-        s.sound(Cue::Slot { column: 70.0, columns: 78.0, x: self.c.x, width: W }, self.now);
+        s.sound(Cue::Slot { column: 60.0, columns: 68.0, x: self.c.x, width: W }, self.now);
         self.blink_once();
     }
 
@@ -117,7 +117,7 @@ impl Lodger {
             self.land(0.38, s);
         }
         if land[2] {
-            s.sound(Cue::Slot { column: 75.0, columns: 78.0, x: PIN_SLOT[0], width: W }, self.now);
+            s.sound(Cue::Slot { column: 65.0, columns: 68.0, x: PIN_SLOT[0], width: W }, self.now);
         }
         if land[3] {
             self.land(0.32, s);
@@ -284,7 +284,7 @@ impl Lodger {
         let mut ran = [false; 2];
         let reached = run_cues(&SLOT_PACK, cue, t, |i| ran[i] = true);
         if ran[0] {
-            s.sound(Cue::Slot { column: 75.0, columns: 78.0, x: HOLE[0], width: W }, self.now);
+            s.sound(Cue::Slot { column: 65.0, columns: 68.0, x: HOLE[0], width: W }, self.now);
         }
         if ran[1] {
             self.blink_once();

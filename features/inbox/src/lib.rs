@@ -1,4 +1,4 @@
-//! Session prompt queue strip and durable prompt outbox for OpenCode (Rune).
+//! Session prompt queue strip and durable prompt outbox for Brocode.
 //!
 //! - [`queue`]: queued/steering prompt strip above the composer, drag-to-reorder and
 //!   edit-in-composer state machines, queue rewrite chains, and inbox SSE/listing reconciliation

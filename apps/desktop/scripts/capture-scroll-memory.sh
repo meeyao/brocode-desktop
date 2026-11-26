@@ -4,9 +4,9 @@
 set -eu
 OUT=${1:-captures/scroll-memory}
 mkdir -p "$OUT"
-cargo build -p opencode-desktop
+cargo build -p brocode-desktop
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-"$TARGET/debug/opencode-desktop" --fixture apps/desktop/assets/fixture.json \
+"$TARGET/debug/brocode-desktop" --fixture apps/desktop/assets/fixture.json \
   --scene session --script apps/desktop/scripts/scroll-memory.json --pointer \
   --size 1280x820 --scale 2 --theme dark --frames 480 --fps 120 \
   --video "$OUT/scroll-memory.mp4" --trace "$OUT/scroll-memory.jsonl" --trace-all

@@ -26,7 +26,7 @@ trained on (commit, Rune rev, rustc, processes, functions that ran).
 - **The instrumented build needs no big machine of your own:** it is whole-program (about 16 GB of
   memory for the one LTO module), and PR CI builds it. Open a draft pull request from a branch named
   `pgo-train/<anything>`: `release.ps1` then builds the Windows x64 exe with `-Cprofile-generate`
-  instead of with the profile, and the run's `build-opencode-rune-pr-windows-x64` artifact is the
+  instead of with the profile, and the run's `build-brocode-pr-windows-x64` artifact is the
   training exe (same runner, toolchain and release profile as the build that ships, so its symbol
   names are the shipped ones). Run the training against it, merge the `.profraw` files with the
   toolchain's `llvm-profdata merge --sparse`, commit the two files from a branch of `dev`, and close
@@ -72,7 +72,7 @@ branch with "no-profile" in its name) builds the release without it, to time wha
 - **After a pin bump, re-key it with the Windows one.** Name the names-draft
   `pgo-train/order-train-<sha>`: that one pull request builds both training exes (`release.ps1` looks
   for `pgo-train/` at the start, `build-app.sh` for "order-train" anywhere). Take
-  `Contents/MacOS/opencode-desktop` out of the `build-opencode-rune-pr-macos-arm64` artifact's zip and
+  `Contents/MacOS/opencode-desktop` out of the `build-brocode-pr-macos-arm64` artifact's zip and
   run `node scripts/pgo-rekey.mjs --counts apps/desktop/pgo/aarch64-apple-darwin.profdata --names <that exe>`
   `--out apps/desktop/pgo/aarch64-apple-darwin.profdata --stamp apps/desktop/pgo/aarch64-apple-darwin.txt`
   `--commit <sha> --rune <rev> --min-kept 90`. The tool reads the names and control-flow hashes from
@@ -111,7 +111,7 @@ pages and few others. Without it the same functions lie spread over the whole of
   1. Open a draft pull request from a branch with `order-train` in its name (or build with
      `OPENCODE_RUNE_PGO_TRAIN=1`). `build-app.sh` then builds Apple silicon with
      `-Cprofile-generate -Cllvm-args=-pgo-temporal-instrumentation`; the run's
-     `build-opencode-rune-pr-macos-arm64` artifact is the training exe. Never install that build.
+     `build-brocode-pr-macos-arm64` artifact is the training exe. Never install that build.
   2. Launch it a few times to its content, each with `LLVM_PROFILE_FILE=<dir>/launch-%p.profraw`,
      and quit it (the profile is written at exit).
   3. `apps/desktop/scripts/startup-order.sh <dir>/launch-*.profraw`, with the `llvm-profdata` of the

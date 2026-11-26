@@ -1,6 +1,6 @@
 //! Per-folder `rune` client MCP lifecycle, multi-window connection sharing, and session routing.
 //!
-//! OpenCode (Rune) attaches one WebSocket per open folder (`name=rune`) on the connected server.
+//! Brocode attaches one WebSocket per open folder (`name=rune`) on the connected server.
 //! Multiple windows open on the same folder share one [`ClientMcp`] connection through
 //! [`RuneMcpHub`], and every incoming `tools/call` is routed by `_meta["ai.opencode/sessionID"]`
 //! (and its parent chain) to the window and session tab showing it.
@@ -26,14 +26,14 @@ use opencode_kit::servers::ServerKey;
 use rune::{Tx, Waker};
 
 pub const MCP_NAME: &str = "rune";
-pub const SESSION_NOT_OPEN_ERROR: &str = "This session isn't open in OpenCode (Rune)";
+pub const SESSION_NOT_OPEN_ERROR: &str = "This session isn't open in Brocode";
 pub const REMOTE_BROWSER_MCP_ERROR: &str =
     "Local browser MCP tools are refused on remote servers to prevent access to the local machine network.";
 pub const RPC_ATTACHED_BROWSER_MCP_ERROR: &str =
     "This session is attached to the built-in experimental.browser tools; local browser_* MCP tools are refused.";
 /// Sent in `initialize.result.instructions` for forward compatibility when OpenCode surfaces
 /// instructions from attached client MCP sockets alongside configured MCP servers.
-pub const MCP_INSTRUCTIONS: &str = "OpenCode (Rune) UI tools for sessions open in OpenCode (Rune). Load the `rune-ui` skill before writing ```ui outlines.";
+pub const MCP_INSTRUCTIONS: &str = "Brocode UI tools for sessions open in Brocode. Load the `rune-ui` skill before writing ```ui outlines.";
 
 /// Whether an MCP tool name belongs to the legacy local `browser_*` / `browser_cdp` tool family.
 pub fn is_browser_tool(name: &str) -> bool {

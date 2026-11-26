@@ -1,6 +1,6 @@
 // What OpenCode Desktop (the official app) leaves in its `userData` folder, made up: a
 // `drafts.sqlite` with a window's tabs, drafts and attachment blobs up to a size, `opencode.settings`
-// and the window's frame. A new profile of OpenCode (Rune) seeds itself from it on its first launch
+// and the window's frame. A new profile of Brocode seeds itself from it on its first launch
 // (`crates/opencode-storage/src/native/seed`), which `launch.bench.ts` times.
 //
 //   bun perf/desktop-profile.ts <folder> [--mb 64] [--running]

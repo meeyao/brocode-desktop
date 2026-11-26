@@ -1,4 +1,4 @@
-// The launch of OpenCode (Rune), measured by strobe from the process's spawn: the four launches a
+// The launch of Brocode, measured by strobe from the process's spawn: the four launches a
 // person gets, against three sizes of profile. README.md beside this file says how to run it and
 // how to get a build with symbols.
 //
@@ -241,9 +241,9 @@ const launch = (profile: "fresh" | "warm") => ({ until: { milestone: "content_li
 
 export default bench({
   targets: {
-    none: app("none", "OpenCode (Rune), no profile"),
-    small: app("small", "OpenCode (Rune), small profile"),
-    big: app("big", "OpenCode (Rune), big profile"),
+    none: app("none", "Brocode, no profile"),
+    small: app("small", "Brocode, small profile"),
+    big: app("big", "Brocode, big profile"),
   },
   cases: {
     first: { primary: "launch.first_frame", hero: true, targets: ["none"], gpuCache: "cold", metrics, launch: launch("fresh") },

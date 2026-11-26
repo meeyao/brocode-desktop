@@ -286,7 +286,7 @@ unsafe fn describe(record: *const c_void, first_chance: bool) {
     // SAFETY: the caller's contract: a valid `EXCEPTION_RECORD`.
     let record = unsafe { &*record.cast::<Record>() };
     let mut out = Out { buf: &mut text[..], len: 0 };
-    out.str("opencode-rune ");
+    out.str("brocode ");
     out.str(crate::updater::build_version());
     out.str(if first_chance { ": first chance: exception 0x" } else { ": fatal exception 0x" });
     out.hex(u64::from(record.code), 8);
@@ -319,7 +319,7 @@ unsafe fn describe(record: *const c_void, first_chance: bool) {
     // From the faulting instruction on; all of it when the walk did not pass through that frame.
     let first = frames.iter().position(|&frame| frame.cast_const() == record.address).unwrap_or(0);
     for (i, &frame) in frames.iter().skip(first).take(SHOWN).enumerate() {
-        out.str(if i < 10 { "opencode-rune:   #0" } else { "opencode-rune:   #" });
+        out.str(if i < 10 { "brocode:   #0" } else { "brocode:   #" });
         out.dec(i as u64);
         out.str(" ");
         place(&mut out, name, frame);

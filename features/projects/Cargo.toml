@@ -1,7 +1,7 @@
 [package]
 name = "opencode-feature-projects"
 version = "0.0.1"
-description = "Project tracking, Home across servers, session import, and remote directory picker dialog for OpenCode (Rune)"
+description = "Project tracking, Home across servers, session import, and remote directory picker dialog for Brocode"
 edition = "2024"
 license.workspace = true
 publish = false

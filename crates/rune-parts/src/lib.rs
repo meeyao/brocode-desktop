@@ -1,7 +1,7 @@
 //! Parts agents compose into notes and chat replies: one catalog, one outline grammar, one checker.
 //!
 //! A ```` ```ui ```` fence holds an outline, a part name first on every line and kids indented two
-//! spaces under it. Compact cards and OpenCode (Rune) sessions draw the same outline with their own
+//! spaces under it. Compact cards and Brocode sessions draw the same outline with their own
 //! theme ([`view`], behind the `view` feature), and the checker gives agents errors they can act on.
 //!
 //! ```text

@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! opencode-desktop.exe --uninstall [--quiet] [--delete-data] [--plan] [--log <file>]
-//! %TEMP%\opencode-rune-uninstall-<pid>.exe --uninstall-cleanup --wait <pid> --root <install>
+//! %TEMP%\brocode-uninstall-<pid>.exe --uninstall-cleanup --wait <pid> --root <install>
 //!     [--caches] [--delete-data] [--log <file>]
 //! ```
 //!
@@ -17,7 +17,7 @@
 //! then itself. Only the folder the uninstall entry names is ever deleted, never the browser
 //! engine every app with a browser pane shares, and while another build that keeps its settings
 //! in the same folders is installed (another release channel; a pull request's build keeps its
-//! own, `rune-opencode.pr-<N>`) they stay. `--plan` prints what would go and does nothing.
+//! own, `brocode.pr-<N>`) they stay. `--plan` prints what would go and does nothing.
 //!
 //! What it deletes is checked first: the install folder must hold the app and be none of the
 //! user's own folders; the updater's folders beside it are allow-listed by name; a data folder
@@ -171,7 +171,7 @@ fn uninstall(a: &Args) -> i32 {
 /// running program can't do to its own folder.
 fn start_cleanup(root: &Path, caches: bool, delete_data: bool, log: Option<&Path>) -> std::io::Result<u32> {
     let temp = std::env::temp_dir();
-    let copy = temp.join(format!("opencode-rune-uninstall-{}.exe", std::process::id()));
+    let copy = temp.join(format!("brocode-uninstall-{}.exe", std::process::id()));
     std::fs::copy(std::env::current_exe()?, &copy)?;
     // A packaged build's exe loads the app from the library that carries its own name
     // (`apps/desktop-thin`): the copy gets one too. A hard link where it can be one: the library
@@ -255,7 +255,7 @@ fn plan(root: &Path, caches: bool, delete_data: bool) -> Plan {
 /// The data folders the flags ask for, each checked: inside the folder Windows names for it
 /// (`SHGetKnownFolderPath`, so no environment variable steers a delete; a `RUNE_DIRS_ROOT` run's
 /// own root instead), with no junction or link on the way down to it. A folder inside another
-/// that goes too goes with it (`%LOCALAPPDATA%\rune-opencode` holds `Cache` and `Logs`).
+/// that goes too goes with it (`%LOCALAPPDATA%\brocode` holds `Cache` and `Logs`).
 fn data_targets(caches: bool, delete_data: bool, exe: &Path) -> Result<Vec<PathBuf>, String> {
     let app = crate::dirs::app().ok_or("the app's folders aren't known")?;
     let rooted = app.is_rooted();
@@ -323,16 +323,16 @@ fn data_free(exe: &Path) -> Result<(), String> {
 }
 
 /// The data folder an installed build keeps (`dirs::app`), from its id: a pull request's build,
-/// stable and beta their own, dev (and a local build) `rune-opencode`; every build
-/// `rune-opencode` under this run's `RUNE_DIRS_ROOT`.
+/// stable and beta their own, dev (and a local build) `brocode`; every build
+/// `brocode` under this run's `RUNE_DIRS_ROOT`.
 fn folder_of(id: &str) -> String {
     if crate::dirs::rooted() {
-        return "rune-opencode".to_owned();
+        return "brocode".to_owned();
     }
-    match id.strip_prefix("anomaly.opencode-rune.") {
-        Some(own @ ("stable" | "beta")) => format!("rune-opencode.{own}"),
-        Some(own) => own.strip_prefix("pr.").map_or_else(|| "rune-opencode".to_owned(), |n| format!("rune-opencode.pr-{n}")),
-        None => "rune-opencode".to_owned(),
+    match id.strip_prefix("com.apibrother.brocode.") {
+        Some(own @ ("stable" | "beta")) => format!("brocode.{own}"),
+        Some(own) => own.strip_prefix("pr.").map_or_else(|| "brocode".to_owned(), |n| format!("brocode.pr-{n}")),
+        None => "brocode".to_owned(),
     }
 }
 
@@ -466,7 +466,7 @@ mod dialog {
         let content = wide(if own_data {
             "This removes the app and its Start menu and desktop shortcuts. Your OpenCode sessions stay on the server."
         } else {
-            "This removes the app and its Start menu and desktop shortcuts. Its settings stay for the other OpenCode (Rune) installed, and your OpenCode sessions stay on the server."
+            "This removes the app and its Start menu and desktop shortcuts. Its settings stay for the other Brocode installed, and your OpenCode sessions stay on the server."
         });
         let verification = wide("Also delete my settings, tabs, drafts and caches");
         let label = wide("Uninstall");

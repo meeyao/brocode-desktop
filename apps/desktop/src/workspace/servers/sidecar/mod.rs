@@ -233,7 +233,7 @@ fn spawn_connect(attempt: Attempt, mode: ConnectMode) {
         match ensure_service(mode, &m.disposed) {
             Ok(data) => dispatch(m, Event::ConnectSucceeded { attempt, data }),
             Err(error) => {
-                eprintln!("opencode-rune: local background service failed: {error}");
+                eprintln!("brocode: local background service failed: {error}");
                 dispatch(m, Event::ConnectFailed { attempt, error });
             }
         }

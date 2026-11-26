@@ -4,9 +4,9 @@
 set -eu
 OUT=${1:-captures/layout-switch}
 mkdir -p "$OUT"
-cargo build -p opencode-desktop
+cargo build -p brocode-desktop
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-"$TARGET/debug/opencode-desktop" --fixture apps/desktop/assets/fixture.json \
+"$TARGET/debug/brocode-desktop" --fixture apps/desktop/assets/fixture.json \
   --scene settings --script apps/desktop/scripts/layout-switch.json --pointer \
   --size 1280x820 --scale 2 --theme dark --frames 420 --fps 120 \
   --video "$OUT/layout-switch.mp4" --trace "$OUT/layout-switch.jsonl" --trace-all

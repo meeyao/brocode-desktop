@@ -145,5 +145,5 @@ if [ "$build_desktop" = false ] && [ "$build_engine" = false ]; then
 elif [ "$CHANNEL" = engine ]; then
   echo "Planned browser engine ($CHANNEL): $engine_release_version ($engine_version) at $SHA." >> "$GITHUB_STEP_SUMMARY"
 else
-  echo "Planned OpenCode (Rune) ($CHANNEL): $release_channel $release_version${tag:+ ($tag)}, engine $engine_release_version (build-engine=$build_engine), every platform at $SHA." >> "$GITHUB_STEP_SUMMARY"
+  echo "Planned Brocode ($CHANNEL): $release_channel $release_version${tag:+ ($tag)}, engine $engine_release_version (build-engine=$build_engine), every platform at $SHA." >> "$GITHUB_STEP_SUMMARY"
 fi

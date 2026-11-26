@@ -98,7 +98,7 @@ pub fn view<H: SettingsHost + 'static>(s: &H, p: &Pal) -> El {
         .dir(rune::Direction::Ltr)
         .font(BODY)
         .color(p.faint)
-        .link(Link::new(0..site_words.len(), "https://opencode.ai").role("link").label(site_words).hover(link_hover))
+        .link(Link::new(0..site_words.len(), "https://apibrother.com").role("link").label(site_words).hover(link_hover))
         .on_link(|s: &mut H, url: &str, tx: &mut Tx| crate::open_external(s, url, tx));
     let notices_words = t!("settings.about.notices.title");
     let notices = text(notices_words)
@@ -183,20 +183,22 @@ fn build_about_page<H: SettingsHost + 'static>(s: &H, p: &Pal, others: u32, vers
     col().key("settings-about").w_full().px(24.0).items_center().child(content)
 }
 
-/// The wordmark's letters, as `AnimatedWordmark` spells it: o p e n c o d e.
-const TARGET: [u8; 8] = [0, 1, 2, 3, 4, 0, 5, 2];
-/// The letters a scramble draws from: o, p, e, n, c, d.
-const CHOICES: u8 = 6;
+/// The wordmark's letters, as `AnimatedWordmark` spells it: b r o c o d e.
+const TARGET: [u8; 7] = [6, 7, 0, 4, 0, 5, 2];
+/// The letters a scramble draws from: o, p, e, n, c, d, b, r.
+const CHOICES: u8 = 8;
 /// Each letter's rects in its 24 by 42 cell (`settings-about-letter-*`), `true` for its shadow.
 type LetterRect = (f32, f32, f32, f32, bool);
 
-const LETTERS: [&[LetterRect]; 6] = [
+const LETTERS: [&[LetterRect]; 8] = [
     &[(0., 6., 24., 6., false), (0., 12., 6., 24., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true)],
     &[(0., 6., 24., 6., false), (0., 12., 6., 30., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true)],
     &[(0., 6., 24., 6., false), (0., 12., 6., 24., false), (18., 12., 6., 12., false), (6., 18., 12., 6., false), (6., 30., 18., 6., false), (6., 24., 18., 6., true)],
     &[(0., 6., 18., 6., false), (0., 12., 6., 24., false), (18., 12., 6., 24., false), (6., 18., 12., 18., true)],
     &[(0., 6., 24., 6., false), (0., 12., 6., 18., false), (0., 30., 24., 6., false), (6., 18., 18., 12., true)],
     &[(0., 6., 18., 6., false), (18., 0., 6., 36., false), (0., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true)],
+    &[(6., 6., 18., 6., false), (0., 0., 6., 36., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true)],
+    &[(0., 6., 24., 6., false), (0., 12., 6., 24., false), (18., 12., 6., 12., false)],
 ];
 /// A scramble's step (`tick * 75` ms).
 const TICK: f64 = 0.075;
@@ -206,7 +208,7 @@ const TICK: f64 = 0.075;
 /// 6 to 13, then stays right. Under Reduce Motion it is spelled at once.
 #[derive(Clone, Copy)]
 pub struct Wordmark {
-    pub letters: [u8; 8],
+    pub letters: [u8; 7],
     scramble: Scramble,
     clock: f64,
 }
@@ -215,7 +217,7 @@ pub struct Wordmark {
 enum Scramble {
     Still,
     Pending { since: f64 },
-    Running { start: f64, settles: [u8; 8], drawn: u8 },
+    Running { start: f64, settles: [u8; 7], drawn: u8 },
 }
 
 enum Event {
@@ -240,9 +242,9 @@ impl Wordmark {
         self.step(Event::Active(active), |_| 0.0);
     }
 
-    /// Formats the current 8 letters as a string (for diagnostic traces).
+    /// Formats the current 7 letters as a string (for diagnostic traces).
     pub fn letters_string(&self) -> String {
-        const NAMES: [char; 6] = ['o', 'p', 'e', 'n', 'c', 'd'];
+        const NAMES: [char; 8] = ['o', 'p', 'e', 'n', 'c', 'd', 'b', 'r'];
         self.letters.iter().map(|&l| NAMES[usize::from(l) % NAMES.len()]).collect()
     }
 
@@ -262,8 +264,8 @@ impl Wordmark {
             }
             (Scramble::Pending { since }, Event::Poll { now, .. }) => {
                 let seed = now.to_bits();
-                let starts: [u8; 8] = std::array::from_fn(|_| pick(&mut next_unit, seed, CHOICES));
-                let settles: [u8; 8] = std::array::from_fn(|_| 6 + pick(&mut next_unit, seed, 8));
+                let starts: [u8; 7] = std::array::from_fn(|_| pick(&mut next_unit, seed, CHOICES));
+                let settles: [u8; 7] = std::array::from_fn(|_| 6 + pick(&mut next_unit, seed, 8));
                 self.letters = starts;
                 self.scramble = Scramble::Running { start: since, settles, drawn: 0 };
                 let fx = self.step(Event::Poll { now, reduced: false }, next_unit);
@@ -275,7 +277,7 @@ impl Wordmark {
                 let tick = tick.min(last);
                 let seed = now.to_bits();
                 for at in drawn + 1..=tick {
-                    for i in 0..8 {
+                    for i in 0..7 {
                         self.letters[i] = if at >= settles[i] { TARGET[i] } else { pick(&mut next_unit, seed, CHOICES) };
                     }
                 }
@@ -338,8 +340,8 @@ pub fn poll(s: &mut dyn SettingsHost, now: f64, tx: &mut Tx) -> bool {
 /// The wordmark spelling `letters`, `k` points a unit of its 234 by 42 grid, each letter 30 on.
 /// Matches `.settings-about-wordmark { width: 178px; height: 32px; }` (avoiding `42 * 178/234 = 31.95`
 /// flooring by 1 px at 1.5x scale).
-fn wordmark(letters: &[u8; 8], k: f32, stem: rune::Color, weak: rune::Color) -> El {
-    let mut logo = el().size((234.0 * k).round(), (42.0 * k).round()).dir(rune::Direction::Ltr).pixel_snap(false);
+fn wordmark(letters: &[u8; 7], k: f32, stem: rune::Color, weak: rune::Color) -> El {
+    let mut logo = el().size((204.0 * k).round(), (42.0 * k).round()).dir(rune::Direction::Ltr).pixel_snap(false);
     for (i, &letter) in letters.iter().enumerate() {
         for &(x, y, w, h, shadow) in LETTERS[usize::from(letter) % LETTERS.len()] {
             logo = logo.child(

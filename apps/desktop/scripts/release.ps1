@@ -1,4 +1,4 @@
-# Builds OpenCode (Rune) as it ships: `cargo build --release` (fat LTO and one codegen unit, from
+# Builds Brocode as it ships: `cargo build --release` (fat LTO and one codegen unit, from
 # Cargo.toml's release profile) with the profile-guided optimisation profile of the target,
 # `apps/desktop/pgo/<target>.profdata`, when there is one. package.ps1 builds the app through this,
 # and so should any release build that times the app: without the profile it's 14-22 % slower per

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-OpenCode (Rune) incorporates the third-party software, fonts, dictionaries, and libraries listed below. Original copyright notices and license texts are reproduced verbatim for attribution and redistribution compliance.
+Brocode incorporates the third-party software, fonts, dictionaries, and libraries listed below. Original copyright notices and license texts are reproduced verbatim for attribution and redistribution compliance.
 
 ---
 
@@ -452,7 +452,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## 6. MPL-2.0 Rust Dependencies
 
-The following 14 crates in `Cargo.lock` are licensed under the **Mozilla Public License, Version 2.0** (`https://mozilla.org/MPL/2.0/`). OpenCode (Rune) uses these crates unmodified; their complete source code is publicly available at the upstream repositories below and on crates.io (`https://crates.io/crates/<name>/<version>`). In accordance with MPL-2.0 Section 3.2(a), any covered source code remains available under the terms of the MPL-2.0.
+The following 14 crates in `Cargo.lock` are licensed under the **Mozilla Public License, Version 2.0** (`https://mozilla.org/MPL/2.0/`). Brocode uses these crates unmodified; their complete source code is publicly available at the upstream repositories below and on crates.io (`https://crates.io/crates/<name>/<version>`). In accordance with MPL-2.0 Section 3.2(a), any covered source code remains available under the terms of the MPL-2.0.
 
 | Crate | Version | Source |
 | --- | --- | --- |

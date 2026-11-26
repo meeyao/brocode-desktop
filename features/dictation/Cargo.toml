@@ -1,7 +1,7 @@
 [package]
 name = "opencode-feature-dictation"
 version = "0.0.1"
-description = "Hex voice dictation state machine, presence watcher, and composer toolbar controls for OpenCode (Rune)"
+description = "Hex voice dictation state machine, presence watcher, and composer toolbar controls for Brocode"
 edition.workspace = true
 license.workspace = true
 publish = false

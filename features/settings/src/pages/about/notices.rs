@@ -1,5 +1,5 @@
 //! Settings › About › Third-party notices (`settings/about/notices/dialog.tsx`): an x-large
-//! scrollable dialog listing OpenCode (Rune)'s bundled third-party notices, clickable upstream
+//! scrollable dialog listing Brocode's bundled third-party notices, clickable upstream
 //! repository links, verbatim notices, and collapsible full license texts parsed from the
 //! repository's `THIRD_PARTY_NOTICES.md`.
 

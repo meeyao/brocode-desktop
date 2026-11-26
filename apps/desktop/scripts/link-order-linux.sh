@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The Linux link of opencode-desktop with the functions a launch runs laid out first and together,
+# The Linux link of brocode-desktop with the functions a launch runs laid out first and together,
 # so a launch whose exe is not in memory reads few pages of it. Cargo calls this as the linker for
 # the Linux targets (`.cargo/config.toml`); every link but the app's exe goes to cc untouched.
 #
@@ -33,7 +33,7 @@ if [ -z "$out" ]; then
   [ -n "$response" ] && [ -f "$response" ] && out=$(grep -A1 -x -e '"-o"' -e '-o' "$response" | sed -n 2p | sed -e 's/^"//' -e 's/"$//')
 fi
 case "$(basename "${out:-none}")" in
-  opencode-desktop | opencode_desktop-*) ;;
+  brocode-desktop | opencode_desktop-*) ;;
   *) exec cc "$@" ;;
 esac
 [ "${OPENCODE_RUNE_LINK_ORDER:-1}" = 1 ] || exec cc "$@"

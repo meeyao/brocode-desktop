@@ -1,6 +1,6 @@
 //! Pure-Rust Rune client for the on-demand `OpenCode Browser Engine` CEF sidecar.
 //!
-//! Keeps `OpenCode (Rune).app` small (~8 MB) and free of C++/CEF dependencies:
+//! Keeps `Brocode.app` small (~8 MB) and free of C++/CEF dependencies:
 //! - Finds the installed engine, or fetches it from the build's source (`source.rs`) and checks it against
 //!   the build's trust rule before anything of it runs: in the background once the app is up
 //!   (`BrowserHost::fetch_in_background`, resumable, on a background-priority thread), on first

@@ -8,8 +8,8 @@
 //!                                                   uninstall entry all point in here
 //! %LOCALAPPDATA%\Programs\.OpenCode Rune.staged\    the next version, verified, beside it
 //! %LOCALAPPDATA%\Programs\.OpenCode Rune.old-<pid>\ the previous one while the swap runs
-//! %LOCALAPPDATA%\rune-opencode\Cache\Updates\       downloads, the helper's copy and its log
-//! %LOCALAPPDATA%\rune-opencode\Cache\Updates\ready  the version staged, so a restart knows it
+//! %LOCALAPPDATA%\brocode\Cache\Updates\       downloads, the helper's copy and its log
+//! %LOCALAPPDATA%\brocode\Cache\Updates\ready  the version staged, so a restart knows it
 //! ```
 //!
 //! Why: a per-user folder needs no administrator to replace, as Hex's and VS Code's user
@@ -451,7 +451,7 @@ pub fn beside(root: &Path, what: &str) -> PathBuf {
 
 fn check_replaceable(root: &Path) -> Result<(), String> {
     let parent = root.parent().ok_or_else(|| "The install folder has no parent folder.".to_owned())?;
-    let probe = parent.join(format!(".opencode-rune-update-probe-{}", std::process::id()));
+    let probe = parent.join(format!(".brocode-update-probe-{}", std::process::id()));
     std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)

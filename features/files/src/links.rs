@@ -4,7 +4,7 @@
 //!
 //! | Link | Opens |
 //! | --- | --- |
-//! | `https:`, `mailto:`, `opencode-rune:`, any scheme but `file:` | The browser or the app that owns it (live runs only) |
+//! | `https:`, `mailto:`, `brocode:`, any scheme but `file:` | The browser or the app that owns it (live runs only) |
 //! | `docs/plan.md`, `./x.md`, `../x.md`, `/abs/in/folder`, `~/…`, `file://…` | The file's tab, at `#L12`, `#L12-L20`, `:12` or `:12-20`; a `#heading` scrolls a rendered file to it |
 //! | An HTML file in the session's folder, on the app's own server with the browser on and the window wide | A page in the browser pane (`fileOrPage`, [`FilesHost::opens_as_page`]) |
 //! | A file outside the session's folder | Revealed in the file manager on a local fixed drive (never executed; UNC/device paths refused before touching disk) |
@@ -123,7 +123,7 @@ pub(crate) fn is_bare_word(path: &str) -> bool {
         && !path.contains(char::is_whitespace)
 }
 
-/// Whether `href` starts with a URL scheme (`https:`, `mailto:`, `opencode-rune:`) rather than a path
+/// Whether `href` starts with a URL scheme (`https:`, `mailto:`, `brocode:`) rather than a path
 /// with a line (`README.md:12`).
 fn scheme(href: &str) -> bool {
     let Some((head, rest)) = href.split_once(':') else { return false };

@@ -1,6 +1,6 @@
 //! The live app's motion log: every drawn frame of real use is watched for the glitches the
 //! motion gate looks for on fixtures, and each one seen is appended as one JSON line to
-//! `motion.jsonl` in the app's log folder (`~/Library/Logs/opencode-rune` on macOS; see
+//! `motion.jsonl` in the app's log folder (`~/Library/Logs/brocode` on macOS; see
 //! `crate::dirs`).
 //!
 //! It runs in debug builds, and in a release build started with `--motion-log` ([`wanted`]);

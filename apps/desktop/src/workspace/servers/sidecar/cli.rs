@@ -117,7 +117,7 @@ fn dev_executable_name() -> &'static str {
 }
 
 fn cli_binary_name() -> &'static str {
-    if cfg!(windows) { "opencode.exe" } else { "opencode" }
+    if cfg!(windows) { "brocode.exe" } else { "brocode" }
 }
 
 fn current_arch() -> &'static str {
@@ -250,7 +250,7 @@ fn resolve_uncached(env: &BTreeMap<String, String>, isolated: bool) -> Result<Re
         return Ok(ResolvedCli { version: None, command, staged_binary: None, bundled: false });
     }
 
-    Err("OpenCode CLI executable not found. Install OpenCode or run opencode serve --service.".into())
+    Err("brocode CLI executable not found. Install brocode or run brocode serve --service.".into())
 }
 
 fn find_bundled_cli(isolated: bool) -> Option<PathBuf> {
@@ -265,7 +265,7 @@ fn find_bundled_cli(isolated: bool) -> Option<PathBuf> {
     candidates.push(exe_dir.join(name));
     #[cfg(target_os = "linux")]
     if let Some(prefix) = exe_dir.parent() {
-        candidates.push(prefix.join("share").join("opencode-rune").join(name));
+        candidates.push(prefix.join("share").join("brocode").join(name));
     }
     candidates.into_iter().find(|p| p.is_file())
 }
@@ -369,23 +369,28 @@ fn find_system_or_official_cli(env: &BTreeMap<String, String>) -> Option<Vec<Str
         return Some(cmd);
     }
 
-    // 2. Standard user install locations.
-    let bin_name = cli_binary_name();
+    // 2. Standard user install locations (brocode first, then OpenCode for compatibility).
+    let bin_names: [&str; 2] = if cfg!(windows) { ["brocode.exe", "opencode.exe"] } else { ["brocode", "opencode"] };
     let mut candidates = Vec::new();
     if let Some(home) = rune::dirs::home_from(|k| std::env::var_os(k)) {
-        candidates.push(home.join(".opencode").join("bin").join(bin_name));
-        candidates.push(home.join(".bun").join("bin").join(bin_name));
-        candidates.push(home.join(".local").join("bin").join(bin_name));
+        for name in bin_names {
+            candidates.push(home.join(".brocode").join("bin").join(name));
+            candidates.push(home.join(".opencode").join("bin").join(name));
+            candidates.push(home.join(".bun").join("bin").join(name));
+            candidates.push(home.join(".local").join("bin").join(name));
+        }
     }
     #[cfg(target_os = "macos")]
-    {
-        candidates.push(PathBuf::from("/opt/homebrew/bin/opencode"));
-        candidates.push(PathBuf::from("/usr/local/bin/opencode"));
+    for dir in ["/opt/homebrew/bin", "/usr/local/bin"] {
+        for name in bin_names {
+            candidates.push(PathBuf::from(dir).join(name));
+        }
     }
     #[cfg(target_os = "linux")]
-    {
-        candidates.push(PathBuf::from("/usr/local/bin/opencode"));
-        candidates.push(PathBuf::from("/usr/bin/opencode"));
+    for dir in ["/usr/local/bin", "/usr/bin"] {
+        for name in bin_names {
+            candidates.push(PathBuf::from(dir).join(name));
+        }
     }
     if let Some(found) = candidates.into_iter().find(|p| p.is_file()) {
         return Some(command_for_path(&found));
@@ -410,7 +415,7 @@ fn search_path(path_var: &str) -> Option<Vec<String>> {
         }
         #[cfg(windows)]
         if fallback_cmd.is_none() {
-            for ext in ["opencode.cmd", "opencode.bat"] {
+            for ext in ["brocode.cmd", "brocode.bat", "opencode.cmd", "opencode.bat"] {
                 let candidate = dir.join(ext);
                 if candidate.is_file() {
                     fallback_cmd = Some(candidate);

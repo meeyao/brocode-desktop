@@ -1,4 +1,4 @@
-//! Cohesive composer input subsystems for OpenCode (Rune):
+//! Cohesive composer input subsystems for Brocode:
 //! - [`attachments`]: inline/path file attachments, remote upload runner & state machine, upload
 //!   progress toast, and reply-image fixture scene helper over [`session_view::images::MediaStore`].
 //! - [`dropzone`]: file drag-and-drop overlay state machine and frosted/striped visual layer.

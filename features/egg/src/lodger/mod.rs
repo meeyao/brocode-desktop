@@ -2,7 +2,7 @@
 //! when the pointer comes near; dragging them pulls the lodger and a single corner pin out on a
 //! stretchy neck; pull far enough and the pin sets off the pin board. From its perch beside the
 //! board it can be carried back into the hole, tapped to hop, or dropped on the composer to play.
-//! Lengths are the logo's 234x42 units; the stage maps them to panel points.
+//! Lengths are the logo's 204x42 units; the stage maps them to panel points.
 
 mod steps;
 pub mod render;
@@ -10,19 +10,19 @@ pub mod render;
 use super::wordmark::{self, Event, State};
 use super::{FrameLoop, FrameLoopEvent};
 
-pub const W: f64 = 234.0;
-pub const HOLE: [f64; 2] = [222.0, 15.0];
-pub const REST: [f64; 2] = [222.0, 21.0];
-pub const PIN_SLOT: [f64; 2] = [226.5, 10.5];
+pub const W: f64 = 204.0;
+pub const HOLE: [f64; 2] = [192.0, 15.0];
+pub const REST: [f64; 2] = [192.0, 21.0];
+pub const PIN_SLOT: [f64; 2] = [196.5, 10.5];
 pub const GROUND: f64 = 36.0;
-pub const HOME: f64 = 246.0;
+pub const HOME: f64 = 216.0;
 const SLIP: f64 = 60.0;
 const HOLE_MAGNET: f64 = 24.0;
 /// A blink (`blinkOnce`): the eyes close to a tenth and open again over 160 ms, eased in and out.
 pub const BLINK: f64 = 0.16;
 
 /// Each letter's bottom-centre pivot.
-pub const LETTER_CX: [f64; 8] = [12.0, 42.0, 72.0, 102.0, 132.0, 162.0, 192.0, 222.0];
+pub const LETTER_CX: [f64; 7] = [12.0, 42.0, 72.0, 102.0, 132.0, 162.0, 192.0];
 
 /// Everything the lodger draws, as `render` writes it (`c` in Desktop).
 #[derive(Clone, Copy, Debug)]
@@ -122,7 +122,7 @@ pub enum Ask {
 
 pub struct Lodger {
     pub c: Critter,
-    pub poses: [LetterPose; 8],
+    pub poses: [LetterPose; 7],
     pub pointer: Pointer,
     /// Squash and stretch on landings: when and how hard (`impacts`).
     pub impacts: Vec<(f64, f64)>,
@@ -145,7 +145,7 @@ impl Lodger {
     pub fn new(still: bool, stage: Stage) -> Lodger {
         Lodger {
             c: Critter::default(),
-            poses: [LetterPose::REST; 8],
+            poses: [LetterPose::REST; 7],
             pointer: Pointer { x: HOLE[0], y: HOLE[1], inside: false, down_x: HOLE[0], down_y: HOLE[1] },
             impacts: Vec::with_capacity(8),
             blink: Blink::Open,
@@ -166,7 +166,7 @@ impl Lodger {
     }
 
     fn reset_poses(&mut self, opacity: f64) {
-        self.poses = [LetterPose { opacity, ..LetterPose::REST }; 8];
+        self.poses = [LetterPose { opacity, ..LetterPose::REST }; 7];
     }
 
     /// Panel points to logo units (`toUnits`).

@@ -2,26 +2,26 @@
 //!
 //! | What | macOS | Windows |
 //! | --- | --- | --- |
-//! | The app's database (`opencode.sqlite`: settings, windows, tabs, drafts, prompt history) | `~/Library/Application Support/rune-opencode` | `%APPDATA%\rune-opencode` |
-//! | Caches (Office fonts, updates) | `~/Library/Caches/rune-opencode` | `%LOCALAPPDATA%\rune-opencode\Cache` |
-//! | Motion log, frame diagnostics (`perf/`) | `~/Library/Logs/opencode-rune` | `%LOCALAPPDATA%\rune-opencode\Logs` |
-//! | Update downloads and records | `~/Library/Caches/<team bundle id>/Updates` | `%LOCALAPPDATA%\rune-opencode\Cache\Updates` |
+//! | The app's database (`opencode.sqlite`: settings, windows, tabs, drafts, prompt history) | `~/Library/Application Support/brocode` | `%APPDATA%\brocode` |
+//! | Caches (Office fonts, updates) | `~/Library/Caches/brocode` | `%LOCALAPPDATA%\brocode\Cache` |
+//! | Motion log, frame diagnostics (`perf/`) | `~/Library/Logs/brocode` | `%LOCALAPPDATA%\brocode\Logs` |
+//! | Update downloads and records | `~/Library/Caches/<team bundle id>/Updates` | `%LOCALAPPDATA%\brocode\Cache\Updates` |
 //! | Browser engine: installed versions, browser profiles (shared with every app with a browser pane) | `~/Library/Application Support/co.anomaly.opencode` | `%LOCALAPPDATA%\co.anomaly.opencode` |
 //!
 //! Linux follows XDG. The folder names differ from OpenCode Desktop's (`ai.opencode.desktop*`),
 //! so the two apps never share files. `RUNE_DIRS_ROOT=<root>` moves every folder this app writes
 //! under `<root>` for an isolated run.
 //!
-//! A debug build keeps its own folders, `rune-opencode.debug` in place of `rune-opencode`, unless
+//! A debug build keeps its own folders, `brocode.debug` in place of `brocode`, unless
 //! `RUNE_DIRS_ROOT` places them: a development or harness run never reads or writes the profile a
 //! release build keeps, as OpenCode Desktop's unpackaged runs keep `ai.opencode.desktop.dev`
 //! apart from the release's (`packages/desktop/src/main/constants.ts`, `APP_ID`). A pull
-//! request's build (`anomaly.opencode-rune.pr.<N>`) keeps `rune-opencode.pr-<N>`, as each of
+//! request's build (`com.apibrother.brocode.pr.<N>`) keeps `brocode.pr-<N>`, as each of
 //! OpenCode Desktop's channels has its own `userData`: installing, running or uninstalling one
-//! never touches another's profile (a `RUNE_DIRS_ROOT` run, apart already, keeps `rune-opencode`
-//! under its root). Stable and beta builds keep `rune-opencode.stable` and `rune-opencode.beta`
+//! never touches another's profile (a `RUNE_DIRS_ROOT` run, apart already, keeps `brocode`
+//! under its root). Stable and beta builds keep `brocode.stable` and `brocode.beta`
 //! (apps of their own beside dev's, as OpenCode Desktop's Dev, Beta and production apps are);
-//! dev keeps `rune-opencode`. The browser engine's folder stays shared.
+//! dev keeps `brocode`. The browser engine's folder stays shared.
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -30,15 +30,15 @@ use rune::dirs::AppDirs;
 
 use crate::App;
 
-const APP_ID: &str = "rune-opencode";
-const DEBUG_APP_ID: &str = "rune-opencode.debug";
+const APP_ID: &str = "brocode";
+const DEBUG_APP_ID: &str = "brocode.debug";
 
 /// The app's folders, for code that removes them (`install`).
 pub(crate) fn app() -> Option<&'static AppDirs> {
     static DIRS: OnceLock<Option<AppDirs>> = OnceLock::new();
     DIRS.get_or_init(|| {
         let dirs = AppDirs::new(APP_ID)?;
-        // A `RUNE_DIRS_ROOT` run is apart already, and the harness seeds `rune-opencode` there.
+        // A `RUNE_DIRS_ROOT` run is apart already, and the harness seeds `brocode` there.
         if dirs.is_rooted() {
             return Some(dirs);
         }
@@ -47,18 +47,18 @@ pub(crate) fn app() -> Option<&'static AppDirs> {
     .as_ref()
 }
 
-/// A release build's folders' name: `rune-opencode`, or a pull request's build's own
-/// `rune-opencode.pr-<N>` (its bundle id, `anomaly.opencode-rune.pr.<N>`, is set at build time).
+/// A release build's folders' name: `brocode`, or a pull request's build's own
+/// `brocode.pr-<N>` (its bundle id, `com.apibrother.brocode.pr.<N>`, is set at build time).
 fn release_id() -> &'static str {
     static ID: OnceLock<String> = OnceLock::new();
     ID.get_or_init(pr_id)
 }
 
 fn pr_id() -> String {
-    match option_env!("OPENCODE_RUNE_BUNDLE_ID").and_then(|id| id.strip_prefix("anomaly.opencode-rune.pr.")) {
+    match option_env!("OPENCODE_RUNE_BUNDLE_ID").and_then(|id| id.strip_prefix("com.apibrother.brocode.pr.")) {
         Some(n) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => format!("{APP_ID}.pr-{n}"),
         // Stable and beta are apps of their own beside dev's (`win_install::side_by_side`), each
-        // with its own `userData` as OpenCode Desktop's channels have; dev keeps `rune-opencode`.
+        // with its own `userData` as OpenCode Desktop's channels have; dev keeps `brocode`.
         _ => match option_env!("OPENCODE_RUNE_BUILD_CHANNEL") {
             Some(c @ ("stable" | "beta")) => format!("{APP_ID}.{c}"),
             _ => APP_ID.to_owned(),
@@ -90,7 +90,7 @@ pub fn cache() -> Option<PathBuf> {
 /// macOS keeps the folder it always had.
 pub fn logs() -> Option<PathBuf> {
     let app = app()?;
-    Some(if cfg!(target_os = "macos") { app.sibling("opencode-rune").logs().to_owned() } else { app.logs().to_owned() })
+    Some(if cfg!(target_os = "macos") { app.sibling("brocode").logs().to_owned() } else { app.logs().to_owned() })
 }
 
 /// The motion log (`motion.jsonl`).
@@ -104,8 +104,8 @@ pub fn motion_log() -> Option<PathBuf> {
 pub fn updates() -> Option<PathBuf> {
     let app = app()?;
     let bundle = match option_env!("OPENCODE_RUNE_BUILD_CHANNEL") {
-        Some(c @ ("stable" | "beta")) => format!("anomaly.opencode-rune.{c}"),
-        _ => "anomaly.opencode-rune".to_owned(),
+        Some(c @ ("stable" | "beta")) => format!("com.apibrother.brocode.{c}"),
+        _ => "com.apibrother.brocode".to_owned(),
     };
     let cache = if cfg!(target_os = "macos") { app.sibling(&bundle).cache().to_owned() } else { app.cache().to_owned() };
     Some(cache.join("Updates"))

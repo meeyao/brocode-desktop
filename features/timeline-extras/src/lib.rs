@@ -1,4 +1,4 @@
-//! Cohesive session timeline interaction docks and live row helpers for OpenCode (Rune):
+//! Cohesive session timeline interaction docks and live row helpers for Brocode:
 //! - [`todos`]: agent plan pill, floating todo list, and completion fill/strike animations over [`TodosHost`].
 //! - [`permission`]: permission/form reply state machines, timeout orchestration, and wire-error recovery over [`PermissionHost`].
 //! - [`question`]: question dock host boundary, reply state machine, and long-question fixtures over [`QuestionHost`].

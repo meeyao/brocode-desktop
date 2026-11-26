@@ -326,7 +326,7 @@ A plugin is its folder and nothing else: `plugin.toml`, `*.luau`, `.luaurc`, `lo
 | `<data>/plugins/<id>/` | Installed for every launch. The first run asks. It can't take a built-in's id. |
 | `<config>/plugins-override/<id>/` | Replaces the built-in with the same id. The first run asks. |
 
-`<data>` and `<config>` are `%APPDATA%\rune-opencode` on Windows and `~/Library/Application Support/rune-opencode` on macOS; Linux follows XDG.
+`<data>` and `<config>` are `%APPDATA%\brocode` on Windows and `~/Library/Application Support/brocode` on macOS; Linux follows XDG.
 
 - **Trust.** A plugin can read and change files, run programs and reach the network through its services. Before an installed or overriding plugin first runs, the app asks *Enable plugin "<name>"?*. The answer holds for the plugin's files as they are: the app remembers their SHA-256, and a changed file asks again, also when you reload the plugin after editing it. The plugin runs once the answer is saved, so a crash can't run it under an OK the app then forgets. *Not now* asks again on the next launch. Turning the plugin off in Settings forgets the OK: turning it on asks again.
 - **Reload.** Saving a file reloads the plugin in place in a development build, or in any build started with `--plugin-hot`. Settings › Extensions › Plugins also has Reload, and a switch that turns the plugin off.

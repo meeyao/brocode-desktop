@@ -1,7 +1,7 @@
 [package]
 name = "opencode-desktop-library"
 version = "0.0.1"
-description = "OpenCode (Rune) as a library: what a packaged Windows build's exe (apps/desktop-thin) loads and runs"
+description = "Brocode as a library: what a packaged Windows build's exe (apps/desktop-thin) loads and runs"
 edition.workspace = true
 license.workspace = true
 
@@ -15,7 +15,7 @@ doctest = false
 # Windows alone packages the app this way; elsewhere the library is empty and links nothing.
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { version = "0.1", default-features = false }
-opencode-desktop = { path = "../desktop" }
+brocode-desktop = { path = "../desktop" }
 procwatch.workspace = true
 
 [build-dependencies]

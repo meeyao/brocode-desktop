@@ -1,4 +1,4 @@
-//! App-level shortcuts that a focused web page yields to OpenCode (Rune) rather than swallowing,
+//! App-level shortcuts that a focused web page yields to Brocode rather than swallowing,
 //! matching official `packages/gui-plugins/src/browser/keys.ts:34-97` (`pageShortcut`).
 
 use crate::keymap::Bind;

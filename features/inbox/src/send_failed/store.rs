@@ -203,7 +203,7 @@ impl Log {
             }
             (Ok(()), None) => {}
             (Err(e), forward) => {
-                eprintln!("opencode-rune: outbox row {row_id} not saved: {e}");
+                eprintln!("brocode: outbox row {row_id} not saved: {e}");
                 if let Some(f) = forward {
                     f.settle(false, &to, row_id.clone());
                 }

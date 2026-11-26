@@ -7,9 +7,9 @@ set -eu
 TAG=${1:-peek}
 OUT=${2:-captures/sidebar-peek}
 mkdir -p "$OUT"
-cargo build -p opencode-desktop
+cargo build -p brocode-desktop
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-BIN="$TARGET/debug/opencode-desktop"
+BIN="$TARGET/debug/brocode-desktop"
 COMMON="--fixture apps/desktop/assets/fixture.json --scene sidebar-closed --pointer --size 1280x820 --scale 2 --theme dark"
 $BIN $COMMON --script apps/desktop/scripts/sidebar-peek.json --fps 120 --video "$OUT/$TAG-peek.mp4" --trace "$OUT/$TAG-peek.jsonl" --trace-all
 $BIN $COMMON --script apps/desktop/scripts/sidebar-dock.json --fps 120 --video "$OUT/$TAG-dock.mp4"

@@ -1,4 +1,4 @@
-//! Shared OpenCode session composer (`p254`): OpenCode (Rune)'s auto-growing editor (`180pt` cap
+//! Shared OpenCode session composer (`p254`): Brocode's auto-growing editor (`180pt` cap
 //! with internal edge-faded scroll), attachment chips & image paste, prompt history (`history`),
 //! `+` attach button, and instant Send / Stop button with `stop_glyph_swap()`.
 
@@ -215,7 +215,7 @@ impl ComposerState {
 
 /// Host hooks for the shared session composer. Defaults give a minimal host auto-grow,
 /// attachment chips, image paste, `+` attach button, and Send / Stop with ~20 lines of glue,
-/// while letting OpenCode (Rune) plug in its pickers, slash/mention menus, queue face, and dictation.
+/// while letting Brocode plug in its pickers, slash/mention menus, queue face, and dictation.
 /// The prompt's name and the suggestion row it names, for a screen reader: built only while one
 /// reads the window, so a keystroke without one makes nothing for them.
 fn named_prompt<S: ComposerHost>(s: &S, prompt: El) -> El {

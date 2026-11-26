@@ -302,8 +302,8 @@ fn open(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Result<()> {
 #[cfg(not(target_arch = "wasm32"))]
 fn not_running(status: &EngineStatus) -> String {
     match status {
-        EngineStatus::Unsupported => "The browser isn't available on this platform yet in OpenCode (Rune)".to_owned(),
-        EngineStatus::NotInstalled | EngineStatus::Downloading { .. } | EngineStatus::Verifying | EngineStatus::Paused(_) => "Browser engine isn't installed yet in OpenCode (Rune)".to_owned(),
+        EngineStatus::Unsupported => "The browser isn't available on this platform yet in Brocode".to_owned(),
+        EngineStatus::NotInstalled | EngineStatus::Downloading { .. } | EngineStatus::Verifying | EngineStatus::Paused(_) => "Browser engine isn't installed yet in Brocode".to_owned(),
         EngineStatus::Failed(err) => format!("Browser engine failed to start: {err}"),
         _ => "Browser engine is still starting; try again in a moment".to_owned(),
     }

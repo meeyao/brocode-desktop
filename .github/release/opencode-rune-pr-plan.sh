@@ -21,8 +21,8 @@ branch_slug=$(printf '%s' "$HEAD_REF" \
   | sed -E 's/-+$//')
 [ -n "$branch_slug" ] || branch_slug="pr-$PR_NUMBER"
 
-app_name="OpenCode (Rune) · $branch_slug"
-bundle_id="anomaly.opencode-rune.pr.$PR_NUMBER"
+app_name="Brocode · $branch_slug"
+bundle_id="com.apibrother.brocode.pr.$PR_NUMBER"
 url_scheme="opencode-rune-pr-$PR_NUMBER"
 version="0.0.0-pr-$PR_NUMBER-$GITHUB_RUN_NUMBER"
 channel="pr-$PR_NUMBER"

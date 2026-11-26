@@ -4,7 +4,7 @@ entries each rule logged in the last N hours, the keys it hit most, and the late
 
   apps/desktop/scripts/motion-report [--hours 24] [--rule end-snap] [--flights] [--top 5] [LOG ...]
 
-With no file, reads ~/Library/Logs/opencode-rune/motion.jsonl and its rotated motion.1.jsonl.
+With no file, reads ~/Library/Logs/brocode/motion.jsonl and its rotated motion.1.jsonl.
 Keys are grouped with their message and session ids folded to `*`, so one rule hitting every
 bubble reads as one row. --flights keeps only flight entries (wrong-start, wrong-side, reversal,
 end-snap, size). --rule prints that rule's entries in full, newest last.
@@ -19,7 +19,7 @@ ap.add_argument("--flights", action="store_true")
 ap.add_argument("--top", type=int, default=5)
 a = ap.parse_args()
 
-base = os.path.expanduser("~/Library/Logs/opencode-rune")
+base = os.path.expanduser("~/Library/Logs/brocode")
 paths = a.logs or [p for p in (f"{base}/motion.1.jsonl", f"{base}/motion.jsonl") if os.path.exists(p)]
 since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=a.hours)
 entries = []

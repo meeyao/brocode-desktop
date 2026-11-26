@@ -1,7 +1,7 @@
 [package]
 name = "opencode-web"
 version = "0.0.1"
-description = "OpenCode (Rune) in a browser: thin wasm32/WebGPU entry over opencode-desktop"
+description = "Brocode in a browser: thin wasm32/WebGPU entry over opencode-desktop"
 edition.workspace = true
 license.workspace = true
 publish = false
@@ -15,7 +15,7 @@ doctest = false
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3"
-opencode-desktop = { path = "../desktop", default-features = false }
+brocode-desktop = { path = "../desktop", default-features = false }
 opencode-i18n = { path = "../../crates/opencode-i18n" }
 opencode-kit = { path = "../../crates/opencode-kit" }
 opencode-storage = { path = "../../crates/opencode-storage" }

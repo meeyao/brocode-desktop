@@ -1,4 +1,4 @@
-# Releasing OpenCode (Rune)
+# Releasing Brocode
 
 `.github/workflows/release.yml` builds, signs and publishes the desktop app to `https://anoma.ly/release` (app `opencode`, artifact `desktop-rune`: `opencode/desktop-rune/<channel>`).
 

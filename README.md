@@ -1,50 +1,59 @@
 <p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="https://opencode.ai/brand/files/opencode-wordmark-transparent-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="https://opencode.ai/brand/files/opencode-wordmark-transparent-light.svg" media="(prefers-color-scheme: light)">
-      <img src="https://opencode.ai/brand/files/opencode-wordmark-transparent-light.svg" alt="OpenCode" height="44">
-    </picture>
-  </a>
+  <img src="apps/desktop/assets/icon/icon-1024.png" width="96" alt="Brocode">
 </p>
 
-<h3 align="center">OpenCode (Rune)</h3>
+<h1 align="center">Brocode Desktop</h1>
 
 <p align="center">
-  OpenCode Desktop, rewritten from scratch in Rust on <a href="https://github.com/anomalyco/rune">Rune</a>.<br>
-  10–100× faster and lighter. Native on macOS, Windows, and Linux — and the same app in the browser over WebGPU.
+  OpenCode Desktop, rewritten from scratch in Rust on <a href="https://github.com/anomalyco/rune">Rune</a>,
+  branded for <a href="https://github.com/meeyao/brocode-cli">brocode-cli</a> and API Brother.<br>
+  Native on macOS, Windows and Linux — and the same app in the browser over WebGPU.
 </p>
 
 <p align="center">
-  <a href="https://opencode.ai"><picture><source srcset="https://opencode.ai/brand/badges/opencode-built-with-a-dark-20.svg" media="(prefers-color-scheme: dark)"><source srcset="https://opencode.ai/brand/badges/opencode-built-with-a-light-20.svg" media="(prefers-color-scheme: light)"><img src="https://opencode.ai/brand/badges/opencode-built-with-a-light-20.svg" alt="Built with OpenCode" height="20"></picture></a>
   <img src="https://img.shields.io/badge/engine-Rune-242424?style=flat-square&labelColor=161616" alt="Engine: Rune" height="20">
   <img src="https://img.shields.io/badge/backends-Metal%20%C2%B7%20DX12%20%C2%B7%20Vulkan%20%C2%B7%20WebGPU-242424?style=flat-square&labelColor=161616" alt="Backends: Metal, DX12, Vulkan, WebGPU" height="20">
   <img src="https://img.shields.io/badge/electron-0%20MB-242424?style=flat-square&labelColor=161616" alt="Electron: 0 MB" height="20">
-  <img src="https://img.shields.io/badge/tests-0-242424?style=flat-square&labelColor=161616" alt="Tests: 0" height="20">
 </p>
 
-<p align="center">
-  <picture>
-    <source srcset="docs/assets/app-hero-dark.png" media="(prefers-color-scheme: dark)">
-    <source srcset="docs/assets/app-hero-light.png" media="(prefers-color-scheme: light)">
-    <img src="docs/assets/app-hero-light.png" alt="OpenCode (Rune) session with native GPU generative UI, vector flowchart, and split diff review" width="100%">
-  </picture>
-</p>
+## This fork
 
-## Try the `dev` build
+A branded fork of [`anomalyco/opencode-rune`](https://github.com/anomalyco/opencode-rune) (MIT).
+The engine, protocol and OpenCode-compatible features are unchanged. On top of upstream:
 
-No Electron, no DOM, no Chromium at startup. Download the latest `dev` build and point it at any running OpenCode server:
+- App name and window title: **Brocode**
+- Icon and About identity: API Brother (`apibrother.com`)
+- App IDs, data folders and deep links: `com.apibrother.brocode`, `brocode://`
+- No Anomaly release feed: source builds do not auto-update
+- Server: a brocode / OpenCode-compatible server on `127.0.0.1:4096` (`brocode serve`), or
+  `~/.config/opencode/service.json` / `~/.local/state/opencode/service.json`; `--server <url>`
+  and `OPENCODE_SERVER_URL` override it. The client never starts a server on its own.
 
-| Platform | Download (`dev`) |
-| --- | --- |
-| **macOS** | [Apple Silicon (`.dmg`)](https://anoma.ly/release/opencode/desktop-rune/dev/macos-arm64-dmg) · [Intel (`.dmg`)](https://anoma.ly/release/opencode/desktop-rune/dev/macos-x64-dmg) |
-| **Windows** | [x64 setup](https://anoma.ly/release/opencode/desktop-rune/dev/windows-x64-setup) · [arm64 setup](https://anoma.ly/release/opencode/desktop-rune/dev/windows-arm64-setup) |
-| **Linux x64** | [AppImage](https://anoma.ly/release/opencode/desktop-rune/dev/linux-x64-appimage) · [DEB](https://anoma.ly/release/opencode/desktop-rune/dev/linux-x64-deb) · [RPM](https://anoma.ly/release/opencode/desktop-rune/dev/linux-x64-rpm) |
-| **Linux arm64** | [AppImage](https://anoma.ly/release/opencode/desktop-rune/dev/linux-arm64-appimage) · [DEB](https://anoma.ly/release/opencode/desktop-rune/dev/linux-arm64-deb) · [RPM](https://anoma.ly/release/opencode/desktop-rune/dev/linux-arm64-rpm) |
+Upstream stays the source of engine fixes; rebase this fork on its `dev` branch.
 
-<sub>Set <code>chmod +x</code> on Linux AppImage files. macOS and Windows <code>dev</code> builds auto-update in the background. Want to test a pull request alongside <code>dev</code>? See <a href="docs/trying-opencode-rune.md">docs/trying-opencode-rune.md</a>. Release channels and signing: <a href="docs/releasing.md">docs/releasing.md</a>.</sub>
+## Run from source
 
-Start a local OpenCode server (`opencode serve --service` or open **OpenCode Desktop**), then launch **OpenCode (Rune)**. It discovers `http://127.0.0.1:4096` or `~/.config/opencode/service.json` automatically (`--server <url>` or `OPENCODE_SERVER_URL` overrides it) and never starts a server on its own.
+Rust 1.99.1 is pinned by `rust-toolchain.toml`. Start a server first:
+
+```sh
+brocode serve --service      # or: opencode serve --service
+```
+
+Then build and launch with the fast profile (no debug info, skips Office previews and the storybook):
+
+```sh
+scripts/dev-fast.sh                       # --live --plugin-hot
+# or
+cargo run --profile dev-fast -p brocode-desktop --no-default-features --features knobs -- --live
+```
+
+The windowed binary is `target/dev-fast/brocode-desktop`. It renders any scene offscreen for
+inspection (`--snap out.png`, `--tree out.json`, `--script …`).
+
+## Upstream
+
+MIT, © Anomaly. `LICENSE` and `THIRD_PARTY_NOTICES.md` are kept from upstream; this fork only
+changes branding and packaging. Upstream project: https://github.com/anomalyco/opencode-rune.
 
 ## What's inside
 
@@ -86,7 +95,7 @@ To scaffold a new Luau plugin (`plugins/<id>/`) or decoupled Rust feature crate 
 | Target | Command |
 | --- | --- |
 | **Standalone `session-view` playground** (no server) | `cargo run -p session-view --example read_only` |
-| **Local macOS `.app`** (`~/Applications/OpenCode (Rune).app`) | `apps/desktop/scripts/dev.sh` (or `--release`) |
+| **Local macOS `.app`** (`~/Applications/Brocode.app`) | `apps/desktop/scripts/dev.sh` (or `--release`) |
 | **Browser `wasm32`/WebGPU** (`apps/web`) | `pwsh scripts/web.ps1` |
 
 > **Release builds:** `--profile release` is what ships — fat LTO, one codegen unit, plus the PGO profiles in `apps/desktop/pgo/` via `pwsh apps/desktop/scripts/release.ps1` (Windows x64) and `apps/desktop/scripts/build-app.sh` (Apple Silicon macOS). A plain `cargo build --release` omits the PGO profile and takes 25–60 minutes and ~10 GB RAM for one `rustc`. Use `--profile release-quick` or `--profile release-thin` for fast optimized iteration ([docs/fast-builds.md](docs/fast-builds.md)).
@@ -99,7 +108,7 @@ Organized by **progressive disclosure** across four tiers: start at Tier 1 and s
   <picture>
     <source srcset="docs/assets/architecture-dark.svg" media="(prefers-color-scheme: dark)">
     <source srcset="docs/assets/architecture-light.svg" media="(prefers-color-scheme: light)">
-    <img src="docs/assets/architecture-light.svg" alt="OpenCode (Rune) four-tier progressive disclosure architecture" width="100%">
+    <img src="docs/assets/architecture-light.svg" alt="Brocode four-tier progressive disclosure architecture" width="100%">
   </picture>
 </p>
 

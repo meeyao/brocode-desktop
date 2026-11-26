@@ -124,8 +124,8 @@ pub fn check_with_dialog(s: &mut App) {
         let ready_title = msg("dialog.ready.title", "Update Ready");
         let ready_tpl = msg("dialog.ready.message", "Update {{version}} downloaded. Restart now?");
         let avail_title = msg("dialog.available.title", "Update Available");
-        let avail_tpl = msg("dialog.available.message", "OpenCode {{version}} is available to download.");
-        let download_label = msg("action.download", "Download OpenCode");
+        let avail_tpl = msg("dialog.available.message", "Brocode {{version}} is available to download.");
+        let download_label = msg("action.download", "Download Brocode");
         let restart_label = msg("dialog.restart", "Restart");
         let later_label = msg("dialog.later", "Later");
         let waker = (*s.waker).clone();

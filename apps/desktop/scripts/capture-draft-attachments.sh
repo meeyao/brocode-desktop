@@ -22,9 +22,9 @@ cat > "$OUT/script.json" <<EOF
   { "t": 3.6, "type": "move", "x": 700, "y": 300 }
 ] }
 EOF
-cargo build -p opencode-desktop
+cargo build -p brocode-desktop
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-"$TARGET/debug/opencode-desktop" --fixture apps/desktop/assets/fixture.json \
+"$TARGET/debug/brocode-desktop" --fixture apps/desktop/assets/fixture.json \
   --scene session --script "$OUT/script.json" --pointer \
   --size 1280x820 --scale 2 --theme dark --frames 540 --fps 120 \
   --video "$OUT/draft-attachments.mp4"

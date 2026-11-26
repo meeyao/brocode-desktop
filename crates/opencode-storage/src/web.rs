@@ -5,7 +5,7 @@
 //!   frames, plugin overrides and trust. It's read once, synchronously, at open: the whole state
 //!   cache is in memory before the first frame. State writes go through Desktop's `WriteBehind`
 //!   machine (250 ms); frames, plugin and trust write at once (they're tiny and rare).
-//! - `IndexedDB` (`opencode-rune-storage`, v1) holds documents, blobs, the outbox, session
+//! - `IndexedDB` (`brocode-storage`, v1) holds documents, blobs, the outbox, session
 //!   previews and caches. Requests before the database opens wait in order and run once it does.
 //!   Unreferenced blobs are swept by Desktop's `DraftGc` machine.
 
@@ -25,7 +25,7 @@ use crate::machine::draft_gc::{self, BLOB_GRACE_MS, DraftGcEffect, DraftGcEvent,
 use crate::machine::write_behind::{self as wb, WriteBehindEffect, WriteBehindEvent, WriteBehindState};
 use crate::{Cmd, FlushReason, FlushReport, OutboxRow, Storage, WindowFrame};
 
-const DB: &str = "opencode-rune-storage";
+const DB: &str = "brocode-storage";
 const STORES: [&str; 5] = ["documents", "blobs", "outbox", "previews", "caches"];
 const FRAMES: &str = "rune.window_state";
 const PLUGINS: &str = "rune.plugin";

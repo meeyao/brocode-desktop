@@ -1,5 +1,5 @@
 //! Multi-server desktop shell state machines, server registry, window tab schema, and legacy
-//! persistence migration for OpenCode (Rune), ported transition for transition from Desktop's
+//! persistence migration for Brocode, ported transition for transition from Desktop's
 //! `*-machine.ts` (`packages/app/src/runtime/server`, `home/`, `settings/servers/`,
 //! `shell/titlebar/`, `session/`):
 //!

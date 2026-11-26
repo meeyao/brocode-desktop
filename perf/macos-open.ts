@@ -1,4 +1,4 @@
-// One launch of OpenCode (Rune) on macOS as the Dock and Finder start it (Launch Services: `open`), for
+// One launch of Brocode on macOS as the Dock and Finder start it (Launch Services: `open`), for
 // `strobe run`. strobe cannot spawn the app itself there (launchd does), so the numbers are the app's own launch
 // marks (`--launch-trace`, µs from the kernel's start time of the process), printed as `strobe:metric` lines.
 //

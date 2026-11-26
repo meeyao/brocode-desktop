@@ -28,7 +28,7 @@ if ! gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json name > /dev/null 2>&1
   else
     notes=(--notes "Dev build $VERSION from https://github.com/$GITHUB_REPOSITORY/commit/$SHA.")
   fi
-  gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --title "OpenCode (Rune) $VERSION" \
+  gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag --title "Brocode $VERSION" \
     --latest=true "${notes[@]}"
 fi
 mirror=$(mktemp -d)

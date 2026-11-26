@@ -1,6 +1,6 @@
-name: OpenCode (Rune) Release
+name: Brocode Release
 
-# Builds, signs, notarizes, and publishes OpenCode (Rune) (apps/desktop) to
+# Builds, signs, notarizes, and publishes Brocode (apps/desktop) to
 # https://anoma.ly/release (docs/releasing.md), split the way Hex's and OpenCode's releases are:
 #
 # - build and verify jobs run repository code with no environment, secrets, or id-token, and
@@ -193,15 +193,15 @@ jobs:
       - name: Install NASM for the x86 video decoder
         if: matrix.arch == 'x64'
         run: brew install nasm
-      - name: Build OpenCode (Rune).app
+      - name: Build Brocode.app
         run: |
           apps/desktop/scripts/set-crate-version.sh "$PWD" "$OPENCODE_RUNE_VERSION"
           mkdir -p "$RUNNER_TEMP/app" "$RUNNER_TEMP/macos"
           apps/desktop/scripts/build-app.sh "$RUNNER_TEMP/app"
           if [ "${{ matrix.arch }}" = arm64 ]; then
-            OPENCODE_RUNE_SMOKE_HEADLESS=1 apps/desktop/scripts/smoke-app.sh "$RUNNER_TEMP/app/OpenCode (Rune).app"
+            OPENCODE_RUNE_SMOKE_HEADLESS=1 apps/desktop/scripts/smoke-app.sh "$RUNNER_TEMP/app/Brocode.app"
           fi
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/app/OpenCode (Rune).app" "$RUNNER_TEMP/macos/OpenCode-Rune.app.zip"
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/app/Brocode.app" "$RUNNER_TEMP/macos/OpenCode-Rune.app.zip"
       - id: upload
         uses: ./.github/release/upload
         with:
@@ -460,7 +460,7 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
-          description: OpenCode (Rune)
+          description: Brocode
           description-url: https://github.com/anomalyco/opencode-rune
           exclude-environment-credential: true
           exclude-workload-identity-credential: true
@@ -627,15 +627,15 @@ jobs:
           check=$(mktemp -d)
           hdiutil attach -quiet -nobrowse -readonly -mountpoint "$check/dmg" "$dmg"
           /usr/bin/ditto -x -k "$zip" "$check/update"
-          apps/desktop/scripts/validate-app.sh "$check/dmg/OpenCode (Rune).app" "$OPENCODE_RUNE_VERSION" "$OPENCODE_RUNE_BUILD_CHANNEL"
-          apps/desktop/scripts/validate-app.sh "$check/update/OpenCode (Rune).app" "$OPENCODE_RUNE_VERSION" "$OPENCODE_RUNE_BUILD_CHANNEL"
-          xcrun stapler validate "$check/update/OpenCode (Rune).app"
-          codesign --verify --deep --strict -R="$(cat apps/desktop/update-requirement.txt)" "$check/update/OpenCode (Rune).app"
-          spctl --assess --type execute --verbose=2 "$check/dmg/OpenCode (Rune).app"
-          diff -qr "$check/dmg/OpenCode (Rune).app" "$check/update/OpenCode (Rune).app"
-          OPENCODE_RUNE_SMOKE_HEADLESS=1 apps/desktop/scripts/smoke-app.sh "$check/dmg/OpenCode (Rune).app"
+          apps/desktop/scripts/validate-app.sh "$check/dmg/Brocode.app" "$OPENCODE_RUNE_VERSION" "$OPENCODE_RUNE_BUILD_CHANNEL"
+          apps/desktop/scripts/validate-app.sh "$check/update/Brocode.app" "$OPENCODE_RUNE_VERSION" "$OPENCODE_RUNE_BUILD_CHANNEL"
+          xcrun stapler validate "$check/update/Brocode.app"
+          codesign --verify --deep --strict -R="$(cat apps/desktop/update-requirement.txt)" "$check/update/Brocode.app"
+          spctl --assess --type execute --verbose=2 "$check/dmg/Brocode.app"
+          diff -qr "$check/dmg/Brocode.app" "$check/update/Brocode.app"
+          OPENCODE_RUNE_SMOKE_HEADLESS=1 apps/desktop/scripts/smoke-app.sh "$check/dmg/Brocode.app"
           hdiutil detach -quiet "$check/dmg" || hdiutil detach -force -quiet "$check/dmg"
-          codesign -dv "$check/update/OpenCode (Rune).app" 2>&1 | grep -E '^(Identifier|TeamIdentifier|Authority=Developer)' >> "$GITHUB_STEP_SUMMARY"
+          codesign -dv "$check/update/Brocode.app" 2>&1 | grep -E '^(Identifier|TeamIdentifier|Authority=Developer)' >> "$GITHUB_STEP_SUMMARY"
 
   # The publisher every signed file carries must be the one the updater checks, read from the app.
   verify-windows:
@@ -1299,7 +1299,7 @@ jobs:
           pattern: sign-opencode-rune-windows
           digests: sign-opencode-rune-windows=${{ needs.sign-windows-setup.outputs.digest }}
           folder: windows
-      - name: Publish OpenCode (Rune) desktop release
+      - name: Publish Brocode desktop release
         run: |
           targets=()
           for arch in x64 arm64; do

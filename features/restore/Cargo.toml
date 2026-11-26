@@ -1,7 +1,7 @@
 [package]
 name = "opencode-feature-restore"
 version = "0.0.1"
-description = "Window state restoration, composer drafts, blob attachments, timeline places, boot previews, offline transcript copies, and draft undo persistence for OpenCode (Rune)"
+description = "Window state restoration, composer drafts, blob attachments, timeline places, boot previews, offline transcript copies, and draft undo persistence for Brocode"
 edition = "2024"
 license.workspace = true
 publish = false

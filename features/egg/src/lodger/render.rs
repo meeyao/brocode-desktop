@@ -59,7 +59,7 @@ pub struct Drawn {
     pub notch: f64,
     pub pin: f64,
     pub pin_at: Affine,
-    pub letters: [(f64, Affine); 8],
+    pub letters: [(f64, Affine); 7],
 }
 
 impl Lodger {

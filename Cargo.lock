@@ -900,6 +900,101 @@ dependencies = [
 ]
 
 [[package]]
+name = "brocode-desktop"
+version = "0.0.1"
+dependencies = [
+ "base64 0.22.1",
+ "browser-extensions",
+ "browser-pane",
+ "browser-policy",
+ "crc32fast",
+ "flate2",
+ "getrandom 0.3.4",
+ "harness-log",
+ "hex-client",
+ "image",
+ "js-sys",
+ "libc",
+ "mimalloc",
+ "mlua",
+ "office-preview",
+ "opencode-code-view",
+ "opencode-feature-annotations",
+ "opencode-feature-composer-input",
+ "opencode-feature-connect",
+ "opencode-feature-dictation",
+ "opencode-feature-egg",
+ "opencode-feature-files",
+ "opencode-feature-find",
+ "opencode-feature-history",
+ "opencode-feature-inbox",
+ "opencode-feature-mcp",
+ "opencode-feature-mentions",
+ "opencode-feature-narrow",
+ "opencode-feature-notifications",
+ "opencode-feature-office",
+ "opencode-feature-open-in",
+ "opencode-feature-panels",
+ "opencode-feature-projects",
+ "opencode-feature-restore",
+ "opencode-feature-review",
+ "opencode-feature-session-menu",
+ "opencode-feature-settings",
+ "opencode-feature-subagents",
+ "opencode-feature-switcher",
+ "opencode-feature-tab-groups",
+ "opencode-feature-terminal-surface",
+ "opencode-feature-timeline-extras",
+ "opencode-feature-tips",
+ "opencode-feature-updater",
+ "opencode-feature-workspace-tools",
+ "opencode-i18n",
+ "opencode-kernel",
+ "opencode-kit",
+ "opencode-platform",
+ "opencode-plugin-runtime",
+ "opencode-plugin-spec",
+ "opencode-runtime",
+ "opencode-search",
+ "opencode-servers",
+ "opencode-storage",
+ "opencode-ui",
+ "procwatch",
+ "project-icon",
+ "rune",
+ "rune-kit",
+ "rune-knobs",
+ "rune-luau",
+ "rune-mac",
+ "rune-notify",
+ "rune-parts",
+ "rune-perf",
+ "rune-register",
+ "rune-theme-opencode",
+ "serde",
+ "serde_json",
+ "session-view",
+ "sha2",
+ "terminal",
+ "ureq",
+ "ureq-web",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "win-install",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "brocode-setup"
+version = "0.0.1"
+dependencies = [
+ "win-install",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "brotli-decompressor"
 version = "5.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3406,98 +3501,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "opencode-desktop"
-version = "0.0.1"
-dependencies = [
- "base64 0.22.1",
- "browser-extensions",
- "browser-pane",
- "browser-policy",
- "crc32fast",
- "flate2",
- "getrandom 0.3.4",
- "harness-log",
- "hex-client",
- "image",
- "js-sys",
- "libc",
- "mimalloc",
- "mlua",
- "office-preview",
- "opencode-code-view",
- "opencode-feature-annotations",
- "opencode-feature-composer-input",
- "opencode-feature-connect",
- "opencode-feature-dictation",
- "opencode-feature-egg",
- "opencode-feature-files",
- "opencode-feature-find",
- "opencode-feature-history",
- "opencode-feature-inbox",
- "opencode-feature-mcp",
- "opencode-feature-mentions",
- "opencode-feature-narrow",
- "opencode-feature-notifications",
- "opencode-feature-office",
- "opencode-feature-open-in",
- "opencode-feature-panels",
- "opencode-feature-projects",
- "opencode-feature-restore",
- "opencode-feature-review",
- "opencode-feature-session-menu",
- "opencode-feature-settings",
- "opencode-feature-subagents",
- "opencode-feature-switcher",
- "opencode-feature-tab-groups",
- "opencode-feature-terminal-surface",
- "opencode-feature-timeline-extras",
- "opencode-feature-tips",
- "opencode-feature-updater",
- "opencode-feature-workspace-tools",
- "opencode-i18n",
- "opencode-kernel",
- "opencode-kit",
- "opencode-platform",
- "opencode-plugin-runtime",
- "opencode-plugin-spec",
- "opencode-runtime",
- "opencode-search",
- "opencode-servers",
- "opencode-storage",
- "opencode-ui",
- "procwatch",
- "project-icon",
- "rune",
- "rune-kit",
- "rune-knobs",
- "rune-luau",
- "rune-mac",
- "rune-notify",
- "rune-parts",
- "rune-perf",
- "rune-register",
- "rune-theme-opencode",
- "serde",
- "serde_json",
- "session-view",
- "sha2",
- "terminal",
- "ureq",
- "ureq-web",
- "url",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "win-install",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "opencode-desktop-library"
 version = "0.0.1"
 dependencies = [
+ "brocode-desktop",
  "mimalloc",
- "opencode-desktop",
  "procwatch",
  "win-install",
 ]
@@ -4053,14 +4061,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "opencode-rune-setup"
-version = "0.0.1"
-dependencies = [
- "win-install",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "opencode-runtime"
 version = "0.0.1"
 dependencies = [
@@ -4133,8 +4133,8 @@ dependencies = [
 name = "opencode-web"
 version = "0.0.1"
 dependencies = [
+ "brocode-desktop",
  "js-sys",
- "opencode-desktop",
  "opencode-i18n",
  "opencode-kit",
  "opencode-storage",

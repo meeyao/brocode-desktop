@@ -1,4 +1,4 @@
-//! Links opened with the app (`App::on_open_url`), on the app's own scheme (`opencode-rune://`,
+//! Links opened with the app (`App::on_open_url`), on the app's own scheme (`brocode://`,
 //! see `launch::product`). OpenCode Desktop's `opencode://` stays OpenCode Desktop's: Rune never
 //! registers it, so such a link opens OpenCode Desktop, or nothing when only Rune is installed.
 //!
@@ -210,7 +210,7 @@ pub(crate) fn key(s: &mut App, ev: &KeyEvent, tx: &mut Tx) -> bool {
 }
 
 /// `DialogOpenDeepLink` (`packages/app/src/shell/deep-links/deep-links.tsx:96-139`, `opencode#65803`):
-/// asks before opening a folder from an `opencode-rune://` link, with Cancel focused by default so
+/// asks before opening a folder from an `brocode://` link, with Cancel focused by default so
 /// a stray Enter can never open an untrusted folder.
 pub(crate) fn dialog(s: &App, p: &Pal, cx: &Cx<App>) -> Vec<El> {
     let Some((attempt, link)) = s.services.deep_links.asking() else {
@@ -319,7 +319,7 @@ pub fn open(s: &mut App, url: &str, tx: &mut Tx) {
             let effects = s.services.deep_links.step(DeepLinkEvent::Received(Queued { server, dir, prompt }), |server| ready.iter().any(|r| r == server));
             run(s, effects, tx);
         }
-        _ => eprintln!("opencode-rune: ignored a link it doesn't open: {url}"),
+        _ => eprintln!("brocode: ignored a link it doesn't open: {url}"),
     }
 }
 

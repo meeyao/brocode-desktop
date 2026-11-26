@@ -142,10 +142,10 @@ impl Game {
         self.composer = composer;
         match logo {
             Some([x, _, lw, _]) => {
-                let pitch = (lw / 78.0).round().max(3.0);
-                let x0 = (x + (lw - pitch * 78.0) / 2.0).round();
+                let pitch = (lw / 68.0).round().max(3.0);
+                let x0 = (x + (lw - pitch * 68.0) / 2.0).round();
                 self.l = x0;
-                self.r = x0 + pitch * 78.0;
+                self.r = x0 + pitch * 68.0;
             }
             None => {
                 self.l = composer.x.max(0.0);

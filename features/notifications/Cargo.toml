@@ -1,7 +1,7 @@
 [package]
 name = "opencode-feature-notifications"
 version = "0.0.1"
-description = "System notifications, actionable permission/question toasts, coordinator, and activation helpers for OpenCode (Rune)"
+description = "System notifications, actionable permission/question toasts, coordinator, and activation helpers for Brocode"
 edition = "2024"
 license.workspace = true
 publish = false

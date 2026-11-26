@@ -1,7 +1,7 @@
-name: OpenCode (Rune) PR Build
+name: Brocode PR Build
 
 # Builds every open PR touching apps/desktop (or its path crates) as a side-by-side
-# macOS app ("OpenCode (Rune) · <branch>.app", anomaly.opencode-rune.pr.<N>, badged icon)
+# macOS app ("Brocode · <branch>.app", com.apibrother.brocode.pr.<N>, badged icon)
 # (ad-hoc signed: PR code never reaches the release environment), unsigned Windows setups
 # (x64, arm64) under the same name and id, and unsigned Linux x64 packages
 # (opencode-rune-linux-build.yml, as release.yml builds them), kept as workflow artifacts for

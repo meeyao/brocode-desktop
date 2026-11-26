@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds OpenCode (Rune) for the browser (apps/web) and serves it on a local port.
+  Builds Brocode for the browser (apps/web) and serves it on a local port.
 
 .DESCRIPTION
   Builds apps/web for wasm32-unknown-unknown, runs wasm-bindgen, and puts the page in

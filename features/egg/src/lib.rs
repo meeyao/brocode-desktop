@@ -88,12 +88,12 @@ pub struct Geo {
 }
 
 impl Geo {
-    /// The lodger's stage: the 78x14 whole-point pitch footprint, its origin rounded in the panel
+    /// The lodger's stage: the 68x14 whole-point pitch footprint, its origin rounded in the panel
     /// (`fitStage`).
     pub fn stage(&self) -> Stage {
         let [x, y, w, h] = self.logo;
-        let pitch = (w / 78.0).round().max(3.0);
-        Stage { x: (x + (w - pitch * 78.0) / 2.0).round(), y: (y + (h - pitch * 14.0) / 2.0).round(), k: pitch / 3.0 }
+        let pitch = (w / 68.0).round().max(3.0);
+        Stage { x: (x + (w - pitch * 68.0) / 2.0).round(), y: (y + (h - pitch * 14.0) / 2.0).round(), k: pitch / 3.0 }
     }
 }
 
@@ -471,7 +471,7 @@ fn trace(live: &Live, now: f64) {
         let [cx, cy] = d.critter.apply(0.0, 0.0);
         let mut line = format!(
             "{{\"t\":{now:.6},\"state\":\"{:?}\",\"x\":{cx},\"y\":{cy},\"cx\":{},\"cy\":{},\"body\":{},\"eyes\":{},\"pin\":{},\"neck\":{},\"notch\":{},\"letter0\":{},\"letter7\":{},\"flat\":\"{:?}\"",
-            live.state, c.x, c.y, d.body, d.eyes, d.pin, d.neck, d.notch, d.letters[0].0, d.letters[7].0, live.page.flat
+            live.state, c.x, c.y, d.body, d.eyes, d.pin, d.neck, d.notch, d.letters[0].0, d.letters[6].0, live.page.flat
         );
         let [poll_us, prepare_us] = COST.with(Cell::get);
         let (heap, footprint) = memory_stats();

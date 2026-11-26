@@ -15,13 +15,13 @@ pub fn render() -> String {
     writeln!(out, "name: rune-ui").ok();
     writeln!(
         out,
-        "description: \"Write ```ui outlines that render as native frames, rows, chat threads, key-value facts, statuses, and controls in OpenCode (Rune) replies. Use when showing a UI mockup, product flow, before-and-after layout, settings screen, or status summary to a user in OpenCode (Rune).\""
+        "description: \"Write ```ui outlines that render as native frames, rows, chat threads, key-value facts, statuses, and controls in Brocode replies. Use when showing a UI mockup, product flow, before-and-after layout, settings screen, or status summary to a user in Brocode.\""
     )
     .ok();
     writeln!(out, "---\n\n# Generative UI outlines (`ui`)\n").ok();
     writeln!(
         out,
-        "In OpenCode (Rune), a ```` ```ui ```` code fence in a chat reply renders as native UI parts instead of a raw code block. Surround it with ordinary Markdown prose, headings, or code fences as needed.\n"
+        "In Brocode, a ```` ```ui ```` code fence in a chat reply renders as native UI parts instead of a raw code block. Surround it with ordinary Markdown prose, headings, or code fences as needed.\n"
     )
     .ok();
     writeln!(out, "## Rules\n").ok();

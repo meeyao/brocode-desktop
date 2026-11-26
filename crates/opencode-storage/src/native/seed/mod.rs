@@ -81,7 +81,7 @@ pub(crate) enum SeedOutcome {
 /// The tabs (`tabs`, `tabs.info`) of the window Desktop wrote last, read via a private scratch
 /// copy so Official Desktop's folder is never written to.
 pub fn recent_tabs_in(dirs: &[PathBuf]) -> Option<(Value, Value)> {
-    let scratch = std::env::temp_dir().join(format!("opencode-rune-seed-{}", std::process::id()));
+    let scratch = std::env::temp_dir().join(format!("brocode-seed-{}", std::process::id()));
     // Read in place when nobody writes the database; from a copy when it was written to meanwhile.
     let res = [true, false].into_iter().find_map(|in_place| {
         let PickResult::Picked(_, snap) = pick_dir(dirs, &scratch, in_place) else { return Some(None) };
@@ -95,7 +95,7 @@ pub fn recent_tabs_in(dirs: &[PathBuf]) -> Option<(Value, Value)> {
 /// Legacy single-file helper kept safe via a private read (the image in memory, or the scratch copy; never writes `-shm` beside `db`).
 pub fn recent_tabs(db: &Path) -> Option<(Value, Value)> {
     let dir = db.parent()?;
-    let scratch = std::env::temp_dir().join(format!("opencode-rune-seed-{}", std::process::id()));
+    let scratch = std::env::temp_dir().join(format!("brocode-seed-{}", std::process::id()));
     let snap = open_snapshot(dir, &scratch).ok()?;
     let res = recent_tabs_from(snap.conn());
     drop(snap);

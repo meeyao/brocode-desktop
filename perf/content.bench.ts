@@ -1,4 +1,4 @@
-// From the window to content: a later launch of OpenCode (Rune) that restores what the window last
+// From the window to content: a later launch of Brocode that restores what the window last
 // showed, against a server that holds a real-size history, timed to what a person is waiting for:
 // the open session's last messages from the saved copy and then from the server, and the last
 // change of the window's pixels.
@@ -130,7 +130,7 @@ const restored = (state: string, shape: (home: string) => void = () => {}) => as
 
 export default bench({
   targets: {
-    opencode: native("opencode-rune", { name: "OpenCode (Rune), a real server", output: true, viewport: { width: 1280, height: 800 } }),
+    opencode: native("opencode-rune", { name: "Brocode, a real server", output: true, viewport: { width: 1280, height: 800 } }),
   },
   cases: {
     // To the app's own "content live": the server answered and the open session's rows show.

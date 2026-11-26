@@ -35,7 +35,7 @@ pub struct ImportConfig {
 }
 
 impl ImportConfig {
-    /// `dir`: the app's data folder (`%APPDATA%\rune-opencode`). Every group is imported unless
+    /// `dir`: the app's data folder (`%APPDATA%\brocode`). Every group is imported unless
     /// [`ImportConfig::groups`] narrows it.
     pub fn new(dir: impl Into<PathBuf>) -> ImportConfig {
         let context = Context { sidecar: vec![opencode_kit::client::DEFAULT_SERVER.to_owned()], ..Context::default() };

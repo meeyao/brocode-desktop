@@ -31,7 +31,7 @@ use crate::{BootPacket, Cmd, FlushReason, FlushReport, Loaded, Storage};
 pub struct StorageConfig {
     /// `opencode.sqlite`, in the app's data folder.
     pub(crate) path: PathBuf,
-    /// The folder the files Rune kept before the database live in (`%APPDATA%\rune-opencode`);
+    /// The folder the files Rune kept before the database live in (`%APPDATA%\brocode`);
     /// none skips the import.
     pub(crate) import: Option<ImportConfig>,
     /// Desktop's `userData` folders to seed a fresh profile from, newest data wins.

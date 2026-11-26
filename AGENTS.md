@@ -1,6 +1,6 @@
-# OpenCode (Rune) (`opencode-rune`)
+# Brocode (`opencode-rune`)
 
-`anomalyco/opencode-rune` houses **OpenCode (Rune)** (`apps/desktop`, `apps/web`, `apps/installer`) and the shared Rust crates (`crates/*`) that any Rune app can embed by git dependency.
+`anomalyco/opencode-rune` houses **Brocode** (`apps/desktop`, `apps/web`, `apps/installer`) and the shared Rust crates (`crates/*`) that any Rune app can embed by git dependency.
 
 ## Layout (Progressive Disclosure)
 

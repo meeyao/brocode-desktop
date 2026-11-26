@@ -175,7 +175,7 @@ impl State {
             (State::Asking { query, shown }, Event::Landed { query: answered, rows: Err(why) }) if answered == query => {
                 // Said once, when it turns off, not on every question.
                 if !matches!(shown, Last::Off) {
-                    eprintln!("opencode-rune: message text isn't searched: {why}");
+                    eprintln!("brocode: message text isn't searched: {why}");
                 }
                 *self = State::Off { query };
                 None

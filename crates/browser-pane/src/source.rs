@@ -32,7 +32,7 @@ pub const TRUST: &str = match option_env!("OPENCODE_BROWSER_ENGINE_TRUST") {
 };
 
 #[cfg(any(all(windows, not(debug_assertions)), target_os = "macos", all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64"))))]
-const RELEASE_SOURCE: &str = "https://anoma.ly/release/opencode-rune/browser-engine/stable.json";
+const RELEASE_SOURCE: &str = "https://anoma.ly/release/brocode/browser-engine/stable.json";
 
 /// Windows, a debug build: `bun apps/browser-engine/scripts/serve.ts` serves a local package here.
 /// Not 47963, which published builds up to `b22a2521` read: a development engine served for a test

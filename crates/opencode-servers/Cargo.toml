@@ -1,7 +1,7 @@
 [package]
 name = "opencode-servers"
 version = "0.0.1"
-description = "Desktop shell multi-server registry, health, controller, Home, Settings, tab, and legacy migration state machines for OpenCode (Rune)"
+description = "Desktop shell multi-server registry, health, controller, Home, Settings, tab, and legacy migration state machines for Brocode"
 edition.workspace = true
 license.workspace = true
 publish = false

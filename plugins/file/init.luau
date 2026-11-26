@@ -80,7 +80,7 @@ return plugin.defineWindow(function(ctx)
     -- Opens a workspace file for the agent, as Desktop's file plugin's `open_file` does.
     ctx:AddMcpTool({
         name = "open_file",
-        description = "Open a workspace file in the OpenCode (Rune) side panel, optionally selecting a line or line range.",
+        description = "Open a workspace file in the Brocode side panel, optionally selecting a line or line range.",
         inputSchema = {
             type = "object",
             properties = {

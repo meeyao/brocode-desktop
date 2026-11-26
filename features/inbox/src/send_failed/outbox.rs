@@ -86,7 +86,7 @@ fn stored_prompts(host: &mut dyn SendFailedHost, server: &str, rows: Result<Vec<
         Ok(rows) => rows,
         Err(e) => {
             // Storage that can't keep them: this run's outbox lives in memory.
-            eprintln!("opencode-rune: outbox not readable, kept in memory: {e}");
+            eprintln!("brocode: outbox not readable, kept in memory: {e}");
             host.unsent_mut().store = Store::Memory;
             return;
         }

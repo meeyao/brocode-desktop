@@ -1,4 +1,4 @@
-//! OpenCode (Rune) as a library, for a packaged Windows build: `opencode-desktop.exe` there is
+//! Brocode as a library, for a packaged Windows build: `opencode-desktop.exe` there is
 //! the thin exe of `apps/desktop-thin`, which loads this library from beside itself and calls
 //! [`opencode_desktop_run`]. Why, with the numbers: `apps/desktop-thin/src/main.rs`.
 //!

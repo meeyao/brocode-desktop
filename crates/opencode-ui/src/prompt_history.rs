@@ -165,7 +165,7 @@ impl<Scope: Clone + PartialEq> PromptHistory<Scope> {
         changed
     }
 
-    /// ↑ or ↓ on the composer: `true` when it recalled or restored a prompt. OpenCode (Rune)
+    /// ↑ or ↓ on the composer: `true` when it recalled or restored a prompt. Brocode
     /// runs this walk in its composer machine; this is for hosts with no machine of their own.
     pub fn step(&mut self, composer: &mut TextEdit, scope: &Scope, shell: bool, up: bool) -> bool {
         if composer.anchor != composer.focus || composer.is_composing() {

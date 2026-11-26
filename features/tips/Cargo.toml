@@ -1,7 +1,7 @@
 [package]
 name = "opencode-feature-tips"
 version = "0.0.1"
-description = "Paced one-time onboarding tips and queue state machine for OpenCode (Rune)"
+description = "Paced one-time onboarding tips and queue state machine for Brocode"
 edition.workspace = true
 license.workspace = true
 publish = false

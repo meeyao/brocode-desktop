@@ -117,7 +117,7 @@ func resize(_ image: CGImage, to px: Int) -> Data {
 
 let master = renderMaster(badgeText: label)
 let fm = FileManager.default
-let tmpRoot = fm.temporaryDirectory.appendingPathComponent("opencode-rune-icon-\(ProcessInfo.processInfo.processIdentifier)")
+let tmpRoot = fm.temporaryDirectory.appendingPathComponent("brocode-icon-\(ProcessInfo.processInfo.processIdentifier)")
 let iconsetDir = tmpRoot.appendingPathComponent("icon.iconset")
 try fm.createDirectory(at: iconsetDir, withIntermediateDirectories: true)
 defer { try? fm.removeItem(at: tmpRoot) }

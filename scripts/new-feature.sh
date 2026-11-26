@@ -228,7 +228,7 @@ cat <<EOF > "$TARGET/Cargo.toml"
 [package]
 name = "opencode-feature-${ID}"
 version = "0.0.1"
-description = "${TITLE_ESC} feature crate for OpenCode (Rune)"
+description = "${TITLE_ESC} feature crate for Brocode"
 edition.workspace = true
 license.workspace = true
 publish = false

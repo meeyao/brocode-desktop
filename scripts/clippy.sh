@@ -2,8 +2,8 @@
 # Runs `cargo clippy --no-deps --all-targets -- -D warnings` across the workspace
 # and every actively used non-default feature set that compiles distinct code:
 #   - workspace (default features)
-#   - opencode-desktop (--no-default-features --features knobs)  [dev-fast / no office or stories]
-#   - opencode-desktop (--features alloc-sites)                  [heap-dump measuring build]
+#   - brocode-desktop (--no-default-features --features knobs)  [dev-fast / no office or stories]
+#   - brocode-desktop (--features alloc-sites)                  [heap-dump measuring build]
 #   - session-view (--features open-bench)                       [open_bench example]
 #   - browser-pane (--no-default-features)                       [no-engine fallback branches]
 #   - browser-pane (--features faults)                           [harness fault injection + engine]
@@ -141,8 +141,8 @@ else
 fi
 
 if [ "$has_features" -eq 0 ]; then
-  run_feature_pass opencode-desktop "opencode-desktop (--no-default-features --features knobs)" --no-default-features --features knobs
-  run_feature_pass opencode-desktop "opencode-desktop (--features alloc-sites)" --features alloc-sites
+  run_feature_pass opencode-desktop "brocode-desktop (--no-default-features --features knobs)" --no-default-features --features knobs
+  run_feature_pass opencode-desktop "brocode-desktop (--features alloc-sites)" --features alloc-sites
   run_feature_pass session-view "session-view (--features open-bench)" --features open-bench
   run_feature_pass browser-pane "browser-pane (--no-default-features)" --no-default-features
   run_feature_pass browser-pane "browser-pane (--features faults)" --features faults

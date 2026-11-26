@@ -28,7 +28,7 @@ fn main() {
     let dir = std::path::PathBuf::from(env("CARGO_MANIFEST_DIR").unwrap_or_default());
     let (icon, manifest) = (dir.join("../desktop/assets/icon.ico"), dir.join("setup.manifest"));
     let description = format!("{title} Setup");
-    let resources = win_install::resources::Resources::new(&icon, &manifest, "opencode-rune-setup.exe", &version).names(&description, &title);
+    let resources = win_install::resources::Resources::new(&icon, &manifest, "brocode-setup.exe", &version).names(&description, &title);
     if let Err(e) = win_install::resources::embed(&resources) {
         panic!("{e}");
     }

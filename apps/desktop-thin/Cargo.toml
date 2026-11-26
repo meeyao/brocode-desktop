@@ -1,7 +1,7 @@
 [package]
 name = "opencode-desktop-thin"
 version = "0.0.1"
-description = "The exe of a packaged Windows build of OpenCode (Rune): it loads the app, a library beside it, and runs it"
+description = "The exe of a packaged Windows build of Brocode: it loads the app, a library beside it, and runs it"
 edition.workspace = true
 license.workspace = true
 

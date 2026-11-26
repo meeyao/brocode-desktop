@@ -66,7 +66,7 @@ pub fn warm_gpu_if_asked() {
     let code = match rune::warm_gpu_cache() {
         Ok(()) => 0,
         Err(why) => {
-            eprintln!("opencode-rune: the GPU's cache was not made: {why}");
+            eprintln!("brocode: the GPU's cache was not made: {why}");
             1
         }
     };
@@ -102,7 +102,7 @@ pub fn print_version_if_asked() {
         // no reason to panic.
         std::io::Write::write_fmt(
             &mut std::io::stdout(),
-            format_args!("opencode-rune {} ({})\n", crate::updater::build_version(), crate::updater::build_channel()),
+            format_args!("brocode {} ({})\n", crate::updater::build_version(), crate::updater::build_channel()),
         )
         .ok();
         std::process::exit(0);
@@ -150,13 +150,13 @@ pub fn unwind_check_if_asked() {
     .ok();
     std::process::exit(if caught && alone && dropped == 34 { 0 } else { 1 });
 }
-/// Window title (`"OpenCode (Rune)"` on `main`, `"OpenCode (Rune) · <branch>"` on PR builds).
+/// Window title (`"Brocode"` on `main`, `"Brocode · <branch>"` on PR builds).
 pub fn window_title() -> &'static str {
     // Stable and beta builds name themselves after their channel (`win_install::default_name`).
     #[cfg(not(target_arch = "wasm32"))]
     let fallback = win_install::default_name(option_env!("OPENCODE_RUNE_BUILD_CHANNEL"));
     #[cfg(target_arch = "wasm32")]
-    let fallback = "OpenCode (Rune)";
+    let fallback = "Brocode";
     option_env!("OPENCODE_RUNE_WINDOW_TITLE").unwrap_or(fallback)
 }
 
@@ -213,11 +213,11 @@ pub fn apply_app_icon() {
 /// of the icon in its exe (1.4 MiB).
 ///
 /// Linux: the desktop finds the app's icon by the window's application id (Wayland `app_id`, X11
-/// `WM_CLASS`), matched to `opencode-rune.desktop`, as Desktop's `StartupWMClass: appId` does.
+/// `WM_CLASS`), matched to `brocode.desktop`, as Desktop's `StartupWMClass: appId` does.
 #[cfg(all(not(target_os = "windows"), not(target_arch = "wasm32")))]
 pub fn apply_app_icon() {
     #[cfg(target_os = "linux")]
-    rune::set_app_id("opencode-rune");
+    rune::set_app_id("brocode");
     #[cfg(not(bundle_assets))]
     {
         let bundled = std::env::current_exe()
@@ -536,7 +536,7 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
             if fallback {
                 Ready { server: None, beta_tabs: None, first: None, refused: false, page: None }
             } else {
-                let msg = start_err.unwrap_or_else(|| format!("No OpenCode server responded at {}", actual.base));
+                let msg = start_err.unwrap_or_else(|| format!("No brocode server responded at {}", actual.base));
                 // `service.json` may name another port next time, so a discovered server keeps
                 // its timer.
                 let refused = !discover_local;
@@ -565,7 +565,7 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
     if now {
         work();
     } else if let Err(e) = rune::task::spawn("opencode-first", work) {
-        eprintln!("opencode-rune: failed to spawn first reads: {e}");
+        eprintln!("brocode: failed to spawn first reads: {e}");
     }
     (rx, accepted)
 }

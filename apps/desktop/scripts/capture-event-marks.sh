@@ -8,9 +8,9 @@ hostname
 TAG=${1:-after}
 OUT=captures/marks-$TAG
 mkdir -p "$OUT"
-cargo build --locked -p opencode-desktop
+cargo build --locked -p brocode-desktop
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
-BIN="$TARGET/debug/opencode-desktop"
+BIN="$TARGET/debug/brocode-desktop"
 COMMON="--fixture apps/desktop/assets/fixture.json --size 1100x900 --scale 2"
 # Points of the first subagent row, the shells' finished row and the Updates fold.
 at() { printf '{"events":[{"t":1.2,"type":"%s","x":%s,"y":%s}]}' "$1" "$2" "$3" > "$OUT/$1-$2.json"; echo "$OUT/$1-$2.json"; }

@@ -525,7 +525,7 @@ pub fn send_failed(host: &mut dyn SendFailedHost, id: &str, error: &WireError) -
         if sent.phase == Phase::Accepted {
             return true;
         }
-        eprintln!("opencode-rune: prompt send failed: {error}");
+        eprintln!("brocode: prompt send failed: {error}");
         if sent.journaled {
             let code = error.status();
             opencode_platform::telemetry::send_receipt(&sent.session, id, "write failed", code.unwrap_or(0));
@@ -637,7 +637,7 @@ fn apply_receipts(host: &mut dyn SendFailedHost, receipts: Vec<(String, Result<r
             Ok(receipt::Receipt::Missing) => Found::Missing,
             Err(error) if error.status() == Some(404) => Found::NoSession,
             Err(error) => {
-                eprintln!("opencode-rune: prompt receipt unavailable: {error}");
+                eprintln!("brocode: prompt receipt unavailable: {error}");
                 Found::Unknown(reason::words(&error))
             }
         };

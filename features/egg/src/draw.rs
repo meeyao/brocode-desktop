@@ -25,17 +25,23 @@ const SHIMMER_KIND: f32 = 4.0;
 const SHADOW: f32 = 5.0;
 const RING: f32 = 6.0;
 
-/// The logo's blocks (`ui/logo.tsx`), in its 234x42 units: x, y, w, h, and whether it's a
+/// The logo's blocks (`ui/logo.tsx`), in its 204x42 units: x, y, w, h, and whether it's a
 /// counter's lower half (`--icon-weak-base`).
-const RECTS: [(f64, f64, f64, f64, bool); 40] = [
-    (0., 6., 24., 6., false), (0., 12., 6., 24., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true),
-    (30., 6., 24., 6., false), (30., 12., 6., 30., false), (48., 12., 6., 24., false), (36., 30., 12., 6., false), (36., 18., 12., 12., true),
-    (60., 6., 24., 6., false), (60., 12., 6., 24., false), (78., 12., 6., 12., false), (66., 18., 12., 6., false), (66., 30., 18., 6., false), (66., 24., 18., 6., true),
-    (90., 6., 18., 6., false), (90., 12., 6., 24., false), (108., 12., 6., 24., false), (96., 18., 12., 18., true),
-    (120., 6., 24., 6., false), (120., 12., 6., 18., false), (120., 30., 24., 6., false), (126., 18., 18., 12., true),
-    (150., 6., 24., 6., false), (150., 12., 6., 24., false), (168., 12., 6., 24., false), (156., 30., 12., 6., false), (156., 18., 12., 12., true),
-    (180., 6., 18., 6., false), (198., 0., 6., 36., false), (180., 12., 6., 24., false), (186., 30., 12., 6., false), (186., 18., 12., 12., true),
-    (210., 6., 24., 6., false), (210., 12., 6., 24., false), (228., 12., 6., 12., false), (216., 18., 12., 6., false), (216., 30., 18., 6., false), (216., 24., 18., 6., true),
+const RECTS: [(f64, f64, f64, f64, bool); 33] = [
+    // b
+    (6., 6., 18., 6., false), (0., 0., 6., 36., false), (18., 12., 6., 24., false), (6., 30., 12., 6., false), (6., 18., 12., 12., true),
+    // r
+    (30., 6., 24., 6., false), (30., 12., 6., 24., false), (48., 12., 6., 12., false),
+    // o
+    (60., 6., 24., 6., false), (60., 12., 6., 24., false), (78., 12., 6., 24., false), (66., 30., 12., 6., false), (66., 18., 12., 12., true),
+    // c
+    (90., 6., 24., 6., false), (90., 12., 6., 18., false), (90., 30., 24., 6., false), (96., 18., 18., 12., true),
+    // o
+    (120., 6., 24., 6., false), (120., 12., 6., 24., false), (138., 12., 6., 24., false), (126., 30., 12., 6., false), (126., 18., 12., 12., true),
+    // d
+    (150., 6., 18., 6., false), (168., 0., 6., 36., false), (150., 12., 6., 24., false), (156., 30., 12., 6., false), (156., 18., 12., 12., true),
+    // e
+    (180., 6., 24., 6., false), (180., 12., 6., 24., false), (198., 12., 6., 12., false), (186., 18., 12., 6., false), (186., 30., 18., 6., false), (186., 24., 18., 6., true),
 ];
 
 /// sRGB-encoded channels, 0 to 1, of a colour.
@@ -89,7 +95,7 @@ pub fn scene(scene: &mut super::gpu::Scene, live: &Live, p: &Pal, slots: &[(u32,
         let stage = live.lodger.stage;
         let rect = if geo.panel[3] > 0.0 {
             let [x, y] = origin(rect, scale);
-            [(x + stage.x * scale) as f32, (y + stage.y * scale) as f32, (234.0 * stage.k * scale) as f32, rect[3]]
+            [(x + stage.x * scale) as f32, (y + stage.y * scale) as f32, (204.0 * stage.k * scale) as f32, rect[3]]
         } else {
             rect
         };
@@ -110,7 +116,7 @@ fn layer(origin: [f64; 2], r: [f64; 4], scale: f64) -> LayerAt {
 /// The wordmark's box: the flat letters (while shown), the notch, the shimmer, then the lodger.
 fn mid(out: &mut Vec<Shape>, live: &Live, p: &Pal, rect: [f32; 4], now: f64) {
     out.clear();
-    let kd = f64::from(rect[2]) / 234.0;
+    let kd = f64::from(rect[2]) / 204.0;
     let stage = Affine([kd, 0.0, 0.0, kd, f64::from(rect[0]), f64::from(rect[1])]);
     let d = &live.lodger.drawn;
     let dark = live.geo.get().dark;
@@ -119,21 +125,21 @@ fn mid(out: &mut Vec<Shape>, live: &Live, p: &Pal, rect: [f32; 4], now: f64) {
         let (stem, weak) = super::view::letter_colors(p);
         let (weak_a, stem, weak) = (f64::from(weak.a), enc(stem), enc(weak));
         for &(x, y, w, h, counter) in &RECTS {
-            let i = ((x / 30.0) as usize).min(7);
+            let i = ((x / 30.0) as usize).min(6);
             let (opacity, m) = d.letters[i];
             let a = opacity * 0.16;
             let color = if counter { premul(weak, a * weak_a) } else { premul(stem, a) };
             out.push(axis_rect(stage.then(m), [x, y, w, h], color, RECT, [0.0; 4]));
         }
-        let (opacity, m) = d.letters[7];
+        let (opacity, m) = d.letters[6];
         if d.notch * opacity > 0.0 {
-            out.push(axis_rect(stage.then(m), [224.6, 8.6, 3.8, 3.8], premul(enc(p.bg_base), d.notch * opacity), RECT, [0.0; 4]));
+            out.push(axis_rect(stage.then(m), [194.6, 8.6, 3.8, 3.8], premul(enc(p.bg_base), d.notch * opacity), RECT, [0.0; 4]));
         }
         if let Shimmer::Running { since } = live.shimmer {
             let t = ((now - since) / SHIMMER).clamp(0.0, 1.0);
             let peak = if dark { 0.0672 } else { 0.45 };
             let o = if t < 0.2 { peak * t / 0.2 } else if t <= 0.8 { peak } else { peak * (1.0 - t) / 0.2 };
-            let w = 234.0 * kd;
+            let w = 204.0 * kd;
             let x50 = f64::from(rect[0]) + (-0.5 + 2.0 * t) * w;
             let mask = [(x50 - 0.3 * w) as f32, x50 as f32, (x50 + 0.3 * w) as f32, 0.0];
             for &(x, y, ww, h, counter) in &RECTS {

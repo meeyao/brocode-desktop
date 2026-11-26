@@ -21,7 +21,7 @@
 <meta name="apple-mobile-web-app-title" content="OpenCode">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="modulepreload" href="app.js">
-<title>OpenCode (Rune)</title>
+<title>Brocode</title>
 <style>
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; touch-action: none; }
   /* The app's window colour (bg-deep), so nothing flashes between the launch screen and the first frame. */
@@ -296,9 +296,9 @@
   // phone's Home Screen opens at the manifest's start (no `?server=`), with storage of its own:
   // iOS copies a tab's cookies, and nothing else, into one added from it, so the URL is in a
   // cookie of the page's folder too.
-  const SERVER_KEY = 'opencode-rune.server';
-  const SERVER_COOKIE = 'opencode-rune-server';
-  const NOTICE_KEY = 'opencode-rune.notice-seen';
+  const SERVER_KEY = 'brocode.server';
+  const SERVER_COOKIE = 'brocode-server';
+  const NOTICE_KEY = 'brocode.notice-seen';
   // Stay signed in, only when the user says so: the password for a server, on this device, in
   // this page's storage and in a cookie of the page's folder, because iOS copies a tab's cookies,
   // and nothing else, into a Home Screen app added from it, which then opens signed in. The cookie
@@ -307,9 +307,9 @@
   // store a page can offer to (`PasswordCredential`: Chrome, Edge, Android) it's offered there
   // too, so its own autofill has it, but never relied on: `store()` resolves whether or not the
   // user saved it, and a silent `get()` answers nothing without the browser's auto sign-in.
-  const SIGNIN_KEY = 'opencode-rune.signin';
-  const DECLINED_KEY = 'opencode-rune.signin-declined';
-  const COOKIE = 'opencode-rune-signin';
+  const SIGNIN_KEY = 'brocode.signin';
+  const DECLINED_KEY = 'brocode.signin-declined';
+  const COOKIE = 'brocode-signin';
   const folder = location.pathname.replace(/[^/]*$/, '');
   const credentials = 'PasswordCredential' in window && !!navigator.credentials;
   const readJson = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback; } catch { return fallback; } };

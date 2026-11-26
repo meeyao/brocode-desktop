@@ -1,4 +1,4 @@
-//! Session timeline history and navigation for OpenCode (Rune):
+//! Session timeline history and navigation for Brocode:
 //! - [`message_nav`]: Previous/Next message stepping and the Jump to message dialog (`dialog.jump`).
 //! - [`rewind`]: Rewind to message, `/undo`, `/redo`, `"Reverted"` toast undo, and message action menus.
 //! - [`fork`]: Forking from a user message and the `"Fork from message"` dialog (`dialog.fork`).

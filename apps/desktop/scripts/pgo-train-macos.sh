@@ -5,7 +5,7 @@
 #
 #   apps/desktop/scripts/pgo-train-macos.sh <the training .app> [<server URL>]
 #
-# The app is the build-opencode-rune-pr-macos-arm64 artifact of a draft pull request from a branch
+# The app is the build-brocode-pr-macos-arm64 artifact of a draft pull request from a branch
 # with "order-train" in its name (build-app.sh builds that one instrumented), unzipped. Run this
 # from a checkout of that pull request's commit: the fixture and the input scripts are read from
 # this tree, and the stamp names its commit. Never install that build.
@@ -36,7 +36,7 @@ set -euo pipefail
 APP=$(cd "$1" && pwd)
 SERVER=${2:-}
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
-EXE="$APP/Contents/MacOS/opencode-desktop"
+EXE="$APP/Contents/MacOS/brocode-desktop"
 # rustc is the repository's (rust-toolchain.toml), whatever folder this is called from.
 cd "$ROOT"
 [ -x "$EXE" ] || { echo "no exe at $EXE" >&2; exit 1; }

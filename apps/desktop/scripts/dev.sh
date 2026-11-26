@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command dev build and install of "OpenCode (Rune).app" into ~/Applications.
+# One-command dev build and install of "Brocode.app" into ~/Applications.
 #   apps/desktop/scripts/dev.sh              build (dev profile), install, relaunch with --live
 #   apps/desktop/scripts/dev.sh --release    same with the release profile
 # Skips the relaunch when the binary is unchanged.
@@ -7,9 +7,9 @@ set -uo pipefail
 export PATH="$HOME/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
-APP="$HOME/Applications/OpenCode (Rune).app"
-INSTALLED="$APP/Contents/MacOS/opencode-desktop"
-STAMP="$HOME/.cache/opencode-rune-build-sha"
+APP="$HOME/Applications/Brocode.app"
+INSTALLED="$APP/Contents/MacOS/brocode-desktop"
+STAMP="$HOME/.cache/brocode-build-sha"
 PROFILE=debug; CARGO_FLAGS=()
 for a in "$@"; do
   case "$a" in
@@ -19,12 +19,12 @@ for a in "$@"; do
 done
 
 say() { echo "$(date '+%F %T') $*"; }
-pids() { local p; for p in $(pgrep -x opencode-desktop); do ps -o command= -p "$p" | grep -qF "$INSTALLED" && echo "$p"; done | sort | tr '\n' ' '; }
+pids() { local p; for p in $(pgrep -x brocode-desktop); do ps -o command= -p "$p" | grep -qF "$INSTALLED" && echo "$p"; done | sort | tr '\n' ' '; }
 overlaps() { local p; for p in $1; do case " $2 " in *" $p "*) return 0;; esac; done; return 1; }
 
 start=$SECONDS
-bin="$ROOT/target/$PROFILE/opencode-desktop"
-( cd "$ROOT" && cargo build -p opencode-desktop ${CARGO_FLAGS[@]+"${CARGO_FLAGS[@]}"} ) || { say "build failed"; exit 1; }
+bin="$ROOT/target/$PROFILE/brocode-desktop"
+( cd "$ROOT" && cargo build -p brocode-desktop ${CARGO_FLAGS[@]+"${CARGO_FLAGS[@]}"} ) || { say "build failed"; exit 1; }
 test -x "$bin" || { say "no binary at $bin after build"; exit 1; }
 sha=$(shasum "$bin" | cut -d" " -f1)
 if [ "$(cat "$STAMP" 2>/dev/null)" = "$sha" ] && [ -n "$(pids)" ]; then

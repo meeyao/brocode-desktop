@@ -1,6 +1,6 @@
 #!/bin/sh
 # Stamps the release version into apps/desktop/Cargo.toml and Cargo.lock so
-# `opencode-desktop --version` reports it. Release/PR CI builds only; never committed.
+# `brocode-desktop --version` reports it. Release/PR CI builds only; never committed.
 #
 #   apps/desktop/scripts/set-crate-version.sh <source root> <version>
 set -eu
@@ -20,11 +20,11 @@ awk -v current="$current" -v version="$version" '
 ' "$manifest" > "$manifest.next"
 mv "$manifest.next" "$manifest"
 awk -v current="$current" -v version="$version" '
-  /^name = "opencode-desktop"$/ { package = 1 }
+  /^name = "brocode-desktop"$/ { package = 1 }
   package && $0 == "version = \"" current "\"" { $0 = "version = \"" version "\""; package = 0 }
   { print }
 ' "$root/Cargo.lock" > "$root/Cargo.lock.next"
 mv "$root/Cargo.lock.next" "$root/Cargo.lock"
 grep -q "^version = \"$version\"" "$manifest"
-grep -A1 '^name = "opencode-desktop"$' "$root/Cargo.lock" | grep -q "^version = \"$version\"$"
-echo "Building OpenCode (Rune) as $version." >&2
+grep -A1 '^name = "brocode-desktop"$' "$root/Cargo.lock" | grep -q "^version = \"$version\"$"
+echo "Building Brocode as $version." >&2

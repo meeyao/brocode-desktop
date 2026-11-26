@@ -15,7 +15,7 @@ use crate::plugin_host::cx::{self, Dep};
 use crate::plugin_host::services::{lazy_signals, map, method};
 use crate::plugin_host::vm::Vmx;
 
-const UNSUPPORTED: &str = "The browser isn't available on this platform yet in OpenCode (Rune)";
+const UNSUPPORTED: &str = "The browser isn't available on this platform yet in Brocode";
 
 pub fn build(lua: &Lua, vmx: &std::rc::Rc<Vmx>, t: &Table) -> mlua::Result<()> {
     method(lua, t, "Tabs", |lua, _sid: Option<String>| {

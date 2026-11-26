@@ -1,11 +1,11 @@
-//! Keeps OpenCode (Rune) current from Anomaly's release feed.
+//! Keeps Brocode current from Anomaly's release feed.
 //!
 //! The update engine is a host service ([`service::UpdaterService`]: a state machine, download
 //! progress, and check and install actions) over a platform updater:
 //!
-//! - **macOS** (`mac.rs`): team builds (`anomaly.opencode-rune`) download and verify a signed
+//! - **macOS** (`mac.rs`): team builds (`com.apibrother.brocode`) download and verify a signed
 //!   bundle (code signature, signing team, Gatekeeper) into a private folder under
-//!   `~/Library/Caches/anomaly.opencode-rune/Updates`, and swap it in atomically on Restart to
+//!   `~/Library/Caches/com.apibrother.brocode/Updates`, and swap it in atomically on Restart to
 //!   update, or on quit when the opt-in "Install updates on quit" setting is on (`opencode#66501`).
 //!   Local dev bundles and bare `cargo` binaries never update.
 //! - **Windows** (`windows.rs`): a per-user install verifies the download (size, SHA-256,
@@ -93,7 +93,7 @@ const DEFAULT_BUILD: BuildInfo = BuildInfo {
     channel: "local",
     version: "0.0.0",
     commit: None,
-    product_name: "OpenCode (Rune)",
+    product_name: "Brocode",
 };
 
 /// Registers the host build identity, updates directory and error formatter.

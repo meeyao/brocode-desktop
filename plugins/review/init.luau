@@ -132,7 +132,7 @@ return plugin.defineWindow(function(ctx)
 
     ctx:AddMcpTool({
         name = "open_diff",
-        description = "Open the Changes diff view in the OpenCode (Rune) side panel, optionally scoped to a mode and file.",
+        description = "Open the Changes diff view in the Brocode side panel, optionally scoped to a mode and file.",
         inputSchema = {
             type = "object",
             properties = {

@@ -1,6 +1,6 @@
 //! Always-on frame diagnostics for live windowed runs, through Rune's `rune-perf`: one writer
 //! thread keeps `perf.json` (a two-second snapshot), capped logs and incident files in
-//! `<data dir>/rune-opencode/perf/`. The UI thread only sends a fixed-size record per frame
+//! `<data dir>/brocode/perf/`. The UI thread only sends a fixed-size record per frame
 //! report; it never formats, writes or asks for a frame, so an idle window still draws nothing.
 //!
 //! Timing is Rune's own (`FrameEncoded::update_ms`, `encode_ms`), so no compositor is attached
@@ -169,7 +169,7 @@ mod native {
 
     fn start() -> Option<Recorder> {
         let dir = crate::dirs::logs()?.join("perf");
-        let config = Config::new(dir, "OpenCode (Rune)").build(env!("CARGO_PKG_VERSION"));
+        let config = Config::new(dir, "Brocode").build(env!("CARGO_PKG_VERSION"));
         match Recorder::start(config) {
             Ok(r) => {
                 // The first call only sets this thread's baseline.
@@ -177,7 +177,7 @@ mod native {
                 Some(r)
             }
             Err(e) => {
-                eprintln!("opencode-rune: frame diagnostics unavailable: {e}");
+                eprintln!("brocode: frame diagnostics unavailable: {e}");
                 None
             }
         }

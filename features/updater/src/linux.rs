@@ -17,8 +17,8 @@ use super::platform::Platform;
 use super::protocol::{APP_NAME, ARTIFACT_NAME, DEFAULT_SERVICE_URL};
 
 /// What the `.deb` and `.rpm` install as (`apps/desktop/scripts/package-linux.sh`).
-const PACKAGE: &str = "opencode-rune";
-const PACKAGED_EXE: &str = "/usr/bin/opencode-rune";
+const PACKAGE: &str = "brocode";
+const PACKAGED_EXE: &str = "/usr/bin/brocode";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Format {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The macOS link of opencode-desktop with the functions a launch runs laid out first and together,
+# The macOS link of brocode-desktop with the functions a launch runs laid out first and together,
 # so a launch whose exe is not in memory reads few pages of it. Cargo calls this as the linker
 # (build-app.sh sets CARGO_TARGET_<TRIPLE>_LINKER); so are the app's code libraries when a build
 # has them (see below); every other link goes to cc untouched.
@@ -44,7 +44,7 @@ done
 link=("$@")
 keep=
 case "$(basename "${out:-none}")" in
-  opencode-desktop | opencode_desktop-*) ;;
+  brocode-desktop | opencode_desktop-*) ;;
   libopencode_layer_*.dylib)
     # One of the app's code libraries (build-app.sh, OPENCODE_RUNE_LAYERS). rustc exports a
     # library's Rust names only, but a higher library also calls the C code linked into this one
