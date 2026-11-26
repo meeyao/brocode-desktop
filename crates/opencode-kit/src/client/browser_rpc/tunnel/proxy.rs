@@ -47,7 +47,7 @@ use super::stream::TransportController;
 use super::super::types::{LocationRef, MAX_TUNNELS, MuxCloseInfo, TunnelTarget, try_random_hex};
 use crate::client::Server;
 
-pub const PROXY_REALM: &str = "OpenCode Browser Proxy";
+pub const PROXY_REALM: &str = "Brocode Browser Proxy";
 const HEADER_TIMEOUT: Duration = Duration::from_secs(3);
 const KEEP_ALIVE_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 const WATCHDOG_HEAD_MARGIN: Duration = Duration::from_secs(1);

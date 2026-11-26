@@ -70,8 +70,8 @@
  "skills": [
   {
    "id": "opencode",
-   "name": "OpenCode",
-   "description": "Questions about OpenCode itself."
+   "name": "Brocode",
+   "description": "Questions about Brocode itself."
   }
  ],
  "models": [
