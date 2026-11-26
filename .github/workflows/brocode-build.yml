@@ -1,0 +1,103 @@
+name: Brocode desktop builds
+
+# Unsigned, ad-hoc builds of the branded desktop app for Windows x64, macOS arm64 and
+# macOS x64. workflow_dispatch only; uploads zips as workflow artifacts, publishes nothing.
+#
+#   gh workflow run brocode-build.yml -R meeyao/brocode-desktop --ref dev
+#
+# macOS artifacts are ad-hoc signed, not notarized: after downloading, right-click > Open,
+# or `xattr -dr com.apple.quarantine Brocode.app`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build
+        required: false
+        default: dev
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --profile release-thin --locked -p brocode-desktop --no-default-features --features knobs
+      - name: Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item target/release-thin/brocode-desktop.exe out/
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md out/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path out/* -DestinationPath brocode-desktop-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brocode-desktop-windows-x64
+          path: brocode-desktop-windows-x64.zip
+          retention-days: 14
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, name: macos-arm64 }
+          - { target: x86_64-apple-darwin, name: macos-x64 }
+    runs-on: macos-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - run: rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Brocode icns
+        run: |
+          python3 -m pip install --quiet --user pillow
+          python3 - <<'PY'
+          import os
+          from PIL import Image
+          src = Image.open('apps/desktop/assets/icon/icon-1024.png').convert('RGBA')
+          slots = {'16x16': 16, '16x16@2x': 32, '32x32': 32, '32x32@2x': 64,
+                   '128x128': 128, '128x128@2x': 256, '256x256': 256,
+                   '256x256@2x': 512, '512x512': 512, '512x512@2x': 1024}
+          os.makedirs('/tmp/icon.iconset', exist_ok=True)
+          for name, size in slots.items():
+              src.resize((size, size), Image.LANCZOS).save(f'/tmp/icon.iconset/icon_{name}.png')
+          PY
+          iconutil -c icns /tmp/icon.iconset -o apps/desktop/assets/icon.icns
+      - name: Build Brocode.app
+        env:
+          OPENCODE_RUNE_VERSION: 0.0.0-dev-${{ github.run_number }}
+          OPENCODE_RUNE_BUILD_CHANNEL: local
+          OPENCODE_RUNE_PROFILE: release-thin
+          OPENCODE_RUNE_PGO_USE: "0"
+          OPENCODE_RUNE_TARGET: ${{ matrix.target }}
+          OPENCODE_RUNE_ICON: ${{ github.workspace }}/apps/desktop/assets/icon.icns
+          OPENCODE_RUNE_SYMBOLS: ${{ runner.temp }}/symbols
+        run: |
+          apps/desktop/scripts/build-app.sh "$PWD/out"
+          ditto -c -k --sequesterRsrc --keepParent "$PWD/out/Brocode.app" "brocode-desktop-${{ matrix.name }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brocode-desktop-${{ matrix.name }}
+          path: brocode-desktop-${{ matrix.name }}.zip
+          retention-days: 14
