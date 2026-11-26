@@ -54,16 +54,16 @@ fn main() {
     // `--release` build is one too, so what it measures is what ships. Debug builds keep their
     // console for logs.
     if env("OPENCODE_RUNE_BUILD_CHANNEL").is_some_and(|c| c != "local") || env("PROFILE").as_deref() == Some("release") {
-        println!("cargo:rustc-link-arg-bin=opencode-desktop=/SUBSYSTEM:WINDOWS");
-        println!("cargo:rustc-link-arg-bin=opencode-desktop=/ENTRY:mainCRTStartup");
+        println!("cargo:rustc-link-arg-bin=brocode-desktop=/SUBSYSTEM:WINDOWS");
+        println!("cargo:rustc-link-arg-bin=brocode-desktop=/ENTRY:mainCRTStartup");
     }
     // System DLLs a first frame doesn't call load on first use instead of before `main`: the
     // loader maps every static import first (43 DLLs, about 14,100 µs on a Windows dev box; comctl32 alone
     // 2,800). The delay-load helper resolves each on its first call.
     for dll in DELAY_LOADED {
-        println!("cargo:rustc-link-arg-bin=opencode-desktop=/DELAYLOAD:{dll}");
+        println!("cargo:rustc-link-arg-bin=brocode-desktop=/DELAYLOAD:{dll}");
     }
-    println!("cargo:rustc-link-arg-bin=opencode-desktop=delayimp.lib");
+    println!("cargo:rustc-link-arg-bin=brocode-desktop=delayimp.lib");
     // The main thread reserves 8 MiB of stack, as macOS and Linux give a main thread; Windows'
     // default is 1 MiB. Layout recurses once per nesting level (about 14 KB a Markdown list level
     // in a release build), so a reply nested 60 deep overflowed 1 MiB and closed the app. Only
@@ -71,7 +71,7 @@ fn main() {
     // in .cargo/config.toml so it holds for every profile and for builds that set RUSTFLAGS (the
     // PGO recording does), and only for this executable.
     if env("CARGO_CFG_TARGET_ENV").as_deref() == Some("msvc") {
-        println!("cargo:rustc-link-arg-bin=opencode-desktop=/STACK:8388608");
+        println!("cargo:rustc-link-arg-bin=brocode-desktop=/STACK:8388608");
     }
     // The exe's icon (Explorer, the taskbar, Alt+Tab, a pinned shortcut), version and manifest.
     let title = env("OPENCODE_RUNE_WINDOW_TITLE").unwrap_or_else(|| win_install::default_name(env("OPENCODE_RUNE_BUILD_CHANNEL").as_deref()).into());
