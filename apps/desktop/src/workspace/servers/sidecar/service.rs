@@ -103,9 +103,9 @@ pub(super) struct EnsureOptions<'a> {
 }
 
 /// fallback() (packages/client/src/service-probe.ts:39-41):
-/// <XDG_STATE_HOME || <home>/.local/state>/opencode/service.json.
+/// <XDG_STATE_HOME || <home>/.local/state>/brocode/service.json.
 pub(super) fn fallback_file() -> Option<PathBuf> {
-    state_dir().map(|d| d.join("opencode").join("service.json"))
+    state_dir().map(|d| d.join("brocode").join("service.json"))
 }
 
 pub(super) fn state_dir() -> Option<PathBuf> {

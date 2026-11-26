@@ -105,6 +105,9 @@ impl App {
         }
         let now = *self.clock;
         crate::connect::picker_reads::poll(self, now, tx);
+        if self.can_write() {
+            crate::connect::maybe_brand_prompt(self, tx);
+        }
         any
     }
 

@@ -57,10 +57,14 @@ fn candidate_paths(var: impl Fn(&str) -> Option<OsString>) -> Vec<PathBuf> {
     let xdg = |k: &str, fallback: &[&str]| set(k).or_else(|| Some(fallback.iter().fold(home.clone()?, |p, part| p.join(part))));
     let local = var("OPENCODE_DESKTOP_SERVER_CHANNEL").is_some_and(|c| c == "local");
     let registration = if local { "service-local.json" } else { "service.json" };
+    let state = xdg("XDG_STATE_HOME", &[".local", "state"]);
+    let config = xdg("XDG_CONFIG_HOME", &[".config"]);
     [
-        xdg("XDG_STATE_HOME", &[".local", "state"]).map(|d| d.join("opencode").join(registration)),
+        state.clone().map(|d| d.join("brocode").join(registration)),
+        state.map(|d| d.join("opencode").join(registration)),
         set("OPENCODE_CONFIG_DIR").map(|d| d.join("service.json")),
-        xdg("XDG_CONFIG_HOME", &[".config"]).map(|d| d.join("opencode").join("service.json")),
+        config.clone().map(|d| d.join("brocode").join("service.json")),
+        config.map(|d| d.join("opencode").join("service.json")),
     ]
     .into_iter()
     .flatten()

@@ -27,7 +27,8 @@ The engine, protocol and OpenCode-compatible features are unchanged. On top of u
 - No Anomaly release feed: source builds do not auto-update
 - Server: a brocode / OpenCode-compatible server on `127.0.0.1:4096` (`brocode serve`), or
   `~/.config/opencode/service.json` / `~/.local/state/opencode/service.json`; `--server <url>`
-  and `OPENCODE_SERVER_URL` override it. The client never starts a server on its own.
+  and `OPENCODE_SERVER_URL` override it. If no server answers, the client starts `brocode serve --service`
+  itself (the `brocode` CLI must be installed) and prompts for the API Brother key when the server has none.
 
 Upstream stays the source of engine fixes; rebase this fork on its `dev` branch.
 

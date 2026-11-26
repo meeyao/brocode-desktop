@@ -194,6 +194,10 @@ impl Modal {
 #[derive(Default)]
 pub struct Connect {
     pub modal: Modal,
+    /// brocode: the API Brother key prompt has run its once-per-launch check.
+    pub brand_prompted: bool,
+    /// brocode: the startup catalog sync for the prompt has been asked for.
+    pub brand_synced: bool,
     /// Fallback editor targets so `on_edit` callbacks never panic if fired after close.
     scratch_search: TextEdit,
     scratch_entry: TextEdit,
@@ -396,10 +400,44 @@ pub(crate) fn apply_modal(host: &mut dyn ConnectHost, event: ModalEvent, tx: &mu
     }
 }
 
+/// brocode: ask for the API Brother key once per run when the server has none, the way the
+/// CLI's startup prompt does. Runs after the integration catalog lands; leaves the prompt for a
+/// later frame while another modal is open.
+pub fn maybe_brand_prompt(host: &mut dyn ConnectHost, tx: &mut Tx) {
+    if host.connect().brand_prompted {
+        return;
+    }
+    let Some(list) = host.catalogs().integrations(None) else {
+        // The catalog is otherwise read only when Connect or Settings opens.
+        if !host.connect().brand_synced {
+            host.connect_mut().brand_synced = true;
+            crate::catalog::sync_catalogs(host, None);
+        }
+        return;
+    };
+    let Some(brand) = list.iter().find(|i| i.id == "brocode") else {
+        host.connect_mut().brand_prompted = true;
+        return;
+    };
+    let can_key = brand
+        .methods
+        .iter()
+        .any(|m| matches!(m.kind, opencode_kit::integration::MethodKind::Key | opencode_kit::integration::MethodKind::Env));
+    if !brand.connections.is_empty() || !can_key {
+        host.connect_mut().brand_prompted = true;
+        return;
+    }
+    if host.connect().is_modal_open() {
+        return;
+    }
+    host.connect_mut().brand_prompted = true;
+    eprintln!("brocode: no API Brother key on the server; opening the connect prompt");
+    open(host, Some("brocode"), false, tx);
+}
+
 /// Opens the dialog on its list, or on `provider`'s sign-in. From Settings it signs in at the
 /// server's default location; from the composer, in the composer's folder.
-pub fn open(host: &mut dyn ConnectHost, provider: Option<&str>, from_settings: bool, tx: &mut Tx) {
-    tx.instant();
+pub fn open(host: &mut dyn ConnectHost, provider: Option<&str>, from_settings: bool, tx: &mut Tx) {    tx.instant();
     host.before_dialog_open();
     let dir = (!from_settings).then(|| host.active_directory()).filter(|d| !d.is_empty());
     let scope = (!from_settings).then(|| host.picker_scope());

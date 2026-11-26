@@ -280,7 +280,7 @@ fn registration_file(reuse: bool, isolated: bool) -> Option<PathBuf> {
     let state = if isolated { crate::dirs::data()? } else { service::state_dir()? };
     let local = std::env::var_os("OPENCODE_DESKTOP_SERVER_CHANNEL").is_some_and(|v| v == "local");
     let name = if local { "service-local.json" } else { "service.json" };
-    Some(state.join("opencode").join(name))
+    Some(state.join("brocode").join(name))
 }
 
 /// BackgroundService.ensure (packages/desktop/src/main/service/background-service.ts:52-156).
