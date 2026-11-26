@@ -105,3 +105,28 @@ jobs:
           name: brocode-desktop-macos-x64
           path: brocode-desktop-macos-x64.zip
           retention-days: 14
+
+  publish:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Assemble
+        run: |
+          set -euo pipefail
+          mkdir -p pub
+          unzip -oq dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64.zip -d pub/windows
+          cp pub/windows/brocode-desktop.exe pub/brocode-desktop-win-x64.exe
+          cp dist/brocode-desktop-macos-arm64/brocode-desktop-macos-arm64.zip pub/brocode-desktop-darwin-arm64.zip
+          cp dist/brocode-desktop-macos-x64/brocode-desktop-macos-x64.zip pub/brocode-desktop-darwin-x64.zip
+      - name: Publish to dl.apibrother.com
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 20b0a3b3121624c5e42cbab0910872ba
+        run: bash scripts/publish-desktop.sh pub

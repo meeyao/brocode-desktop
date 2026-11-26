@@ -32,6 +32,19 @@ The engine, protocol and OpenCode-compatible features are unchanged. On top of u
 
 Upstream stays the source of engine fixes; rebase this fork on its `dev` branch.
 
+## Downloads
+
+The build workflow publishes unsigned desktop builds to `dl.apibrother.com`:
+
+| Platform | Download |
+| --- | --- |
+| **Windows x64** | [brocode-desktop-win-x64.exe](https://dl.apibrother.com/brocode-desktop-win-x64.exe) |
+| **macOS arm64** | [brocode-desktop-darwin-arm64.zip](https://dl.apibrother.com/brocode-desktop-darwin-arm64.zip) |
+| **macOS x64** | [brocode-desktop-darwin-x64.zip](https://dl.apibrother.com/brocode-desktop-darwin-x64.zip) |
+
+Version, sizes and SHA-256: [brocode-desktop-latest.json](https://dl.apibrother.com/brocode-desktop-latest.json).
+The zips are ad-hoc signed, not notarized: right-click → Open, or `xattr -dr com.apple.quarantine Brocode.app`.
+
 ## Run from source
 
 Rust 1.99.1 is pinned by `rust-toolchain.toml`. Start a server first:
@@ -73,6 +86,19 @@ changes branding and packaging. Upstream project: https://github.com/anomalyco/o
 - **0 ms UI iteration.** Built-in `--!strict` Luau plugins (`plugins/*`) reload live in place with `--plugin-hot` without touching `rustc`.
 - **Headless eyes, zero tests.** By policy, this repo has no automated tests or mocks (*"Application code is truth"*, see [AGENTS.md](AGENTS.md)). The binary renders any scene or 111-story playground view offscreen to PNG (`--snap`), dumps its live element tree (`--tree`), and replays scripted input (`--script`).
 - **Weird things built right in.** Pull on the final `e` of the wordmark on a new-session tab — something lives inside it, and pulling it out pops the letters into an 800-pin 3D GPU board and Brick Breaker with synthesized sound (`features/egg`). Press `⌘⇧⌥R` (`Dev › Rewind`) to freeze the last minute of layout frames and scrub a glitch frame by frame.
+
+## Downloads
+
+The build workflow publishes unsigned desktop builds to `dl.apibrother.com`:
+
+| Platform | Download |
+| --- | --- |
+| **Windows x64** | [brocode-desktop-win-x64.exe](https://dl.apibrother.com/brocode-desktop-win-x64.exe) |
+| **macOS arm64** | [brocode-desktop-darwin-arm64.zip](https://dl.apibrother.com/brocode-desktop-darwin-arm64.zip) |
+| **macOS x64** | [brocode-desktop-darwin-x64.zip](https://dl.apibrother.com/brocode-desktop-darwin-x64.zip) |
+
+Version, sizes and SHA-256: [brocode-desktop-latest.json](https://dl.apibrother.com/brocode-desktop-latest.json).
+The zips are ad-hoc signed, not notarized: right-click → Open, or `xattr -dr com.apple.quarantine Brocode.app`.
 
 ## Run from source
 
