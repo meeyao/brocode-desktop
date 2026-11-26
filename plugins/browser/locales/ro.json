@@ -41,7 +41,7 @@
   "site.insecure": "Conexiunea nu este securizată",
   "site.insecure.description": "Nu introduce parole sau alte informații private pe această pagină.",
   "site.local": "Server local",
-  "site.local.description": "Adresele locale se deschid pe mașina care rulează serverul OpenCode.",
+  "site.local.description": "Adresele locale se deschid pe mașina care rulează serverul Brocode.",
   "site.file": "Fișier din spațiul de lucru",
   "site.file.description": "Aici se pot deschide doar fișiere din spațiul de lucru al acestei sesiuni.",
   "site.network": "Paginile se încarcă prin rețeaua {{server}}.",

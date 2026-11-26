@@ -1,7 +1,7 @@
 {
   "action.reload": "إعادة التحميل للتحديث",
   "action.reloading": "جارٍ إعادة التحميل…",
-  "web.ready.message": "إصدار جديد من OpenCode جاهز. أعد التحميل لاستخدامه في كل نافذة مفتوحة.",
+  "web.ready.message": "إصدار جديد من Brocode جاهز. أعد التحميل لاستخدامه في كل نافذة مفتوحة.",
   "web.ready.title": "التحديث جاهز",
   "web.reload": "إعادة التحميل",
   "web.reset.action": "إعادة التحميل من الخادم",

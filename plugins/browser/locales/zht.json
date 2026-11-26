@@ -41,7 +41,7 @@
   "site.insecure": "連線不安全",
   "site.insecure.description": "請勿在此頁面輸入密碼或其他私人資訊。",
   "site.local": "本機伺服器",
-  "site.local.description": "本機位址會在執行 OpenCode 伺服器的電腦上開啟。",
+  "site.local.description": "本機位址會在執行 Brocode 伺服器的電腦上開啟。",
   "site.file": "工作區檔案",
   "site.file.description": "這裡只能開啟此工作階段工作區內的檔案。",
   "site.network": "頁面透過 {{server}} 的網路載入。",

@@ -1,7 +1,7 @@
 {
   "action.reload": "再読み込みして更新",
   "action.reloading": "再読み込み中…",
-  "web.ready.message": "OpenCode の新しいバージョンの準備ができました。再読み込みすると、開いているすべてのウインドウで使用できます。",
+  "web.ready.message": "Brocode の新しいバージョンの準備ができました。再読み込みすると、開いているすべてのウインドウで使用できます。",
   "web.ready.title": "アップデートの準備完了",
   "web.reload": "再読み込み",
   "web.reset.action": "サーバーから再読み込み",

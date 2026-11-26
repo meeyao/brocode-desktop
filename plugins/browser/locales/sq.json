@@ -41,7 +41,7 @@
   "site.insecure": "Lidhja nuk është e sigurt",
   "site.insecure.description": "Mos futni fjalëkalime ose informacione të tjera private në këtë faqe.",
   "site.local": "Server lokal",
-  "site.local.description": "Adresat lokale hapen në makinën ku ekzekutohet serveri OpenCode.",
+  "site.local.description": "Adresat lokale hapen në makinën ku ekzekutohet serveri Brocode.",
   "site.file": "Skedar i hapësirës së punës",
   "site.file.description": "Këtu mund të hapen vetëm skedarë brenda hapësirës së punës së këtij sesioni.",
   "site.network": "Faqet ngarkohen përmes rrjetit të {{server}}.",

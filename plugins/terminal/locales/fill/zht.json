@@ -2,7 +2,7 @@
   "close.failed": "無法關閉終端機",
   "connectionFailed": "終端機連線失敗",
   "create.failed": "無法建立終端機",
-  "create.unsupported": "此伺服器版本太舊，不支援終端機。請更新此伺服器上的 OpenCode。",
+  "create.unsupported": "此伺服器版本太舊，不支援終端機。請更新此伺服器上的 Brocode。",
   "disconnected": "終端機已中斷連線",
   "list.failed": "無法載入終端機",
   "location.open": "在終端機中開啟",
@@ -13,8 +13,8 @@
   "quote.label": "終端機",
   "quote.tooLong": "選取內容過長",
   "rename.failed": "無法重新命名終端機",
-  "rename.unsupported": "OpenCode 的終端機服務重新啟動後，即可重新命名終端機",
+  "rename.unsupported": "Brocode 的終端機服務重新啟動後，即可重新命名終端機",
   "request.timedOut": "伺服器回應逾時",
-  "serverOutdated": "此伺服器版本太舊，不支援終端機；請更新其上的 OpenCode",
+  "serverOutdated": "此伺服器版本太舊，不支援終端機；請更新其上的 Brocode",
   "unavailable": "此伺服器上沒有可用的終端機"
 }

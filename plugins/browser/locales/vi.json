@@ -41,7 +41,7 @@
   "site.insecure": "Kết nối không an toàn",
   "site.insecure.description": "Không nhập mật khẩu hoặc thông tin riêng tư khác trên trang này.",
   "site.local": "Máy chủ cục bộ",
-  "site.local.description": "Địa chỉ cục bộ được mở trên máy đang chạy máy chủ OpenCode.",
+  "site.local.description": "Địa chỉ cục bộ được mở trên máy đang chạy máy chủ Brocode.",
   "site.file": "Tệp trong không gian làm việc",
   "site.file.description": "Chỉ có thể mở các tệp trong không gian làm việc của phiên này ở đây.",
   "site.network": "Các trang được tải qua mạng của {{server}}.",

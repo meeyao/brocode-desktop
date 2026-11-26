@@ -41,7 +41,7 @@
   "site.insecure": "Ühendus pole turvaline",
   "site.insecure.description": "Ära sisesta sellel lehel paroole ega muud privaatset teavet.",
   "site.local": "Kohalik server",
-  "site.local.description": "Kohalikud aadressid avanevad masinas, mis käitab OpenCode'i serverit.",
+  "site.local.description": "Kohalikud aadressid avanevad masinas, mis käitab Brocode'i serverit.",
   "site.file": "Tööruumi fail",
   "site.file.description": "Siin saab avada ainult selle seansi tööruumi faile.",
   "site.network": "Lehed laaditakse serveri {{server}} võrgu kaudu.",

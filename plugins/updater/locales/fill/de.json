@@ -1,7 +1,7 @@
 {
   "action.reload": "Zum Aktualisieren neu laden",
   "action.reloading": "Wird neu geladen…",
-  "web.ready.message": "Eine neue Version von OpenCode ist bereit. Laden Sie neu, um sie in jedem geöffneten Fenster zu verwenden.",
+  "web.ready.message": "Eine neue Version von Brocode ist bereit. Laden Sie neu, um sie in jedem geöffneten Fenster zu verwenden.",
   "web.ready.title": "Update bereit",
   "web.reload": "Neu laden",
   "web.reset.action": "Vom Server neu laden",

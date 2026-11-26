@@ -41,7 +41,7 @@
   "site.insecure": "接続は保護されていません",
   "site.insecure.description": "このページではパスワードなどの個人情報を入力しないでください。",
   "site.local": "ローカルサーバー",
-  "site.local.description": "ローカルアドレスは、OpenCodeサーバーを実行しているマシン上で開かれます。",
+  "site.local.description": "ローカルアドレスは、Brocodeサーバーを実行しているマシン上で開かれます。",
   "site.file": "ワークスペースのファイル",
   "site.file.description": "ここで開けるのは、このセッションのワークスペース内のファイルのみです。",
   "site.network": "ページは{{server}}のネットワーク経由で読み込まれます。",

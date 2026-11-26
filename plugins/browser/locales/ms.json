@@ -41,7 +41,7 @@
   "site.insecure": "Sambungan tidak selamat",
   "site.insecure.description": "Jangan masukkan kata laluan atau maklumat peribadi lain pada halaman ini.",
   "site.local": "Pelayan setempat",
-  "site.local.description": "Alamat setempat dibuka pada mesin yang menjalankan pelayan OpenCode.",
+  "site.local.description": "Alamat setempat dibuka pada mesin yang menjalankan pelayan Brocode.",
   "site.file": "Fail ruang kerja",
   "site.file.description": "Hanya fail dalam ruang kerja sesi ini boleh dibuka di sini.",
   "site.network": "Halaman dimuatkan melalui rangkaian {{server}}.",

@@ -40,7 +40,7 @@
   "site.insecure": "Verbindung ist nicht sicher",
   "site.insecure.description": "Geben Sie auf dieser Seite keine Passwörter oder andere private Informationen ein.",
   "site.local": "Lokaler Server",
-  "site.local.description": "Lokale Adressen werden auf dem Rechner geöffnet, auf dem der OpenCode-Server läuft.",
+  "site.local.description": "Lokale Adressen werden auf dem Rechner geöffnet, auf dem der Brocode-Server läuft.",
   "site.network": "Seiten werden über das Netzwerk von {{server}} geladen.",
   "site.permissions": "Berechtigungen sind blockiert",
   "site.permissions.description": "Kamera, Mikrofon, Standort und Benachrichtigungen funktionieren in diesem Browser nicht.",

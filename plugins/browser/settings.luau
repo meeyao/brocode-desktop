@@ -331,7 +331,7 @@ function settings.create(env: Env, refresh: () -> ())
             end
         end
 
-        -- 3. Open links in OpenCode (`settings-browser-links`)
+        -- 3. Open links in Brocode (`settings-browser-links`)
         table.insert(sections, ui.settingsList({ key = "settings-browser-links-section" }, {
             ui.settingsRow(
                 {

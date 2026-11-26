@@ -19,7 +19,7 @@ pub fn transcript(now_ms: i64, streaming: bool) -> Transcript {
                 "id": "msg_sv_1",
                 "type": "user",
                 "time": { "created": now_ms - 240_000 },
-                "text": "Can another Rune app render an OpenCode session directly from crates/session-view?"
+                "text": "Can another Rune app render a Brocode session directly from crates/session-view?"
             },
             {
                 "id": "msg_sv_2",

@@ -41,7 +41,7 @@
   "site.insecure": "Verbindung ist nicht sicher",
   "site.insecure.description": "Geben Sie auf dieser Seite keine Passwörter oder andere private Daten ein.",
   "site.local": "Lokaler Server",
-  "site.local.description": "Lokale Adressen werden auf dem Rechner geöffnet, auf dem der OpenCode-Server läuft.",
+  "site.local.description": "Lokale Adressen werden auf dem Rechner geöffnet, auf dem der Brocode-Server läuft.",
   "site.file": "Arbeitsbereichsdatei",
   "site.file.description": "Hier können nur Dateien im Arbeitsbereich dieser Sitzung geöffnet werden.",
   "site.network": "Seiten werden über das Netzwerk von {{server}} geladen.",

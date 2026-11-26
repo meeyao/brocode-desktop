@@ -41,7 +41,7 @@
   "site.insecure": "Sambandið er ikki trygt",
   "site.insecure.description": "Skriva ikki loyniorð ella aðrar privatar upplýsingar á hesi síðuni.",
   "site.local": "Lokalur ambætari",
-  "site.local.description": "Lokalar adressur verða latnar upp á teldu, sum koyrir OpenCode ambætaran.",
+  "site.local.description": "Lokalar adressur verða latnar upp á teldu, sum koyrir Brocode ambætaran.",
   "site.file": "Workspace-fíla",
   "site.file.description": "Bert fílur í workspace hjá hesi setuni kunnu latast upp her.",
   "site.network": "Síður verða heintaðar gjøgnum netið hjá {{server}}.",

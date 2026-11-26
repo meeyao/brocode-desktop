@@ -41,7 +41,7 @@
   "site.insecure": "Ryšys nesaugus",
   "site.insecure.description": "Šiame puslapyje neįveskite slaptažodžių ar kitos privačios informacijos.",
   "site.local": "Vietinis serveris",
-  "site.local.description": "Vietiniai adresai atveriami kompiuteryje, kuriame veikia OpenCode serveris.",
+  "site.local.description": "Vietiniai adresai atveriami kompiuteryje, kuriame veikia Brocode serveris.",
   "site.file": "Darbo srities failas",
   "site.file.description": "Čia galima atverti tik failus iš šio seanso darbo srities.",
   "site.network": "Puslapiai įkeliami per {{server}} tinklą.",

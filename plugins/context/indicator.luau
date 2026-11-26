@@ -36,7 +36,7 @@ function indicator.usage(env: Env, s: Session): Usage
         end
     end
     -- Spend anywhere in the family shows the cost, even on a free model; an unknown model too,
-    -- except OpenCode Go at zero spend (`indicator.tsx`).
+    -- except Brocode Go at zero spend (`indicator.tsx`).
     local provider, model = s.providerId, s.modelId
     if model == nil or model == "" then
         provider, model = s.usageProviderId, s.usageModelId

@@ -44,7 +44,7 @@
   "site.insecure": "الاتصال غير آمن",
   "site.insecure.description": "لا تُدخل كلمات المرور أو أي معلومات خاصة أخرى في هذه الصفحة.",
   "site.local": "خادم محلي",
-  "site.local.description": "تُفتح العناوين المحلية على الجهاز الذي يشغّل خادم OpenCode.",
+  "site.local.description": "تُفتح العناوين المحلية على الجهاز الذي يشغّل خادم Brocode.",
   "site.network": "يتم تحميل الصفحات عبر شبكة ⁨{{server}}⁩.",
   "site.permissions": "الأذونات محظورة",
   "site.permissions.description": "لا تعمل الكاميرا والميكروفون والموقع والإشعارات في هذا المتصفح.",

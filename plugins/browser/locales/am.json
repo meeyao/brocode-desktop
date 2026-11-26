@@ -41,7 +41,7 @@
   "site.insecure": "ግንኙነቱ ደህንነቱ የተጠበቀ አይደለም",
   "site.insecure.description": "በዚህ ገጽ ላይ የይለፍ ቃሎችን ወይም ሌላ የግል መረጃ አያስገቡ።",
   "site.local": "አካባቢያዊ አገልጋይ",
-  "site.local.description": "አካባቢያዊ አድራሻዎች የOpenCode አገልጋዩን በሚያሄደው ማሽን ላይ ይከፈታሉ።",
+  "site.local.description": "አካባቢያዊ አድራሻዎች የBrocode አገልጋዩን በሚያሄደው ማሽን ላይ ይከፈታሉ።",
   "site.file": "የworkspace ፋይል",
   "site.file.description": "እዚህ ሊከፈቱ የሚችሉት በዚህ ክፍለ ጊዜ workspace ውስጥ ያሉ ፋይሎች ብቻ ናቸው።",
   "site.network": "ገጾች በ{{server}} አውታረ መረብ በኩል ይጫናሉ።",

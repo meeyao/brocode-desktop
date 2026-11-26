@@ -8,7 +8,7 @@ use super::{GENERATED, Out};
 
 pub fn definitions(c: &Contract) -> Result<String, String> {
     let mut o = Out::default();
-    o.line(&format!("-- OpenCode plugin contract {}: global types for luau-lsp.", c.contract));
+    o.line(&format!("-- Brocode plugin contract {}: global types for luau-lsp.", c.contract));
     o.line(&format!("-- {GENERATED}"));
     o.line("-- Load it with `luau-lsp analyze --definitions=@opencode=plugins/opencode.d.luau`.");
     o.blank();

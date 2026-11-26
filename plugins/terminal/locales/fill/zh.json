@@ -2,7 +2,7 @@
   "close.failed": "无法关闭终端",
   "connectionFailed": "终端连接失败",
   "create.failed": "无法创建终端",
-  "create.unsupported": "此服务器版本过旧，不支持终端。请更新此服务器上的 OpenCode。",
+  "create.unsupported": "此服务器版本过旧，不支持终端。请更新此服务器上的 Brocode。",
   "disconnected": "终端已断开连接",
   "list.failed": "无法加载终端",
   "location.open": "在终端中打开",
@@ -13,8 +13,8 @@
   "quote.label": "终端",
   "quote.tooLong": "所选内容过长",
   "rename.failed": "无法重命名终端",
-  "rename.unsupported": "OpenCode 的终端服务重启后即可重命名终端",
+  "rename.unsupported": "Brocode 的终端服务重启后即可重命名终端",
   "request.timedOut": "服务器响应超时",
-  "serverOutdated": "此服务器版本过旧，不支持终端；请更新其上的 OpenCode",
+  "serverOutdated": "此服务器版本过旧，不支持终端；请更新其上的 Brocode",
   "unavailable": "此服务器上没有可用的终端"
 }

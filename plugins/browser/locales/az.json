@@ -41,7 +41,7 @@
   "site.insecure": "Bağlantı təhlükəsiz deyil",
   "site.insecure.description": "Bu səhifədə şifrə və ya digər şəxsi məlumatları daxil etməyin.",
   "site.local": "Lokal server",
-  "site.local.description": "Lokal ünvanlar OpenCode serverinin işlədiyi maşında açılır.",
+  "site.local.description": "Lokal ünvanlar Brocode serverinin işlədiyi maşında açılır.",
   "site.file": "İş sahəsi faylı",
   "site.file.description": "Burada yalnız bu sessiyanın iş sahəsindəki fayllar açıla bilər.",
   "site.network": "Səhifələr {{server}} şəbəkəsi vasitəsilə yüklənir.",

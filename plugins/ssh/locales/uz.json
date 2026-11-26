@@ -19,7 +19,7 @@
   "error.platform": "Bu masofaviy platforma qo‘llab-quvvatlanmaydi. Avtomatik sozlash uchun hozirda x64 yoki arm64 da Linux yoki macOS kerak.",
   "error.install": "Masofaviy serverni o‘rnatib bo‘lmadi. Ulanishni, disk maydonini va tar o'rnatilganligini tekshiring.",
   "error.unpublished": "Ushbu ish stoli versiyasida chop etilgan masofaviy server mavjud emas. Dasturiy tuzilmalar uchun V2 ni xostga oʻrnating va ishga tushiring, soʻngra qayta urinib koʻring.",
-  "error.service": "SSH ulandi, lekin OpenCode serveri tayyor emas.",
+  "error.service": "SSH ulandi, lekin Brocode serveri tayyor emas.",
   "error.host-key": "Uy egasining shaxsini tekshirib bo‘lmadi. SSH ma'lum xostlarini yangilashdan oldin uning barmoq izini tekshiring.",
   "error.ssh-missing": "OpenSSH topilmadi. OpenSSH mijozini o'rnating va PATH da ssh mavjudligiga ishonch hosil qiling.",
   "action.authenticate": "Autentifikatsiya qilish",

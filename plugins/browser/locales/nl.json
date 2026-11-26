@@ -41,7 +41,7 @@
   "site.insecure": "Verbinding is niet beveiligd",
   "site.insecure.description": "Voer op deze pagina geen wachtwoorden of andere privégegevens in.",
   "site.local": "Lokale server",
-  "site.local.description": "Lokale adressen worden geopend op de machine waarop de OpenCode-server draait.",
+  "site.local.description": "Lokale adressen worden geopend op de machine waarop de Brocode-server draait.",
   "site.file": "Werkruimtebestand",
   "site.file.description": "Alleen bestanden in de werkruimte van deze sessie kunnen hier worden geopend.",
   "site.network": "Pagina's laden via het netwerk van {{server}}.",

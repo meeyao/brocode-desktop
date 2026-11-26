@@ -41,7 +41,7 @@
   "site.insecure": "कनेक्शन सुरक्षित नहीं है",
   "site.insecure.description": "इस पेज पर पासवर्ड या अन्य निजी जानकारी दर्ज न करें।",
   "site.local": "स्थानीय सर्वर",
-  "site.local.description": "स्थानीय पते उस मशीन पर खुलते हैं जो OpenCode सर्वर चलाती है।",
+  "site.local.description": "स्थानीय पते उस मशीन पर खुलते हैं जो Brocode सर्वर चलाती है।",
   "site.file": "वर्कस्पेस फ़ाइल",
   "site.file.description": "यहाँ केवल इस सेशन के वर्कस्पेस की फ़ाइलें खुल सकती हैं।",
   "site.network": "पेज {{server}} के नेटवर्क के माध्यम से लोड होते हैं।",

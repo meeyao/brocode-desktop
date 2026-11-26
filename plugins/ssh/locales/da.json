@@ -19,7 +19,7 @@
   "error.platform": "Denne fjernplatform er ikke understøttet. Automatisk opsætning kræver i øjeblikket Linux eller macOS på x64 eller arm64.",
   "error.install": "Fjernserveren kunne ikke installeres. Tjek tilslutningsmuligheder, diskplads, og at tar er installeret.",
   "error.unpublished": "Denne desktopversion har ingen offentliggjort fjernserver. For udviklingsbuilds, installer og start V2 på værten, og prøv derefter igen.",
-  "error.service": "SSH tilsluttet, men OpenCode-serveren blev ikke klar.",
+  "error.service": "SSH tilsluttet, men Brocode-serveren blev ikke klar.",
   "error.host-key": "Værtens identitet kunne ikke bekræftes. Bekræft dets fingeraftryk, før du opdaterer dine SSH kendte værter.",
   "error.ssh-missing": "OpenSSH blev ikke fundet. Installer en OpenSSH-klient, og sørg for, at ssh er tilgængelig på PATH.",
   "action.authenticate": "Godkend",

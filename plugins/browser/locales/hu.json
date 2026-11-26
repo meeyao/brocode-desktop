@@ -41,7 +41,7 @@
   "site.insecure": "A kapcsolat nem biztonságos",
   "site.insecure.description": "Ne adjon meg jelszót vagy más személyes adatot ezen az oldalon.",
   "site.local": "Helyi szerver",
-  "site.local.description": "A helyi címek az OpenCode szervert futtató gépen nyílnak meg.",
+  "site.local.description": "A helyi címek az Brocode szervert futtató gépen nyílnak meg.",
   "site.file": "Munkaterületi fájl",
   "site.file.description": "Itt csak a munkamenet munkaterületén belüli fájlok nyithatók meg.",
   "site.network": "Az oldalak a(z) {{server}} hálózatán keresztül töltődnek be.",

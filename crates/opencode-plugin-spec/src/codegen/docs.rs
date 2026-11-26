@@ -6,7 +6,7 @@ use super::{GENERATED, Out};
 
 pub fn api(c: &Contract) -> String {
     let mut o = Out::default();
-    o.line(&format!("# OpenCode plugin API reference (contract {})", c.contract));
+    o.line(&format!("# Brocode plugin API reference (contract {})", c.contract));
     o.blank();
     o.line(&format!("> {GENERATED} For a walkthrough, read [Writing a plugin](writing-a-plugin.md)."));
     o.blank();

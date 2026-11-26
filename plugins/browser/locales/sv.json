@@ -41,7 +41,7 @@
   "site.insecure": "Anslutningen är inte säker",
   "site.insecure.description": "Ange inte lösenord eller annan privat information på den här sidan.",
   "site.local": "Lokal server",
-  "site.local.description": "Lokala adresser öppnas på datorn som kör OpenCode-servern.",
+  "site.local.description": "Lokala adresser öppnas på datorn som kör Brocode-servern.",
   "site.file": "Fil i arbetsytan",
   "site.file.description": "Endast filer i den här sessionens arbetsyta kan öppnas här.",
   "site.network": "Sidor läses in via nätverket för {{server}}.",

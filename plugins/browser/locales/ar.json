@@ -41,7 +41,7 @@
   "site.insecure": "الاتصال غير آمن",
   "site.insecure.description": "لا تُدخل كلمات المرور أو غيرها من المعلومات الخاصة في هذه الصفحة.",
   "site.local": "خادم محلي",
-  "site.local.description": "تُفتح العناوين المحلية على الجهاز الذي يشغّل خادم OpenCode.",
+  "site.local.description": "تُفتح العناوين المحلية على الجهاز الذي يشغّل خادم Brocode.",
   "site.file": "ملف من مساحة العمل",
   "site.file.description": "يمكن فتح الملفات الموجودة داخل مساحة عمل هذه الجلسة فقط هنا.",
   "site.network": "تُحمَّل الصفحات عبر شبكة {{server}}.",

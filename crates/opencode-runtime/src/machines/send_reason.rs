@@ -10,12 +10,12 @@ pub fn words(error: &WireError) -> &'static str {
     // portal or a proxy. It isn't a refusal by OpenCode, so it never reads as one.
     match &error.kind {
         WireKind::Redirected { .. } => return "the network sent it to a sign-in page",
-        WireKind::NotOpenCode { what, .. } if what.contains("text/html") => return "the network answered with a web page, not OpenCode",
-        WireKind::NotOpenCode { .. } => return "the answer didn't come from OpenCode",
+        WireKind::NotOpenCode { what, .. } if what.contains("text/html") => return "the network answered with a web page, not Brocode",
+        WireKind::NotOpenCode { .. } => return "the answer didn't come from Brocode",
         _ => {}
     }
     match error.status() {
-        Some(401) => "sign in to OpenCode",
+        Some(401) => "sign in to Brocode",
         Some(403) => "permission denied",
         Some(404) => "session not found",
         Some(408 | 504) => "server timed out",
@@ -26,7 +26,7 @@ pub fn words(error: &WireError) -> &'static str {
         Some(400..=499) => "Brocode rejected this message",
         _ => match &error.kind {
             WireKind::TimedOut => "server didn't answer in time",
-            WireKind::Unreachable(_) => "can't reach OpenCode",
+            WireKind::Unreachable(_) => "can't reach Brocode",
             WireKind::Dropped(_) => "connection interrupted",
             _ => NO_RECEIPT,
         },

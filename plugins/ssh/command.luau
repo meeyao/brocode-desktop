@@ -1,7 +1,7 @@
 --!strict
 -- `ssh` itself (Desktop's `command.ts`, `remote-cli.ts`, `bootstrap.ts`): the target a user
 -- types, the options every connection takes, the tunnel's, and the scripts run on the host to
--- find, install and start its OpenCode service and read its registration.
+-- find, install and start its Brocode service and read its registration.
 
 local decode = require("./decode")
 

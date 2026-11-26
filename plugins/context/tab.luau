@@ -215,7 +215,7 @@ local function stats(env: Env, session: Session?, sid: string, raws: { Raw }?, w
     local function stat(name: string, value: string): ui.Node
         return ui.col(STAT, { ui.text(I18n:T(name), STAT_NAME), ui.text(value, STAT_VALUE) })
     end
-    -- `tab.tsx`: omit Total Cost when no session is selected, or when spend is zero on OpenCode Go.
+    -- `tab.tsx`: omit Total Cost when no session is selected, or when spend is zero on Brocode Go.
     local costProvider: string? = if session and session.modelId and session.modelId ~= ""
         then session.providerId
         else session and session.usageProviderId

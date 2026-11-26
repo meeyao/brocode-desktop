@@ -10,7 +10,7 @@ local whatsnew = {}
 -- Bounds the changelog request, so a stalled connection never opens a dialog mid-session.
 whatsnew.TIMEOUT = 15
 
-whatsnew.CHANGELOG_URL = "https://opencode.ai/changelog.json"
+whatsnew.CHANGELOG_URL = ""
 
 export type Highlight = { title: string, description: string, media: { type: string, src: string, alt: string? }? }
 
@@ -44,7 +44,7 @@ function whatsnew.init(input: Init): (State, { Effect })
     if not version or input.previousVersion == version then
         return DONE, {}
     end
-    if not input.previousVersion or not input.enabled then
+    if not input.previousVersion or not input.enabled or whatsnew.CHANGELOG_URL == "" then
         return DONE, { { type = "mark-seen", version = version } }
     end
     local previous = input.previousVersion :: string

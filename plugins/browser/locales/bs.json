@@ -41,7 +41,7 @@
   "site.insecure": "Veza nije sigurna",
   "site.insecure.description": "Ne unosite lozinke ni druge privatne podatke na ovoj stranici.",
   "site.local": "Lokalni server",
-  "site.local.description": "Lokalne adrese otvaraju se na računaru na kojem radi OpenCode server.",
+  "site.local.description": "Lokalne adrese otvaraju se na računaru na kojem radi Brocode server.",
   "site.file": "Datoteka radnog prostora",
   "site.file.description": "Ovdje se mogu otvoriti samo datoteke unutar radnog prostora ove sesije.",
   "site.network": "Stranice se učitavaju preko mreže servera {{server}}.",

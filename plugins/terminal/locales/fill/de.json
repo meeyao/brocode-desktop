@@ -2,7 +2,7 @@
   "close.failed": "Das Terminal konnte nicht geschlossen werden",
   "connectionFailed": "Terminalverbindung fehlgeschlagen",
   "create.failed": "Es konnte kein Terminal erstellt werden",
-  "create.unsupported": "Dieser Server ist zu alt für Terminals. Aktualisieren Sie OpenCode auf diesem Server.",
+  "create.unsupported": "Dieser Server ist zu alt für Terminals. Aktualisieren Sie Brocode auf diesem Server.",
   "disconnected": "Terminal getrennt",
   "list.failed": "Terminals konnten nicht geladen werden",
   "location.open": "Im Terminal öffnen",
@@ -13,8 +13,8 @@
   "quote.label": "Terminal",
   "quote.tooLong": "Auswahl zu lang",
   "rename.failed": "Das Terminal konnte nicht umbenannt werden",
-  "rename.unsupported": "Das Umbenennen von Terminals ist verfügbar, nachdem der Terminaldienst von OpenCode neu gestartet wurde",
+  "rename.unsupported": "Das Umbenennen von Terminals ist verfügbar, nachdem der Terminaldienst von Brocode neu gestartet wurde",
   "request.timedOut": "Der Server hat zu lange nicht geantwortet",
-  "serverOutdated": "Dieser Server ist zu alt für Terminals; aktualisieren Sie OpenCode darauf",
+  "serverOutdated": "Dieser Server ist zu alt für Terminals; aktualisieren Sie Brocode darauf",
   "unavailable": "Auf diesem Server sind keine Terminals verfügbar"
 }

@@ -2,7 +2,7 @@
 -- The SSH plugin's app half (Desktop's `main.ts`, `controller.ts`, `bootstrap.ts`): once per
 -- process. It owns the connections' machine (`machine.luau`) and runs its effects: a connect
 -- parses the target, opens a sign-in listener (`Askpass`), resolves where `ssh` goes
--- (`ssh -G`), finds or installs and starts the host's OpenCode service and reads its
+-- (`ssh -G`), finds or installs and starts the host's Brocode service and reads its
 -- registration, forwards a free local port to it through an `ssh -L` tunnel, and waits for
 -- `/api/info` to answer. Every step is a process the host supervises; a stop kills them and
 -- closes the listener. Windows reach it through the `ssh` contract.

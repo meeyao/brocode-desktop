@@ -41,7 +41,7 @@
   "site.insecure": "Bağlantı güvenli değil",
   "site.insecure.description": "Bu sayfaya parola veya diğer özel bilgileri girmeyin.",
   "site.local": "Yerel sunucu",
-  "site.local.description": "Yerel adresler, OpenCode sunucusunu çalıştıran makinede açılır.",
+  "site.local.description": "Yerel adresler, Brocode sunucusunu çalıştıran makinede açılır.",
   "site.file": "Çalışma alanı dosyası",
   "site.file.description": "Burada yalnızca bu oturumun çalışma alanındaki dosyalar açılabilir.",
   "site.network": "Sayfalar {{server}} ağı üzerinden yüklenir.",

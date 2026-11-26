@@ -41,7 +41,7 @@
   "site.insecure": "Birikme howpsuz däl",
   "site.insecure.description": "Bu sahypada parollary ýa-da beýleki şahsy maglumatlary girizmäň.",
   "site.local": "Ýerli serwer",
-  "site.local.description": "Ýerli salgylar OpenCode serweri işleýän kompýuterde açylýar.",
+  "site.local.description": "Ýerli salgylar Brocode serweri işleýän kompýuterde açylýar.",
   "site.file": "Workspace faýly",
   "site.file.description": "Bu ýerde diňe bu sessiýanyň workspace-indäki faýllar açylyp bilýär.",
   "site.network": "Sahypalar {{server}} serweriniň tory arkaly ýüklenýär.",

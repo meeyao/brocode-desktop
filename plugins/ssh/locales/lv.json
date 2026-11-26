@@ -19,7 +19,7 @@
   "error.platform": "Šī attālā platforma netiek atbalstīta. Automātiskajai iestatīšanai pašlaik ir nepieciešams Linux vai macOS uz x64 vai arm64.",
   "error.install": "Nevarēja instalēt attālo serveri. Pārbaudiet savienojumu, diska vietu un to, vai ir instalēta tar.",
   "error.unpublished": "Šai darbvirsmas versijai nav publicēta attālā servera. Izstrādes būvējumiem instalējiet un startējiet V2 resursdatorā, pēc tam mēģiniet vēlreiz.",
-  "error.service": "SSH ir izveidots savienojums, taču serveris OpenCode nebija gatavs.",
+  "error.service": "SSH ir izveidots savienojums, taču serveris Brocode nebija gatavs.",
   "error.host-key": "Nevarēja pārbaudīt saimnieka identitāti. Pirms SSH zināmo saimniekdatoru atjaunināšanas pārbaudiet tā pirkstu nospiedumu.",
   "error.ssh-missing": "OpenSSH netika atrasts. Instalējiet OpenSSH klientu un pārliecinieties, ka ssh ir pieejams PATH.",
   "action.authenticate": "Autentificēt",

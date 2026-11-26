@@ -39,7 +39,7 @@
   "site.insecure": "連線不安全",
   "site.insecure.description": "請勿在此頁面輸入密碼或其他私人資訊。",
   "site.local": "本機伺服器",
-  "site.local.description": "本機位址會在執行 OpenCode 伺服器的電腦上開啟。",
+  "site.local.description": "本機位址會在執行 Brocode 伺服器的電腦上開啟。",
   "site.network": "頁面透過 {{server}} 的網路載入。",
   "site.permissions": "權限已封鎖",
   "site.permissions.description": "攝影機、麥克風、位置和通知在此瀏覽器中無法使用。",

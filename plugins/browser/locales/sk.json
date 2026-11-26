@@ -41,7 +41,7 @@
   "site.insecure": "Pripojenie nie je zabezpečené",
   "site.insecure.description": "Na tejto stránke nezadávajte heslá ani iné súkromné údaje.",
   "site.local": "Lokálny server",
-  "site.local.description": "Lokálne adresy sa otvárajú na počítači, na ktorom beží server OpenCode.",
+  "site.local.description": "Lokálne adresy sa otvárajú na počítači, na ktorom beží server Brocode.",
   "site.file": "Súbor pracovného priestoru",
   "site.file.description": "Otvárať sa tu dajú iba súbory v pracovnom priestore tejto relácie.",
   "site.network": "Stránky sa načítavajú cez sieť {{server}}.",

@@ -1,7 +1,7 @@
 --!strict
 -- The WSL main side's state machine (Desktop's `machine.ts`), as plain data. WSL itself runs one
 -- host job at a time (probe the runtime, list distros, install WSL); each distro runs one job
--- (probe, install, update OpenCode, start or remove its server), and every completion carries
+-- (probe, install, update Brocode, start or remove its server), and every completion carries
 -- the attempt that started it, so a stale one changes nothing. `step` changes the state and
 -- returns the effects; the controller (`app.luau`) runs them.
 

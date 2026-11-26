@@ -41,7 +41,7 @@
   "site.insecure": "Yhteys ei ole suojattu",
   "site.insecure.description": "Älä anna salasanoja tai muita yksityisiä tietoja tällä sivulla.",
   "site.local": "Paikallinen palvelin",
-  "site.local.description": "Paikalliset osoitteet avautuvat koneella, jolla OpenCode-palvelin on käynnissä.",
+  "site.local.description": "Paikalliset osoitteet avautuvat koneella, jolla Brocode-palvelin on käynnissä.",
   "site.file": "Työtilan tiedosto",
   "site.file.description": "Täällä voi avata vain tämän istunnon työtilan tiedostoja.",
   "site.network": "Sivut ladataan palvelimen {{server}} verkon kautta.",

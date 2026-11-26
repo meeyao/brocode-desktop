@@ -41,7 +41,7 @@
   "site.insecure": "Savienojums nav drošs",
   "site.insecure.description": "Neievadiet paroles vai citu privātu informāciju šajā lapā.",
   "site.local": "Lokālais serveris",
-  "site.local.description": "Lokālās adreses tiek atvērtas datorā, kurā darbojas OpenCode serveris.",
+  "site.local.description": "Lokālās adreses tiek atvērtas datorā, kurā darbojas Brocode serveris.",
   "site.file": "Darbvietas fails",
   "site.file.description": "Šeit var atvērt tikai failus no šīs sesijas darbvietas.",
   "site.network": "Lapas tiek ielādētas caur {{server}} tīklu.",

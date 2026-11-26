@@ -226,7 +226,7 @@ return plugin.defineApp(function(ctx)
         return { name = name, canExecute = true, hasBash = has("bash"), hasCurl = has("curl") }
     end
 
-    -- Where the distro's OpenCode is and what version it runs. Any version that runs will do.
+    -- Where the distro's Brocode is and what version it runs. Any version that runs will do.
     local function inspectCli(distro: string): (machine.OpencodeCheck?, string?)
         local out, err = wsl(runtime.sh(runtime.DISCOVER_SCRIPT, distro), runtime.TIMEOUT)
         if not out then
@@ -373,7 +373,7 @@ return plugin.defineApp(function(ctx)
         dispatch({ type = "server.failed", distro = side.distro, attempt = attempt, message = message :: string })
     end
 
-    -- A distro's OpenCode server: find its CLI, pick a free port and a password, run `opencode
+    -- A distro's Brocode server: find its CLI, pick a free port and a password, run `opencode
     -- serve` in the distro (its script on stdin, the Windows PATH left out), and poll
     -- `/api/info` until it answers.
     local function spawnSidecar(distro: string, attempt: number)

@@ -1,6 +1,6 @@
 --!strict
 -- A WSL server's row in Settings › Servers (Desktop's `row.tsx`): its health, the distro's name
--- and the WSL badge, the OpenCode version it runs, Install or Update OpenCode when it needs it,
+-- and the WSL badge, the Brocode version it runs, Install or Update Brocode when it needs it,
 -- and its menu (Retry start, Remove).
 
 local ui = require("@opencode/ui")

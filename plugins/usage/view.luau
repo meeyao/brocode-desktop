@@ -1,5 +1,5 @@
 --!strict
--- The Usage dialog view (`usage/dialog.tsx`, `usage/dialog.css`): Usage header, OpenCode Go
+-- The Usage dialog view (`usage/dialog.tsx`, `usage/dialog.css`): Usage header, Brocode Go
 -- windows and Console budgets in bordered panels with spend and track bars, danger callout when
 -- paid models are paused, model-switch action row, and footer with reset time and View details.
 

@@ -41,7 +41,7 @@
   "site.insecure": "Povezava ni varna",
   "site.insecure.description": "Na tej strani ne vnašajte gesel ali drugih zasebnih podatkov.",
   "site.local": "Lokalni strežnik",
-  "site.local.description": "Lokalni naslovi se odprejo na računalniku, na katerem teče strežnik OpenCode.",
+  "site.local.description": "Lokalni naslovi se odprejo na računalniku, na katerem teče strežnik Brocode.",
   "site.file": "Datoteka delovnega prostora",
   "site.file.description": "Tukaj se lahko odprejo samo datoteke v delovnem prostoru te seje.",
   "site.network": "Strani se nalagajo prek omrežja strežnika {{server}}.",

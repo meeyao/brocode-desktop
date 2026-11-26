@@ -54,7 +54,7 @@ return plugin.defineWindow(function(ctx)
     end
 
     -- Update Ready (Restart / Later) or, for a download this install can't put in place by itself
-    -- (Linux), Update Available (Download OpenCode / Later). One at a time: a newer one replaces it.
+    -- (Linux), Update Available (Download Brocode / Later). One at a time: a newer one replaces it.
     local offer: ToastHandle? = nil
     local function showOffer(version: string, ready: boolean)
         if offer then

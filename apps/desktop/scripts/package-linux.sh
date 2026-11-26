@@ -148,7 +148,7 @@ cat > "$root/DEBIAN/control" <<EOF
 Package: brocode
 Version: $pkg_version
 Architecture: $deb_arch
-Maintainer: Anomaly <support@opencode.ai>
+Maintainer: API Brother <support@apibrother.com>
 Depends: libc6, libgcc-s1, libstdc++6, libasound2, libfontconfig1, libxkbcommon0, libwayland-client0, libx11-6
 Description: Brocode native desktop client
 EOF

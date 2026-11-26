@@ -41,7 +41,7 @@
   "site.insecure": "La connexió no és segura",
   "site.insecure.description": "No introduïu contrasenyes ni altra informació privada en aquesta pàgina.",
   "site.local": "Servidor local",
-  "site.local.description": "Les adreces locals s'obren a la màquina on s'executa el servidor d'OpenCode.",
+  "site.local.description": "Les adreces locals s'obren a la màquina on s'executa el servidor d'Brocode.",
   "site.file": "Fitxer de l'espai de treball",
   "site.file.description": "Aquí només es poden obrir fitxers de l'espai de treball d'aquesta sessió.",
   "site.network": "Les pàgines es carreguen a través de la xarxa de {{server}}.",

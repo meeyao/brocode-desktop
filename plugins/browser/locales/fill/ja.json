@@ -39,7 +39,7 @@
   "site.insecure": "この接続は安全ではありません",
   "site.insecure.description": "このページでパスワードやその他の個人情報を入力しないでください。",
   "site.local": "ローカルサーバー",
-  "site.local.description": "ローカルアドレスは、OpenCode サーバーを実行しているマシンで開きます。",
+  "site.local.description": "ローカルアドレスは、Brocode サーバーを実行しているマシンで開きます。",
   "site.network": "ページは {{server}} のネットワーク経由で読み込まれます。",
   "site.permissions": "権限はブロックされています",
   "site.permissions.description": "このブラウザーでは、カメラ、マイク、位置情報、通知は機能しません。",

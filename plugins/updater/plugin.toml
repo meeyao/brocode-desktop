@@ -3,14 +3,14 @@ id = "updater"
 name = "Updater"
 version = "1.0.0"
 contract = "1.7"
-description = "Keeps OpenCode current: the titlebar's Update pill, Settings > Updates, Check for Updates…, and What's new after an update"
+description = "Keeps Brocode current: the titlebar's Update pill, Settings > Updates, Check for Updates…, and What's new after an update"
 app = "app.luau"
 
 # Whether What's New shows after an update.
 [[stores]]
 name = "releaseNotes"
 
-# Opt-in: install downloaded updates automatically when OpenCode quits (opencode#66501).
+# Opt-in: install downloaded updates automatically when Brocode quits (opencode#66501).
 [[stores]]
 name = "installOnQuit"
 
@@ -28,7 +28,7 @@ description = "Show What's New popups after updates"
 id = "settings-install-on-quit"
 page = "general"
 title = "Install updates on quit"
-description = "Automatically install downloaded updates when you quit OpenCode"
+description = "Automatically install downloaded updates when you quit Brocode"
 
 [[settings_search]]
 id = "settings-check-updates"

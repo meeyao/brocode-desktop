@@ -41,7 +41,7 @@
   "site.insecure": "Ulanish xavfsiz emas",
   "site.insecure.description": "Bu sahifada parollar yoki boshqa shaxsiy ma’lumotlarni kiritmang.",
   "site.local": "Mahalliy server",
-  "site.local.description": "Mahalliy manzillar OpenCode serveri ishlayotgan kompyuterda ochiladi.",
+  "site.local.description": "Mahalliy manzillar Brocode serveri ishlayotgan kompyuterda ochiladi.",
   "site.file": "Ish maydoni fayli",
   "site.file.description": "Bu yerda faqat ushbu sessiya ish maydonidagi fayllarni ochish mumkin.",
   "site.network": "Sahifalar {{server}} tarmog‘i orqali yuklanadi.",

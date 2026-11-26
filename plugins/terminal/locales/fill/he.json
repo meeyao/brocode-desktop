@@ -2,7 +2,7 @@
   "close.failed": "לא ניתן היה לסגור את המסוף",
   "connectionFailed": "החיבור למסוף נכשל",
   "create.failed": "לא ניתן היה ליצור מסוף",
-  "create.unsupported": "שרת זה ישן מדי לתמיכה במסופים. עדכן את OpenCode בשרת זה.",
+  "create.unsupported": "שרת זה ישן מדי לתמיכה במסופים. עדכן את Brocode בשרת זה.",
   "disconnected": "המסוף התנתק",
   "list.failed": "לא ניתן היה לטעון מסופים",
   "location.open": "פתיחה במסוף",
@@ -13,8 +13,8 @@
   "quote.label": "מסוף",
   "quote.tooLong": "הבחירה ארוכה מדי",
   "rename.failed": "לא ניתן היה לשנות את שם המסוף",
-  "rename.unsupported": "שינוי שם מסופים יהיה זמין לאחר הפעלה מחדש של שירות המסוף של OpenCode",
+  "rename.unsupported": "שינוי שם מסופים יהיה זמין לאחר הפעלה מחדש של שירות המסוף של Brocode",
   "request.timedOut": "השרת לא הגיב בזמן",
-  "serverOutdated": "שרת זה ישן מדי לתמיכה במסופים; עדכן בו את OpenCode",
+  "serverOutdated": "שרת זה ישן מדי לתמיכה במסופים; עדכן בו את Brocode",
   "unavailable": "מסופים אינם זמינים בשרת זה"
 }

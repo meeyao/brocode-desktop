@@ -19,7 +19,7 @@
   "error.platform": "Această platformă la distanță nu este acceptată. În prezent, configurarea automată necesită Linux sau macOS pe x64 sau arm64.",
   "error.install": "Nu s-a putut instala serverul la distanță. Verificați conectivitatea, spațiul pe disc și dacă tar este instalat.",
   "error.unpublished": "Această versiune desktop nu are un server la distanță publicat. Pentru versiunile de dezvoltare, instalați și porniți V2 pe gazdă, apoi încercați din nou.",
-  "error.service": "SSH s-a conectat, dar serverul OpenCode nu a devenit gata.",
+  "error.service": "SSH s-a conectat, dar serverul Brocode nu a devenit gata.",
   "error.host-key": "Identitatea gazdei nu a putut fi verificată. Verificați-i amprenta înainte de a actualiza gazdele cunoscute SSH.",
   "error.ssh-missing": "OpenSSH nu a fost găsit. Instalați un client OpenSSH și asigurați-vă că ssh este disponibil pe PATH.",
   "action.authenticate": "Autentificare",

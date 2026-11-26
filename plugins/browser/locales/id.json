@@ -41,7 +41,7 @@
   "site.insecure": "Koneksi tidak aman",
   "site.insecure.description": "Jangan masukkan kata sandi atau informasi pribadi lainnya di halaman ini.",
   "site.local": "Server lokal",
-  "site.local.description": "Alamat lokal dibuka di mesin yang menjalankan server OpenCode.",
+  "site.local.description": "Alamat lokal dibuka di mesin yang menjalankan server Brocode.",
   "site.file": "Berkas ruang kerja",
   "site.file.description": "Hanya berkas di dalam ruang kerja sesi ini yang dapat dibuka di sini.",
   "site.network": "Halaman dimuat melalui jaringan {{server}}.",

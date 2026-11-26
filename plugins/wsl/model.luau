@@ -357,7 +357,7 @@ function model.plan(state: any, view: string, busy: boolean, selected: string?, 
     return { kind = "addable", key = "addable:" .. table.concat(pending, "|"), distros = distros }
 end
 
--- A configured distro's row (`wslRowView`): its OpenCode version, its install or update button,
+-- A configured distro's row (`wslRowView`): its Brocode version, its install or update button,
 -- whether Retry start and Remove are offered.
 function model.row(state: any, distro: string)
     local job = if state then state.distroJobs[distro] else nil

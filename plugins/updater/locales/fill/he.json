@@ -1,7 +1,7 @@
 {
   "action.reload": "טעינה מחדש לעדכון",
   "action.reloading": "טוען מחדש…",
-  "web.ready.message": "גרסה חדשה של OpenCode מוכנה. טען מחדש כדי להשתמש בה בכל חלון פתוח.",
+  "web.ready.message": "גרסה חדשה של Brocode מוכנה. טען מחדש כדי להשתמש בה בכל חלון פתוח.",
   "web.ready.title": "העדכון מוכן",
   "web.reload": "טעינה מחדש",
   "web.reset.action": "טעינה מחדש מהשרת",

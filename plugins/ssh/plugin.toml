@@ -3,7 +3,7 @@ id = "ssh"
 name = "SSH"
 version = "0.2.0"
 contract = "1.1"
-description = "OpenCode servers on hosts you reach over SSH: Add SSH server, the tunnel, sign-in prompts and each host's row in Settings > Servers"
+description = "Brocode servers on hosts you reach over SSH: Add SSH server, the tunnel, sign-in prompts and each host's row in Settings > Servers"
 entry = "init.luau"
 app = "app.luau"
 

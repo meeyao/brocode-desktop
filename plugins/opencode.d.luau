@@ -1,4 +1,4 @@
--- OpenCode plugin contract 1.11: global types for luau-lsp.
+-- Brocode plugin contract 1.11: global types for luau-lsp.
 -- Generated from crates/opencode-plugin-spec/contract.json by `cargo run -p opencode-plugin-spec -- --write`. Do not edit.
 -- Load it with `luau-lsp analyze --definitions=@opencode=plugins/opencode.d.luau`.
 
@@ -5382,7 +5382,7 @@ export type ModelsService = {
     Changed: Signal<()>,
 }
 
---- The OpenCode server this window works with: the server of the session or draft it shows, so a panel in a tab from another server talks to that server. A path that starts with `local:` goes to the app's own server. In the app half, the app's own server. Both halves: `ctx:GetService("Server")`.
+--- The Brocode server this window works with: the server of the session or draft it shows, so a panel in a tab from another server talks to that server. A path that starts with `local:` goes to the app's own server. In the app half, the app's own server. Both halves: `ctx:GetService("Server")`.
 export type ServerService = {
     --- Sends a request with a JSON body, off the UI thread. Yields: call it from a handler, a task or a signal callback.
     RequestAsync: (self: ServerService, method: HttpMethod, path: string, body: any?) -> ServerResponse,

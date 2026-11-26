@@ -1,6 +1,6 @@
 --!strict
 -- View usage (`composer/commands.tsx:90-130`, `usage/dialog.tsx`, `usage/machine.ts`): the
--- location's OpenCode Go allowance and Console budgets, read from the server each time the
+-- location's Brocode Go allowance and Console budgets, read from the server each time the
 -- dialog opens. Limits read before show while the new read runs; a read that fails, or takes
 -- longer than 15 s, offers Try again; a server not signed in to Console says so.
 

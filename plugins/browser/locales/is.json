@@ -41,7 +41,7 @@
   "site.insecure": "Tengingin er ekki örugg",
   "site.insecure.description": "Ekki slá inn lykilorð eða aðrar persónulegar upplýsingar á þessari síðu.",
   "site.local": "Staðbundinn netþjónn",
-  "site.local.description": "Staðbundin vefföng opnast á vélinni sem keyrir OpenCode-netþjóninn.",
+  "site.local.description": "Staðbundin vefföng opnast á vélinni sem keyrir Brocode-netþjóninn.",
   "site.file": "Skrá á vinnusvæði",
   "site.file.description": "Aðeins skrár innan vinnusvæðis þessarar setu geta opnast hér.",
   "site.network": "Síður hlaðast í gegnum net {{server}}.",

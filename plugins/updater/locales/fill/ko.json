@@ -1,7 +1,7 @@
 {
   "action.reload": "다시 불러와서 업데이트",
   "action.reloading": "다시 불러오는 중…",
-  "web.ready.message": "OpenCode의 새 버전이 준비되었습니다. 다시 불러오면 열려 있는 모든 창에서 사용할 수 있습니다.",
+  "web.ready.message": "Brocode의 새 버전이 준비되었습니다. 다시 불러오면 열려 있는 모든 창에서 사용할 수 있습니다.",
   "web.ready.title": "업데이트 준비됨",
   "web.reload": "다시 불러오기",
   "web.reset.action": "서버에서 다시 불러오기",

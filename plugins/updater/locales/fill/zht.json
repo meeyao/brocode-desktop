@@ -1,7 +1,7 @@
 {
   "action.reload": "重新載入以更新",
   "action.reloading": "正在重新載入…",
-  "web.ready.message": "OpenCode 新版本已就緒。重新載入即可在所有開啟的視窗中使用。",
+  "web.ready.message": "Brocode 新版本已就緒。重新載入即可在所有開啟的視窗中使用。",
   "web.ready.title": "更新已就緒",
   "web.reload": "重新載入",
   "web.reset.action": "從伺服器重新載入",

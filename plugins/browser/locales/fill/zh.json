@@ -39,7 +39,7 @@
   "site.insecure": "连接不安全",
   "site.insecure.description": "请勿在此页面上输入密码或其他私人信息。",
   "site.local": "本地服务器",
-  "site.local.description": "本地地址会在运行 OpenCode 服务器的机器上打开。",
+  "site.local.description": "本地地址会在运行 Brocode 服务器的机器上打开。",
   "site.network": "页面通过 {{server}} 的网络加载。",
   "site.permissions": "权限已被阻止",
   "site.permissions.description": "摄像头、麦克风、位置和通知在此浏览器中不可用。",

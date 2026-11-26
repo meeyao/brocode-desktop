@@ -466,7 +466,7 @@ local function renderInstallReview(env: DialogEnv, view: View, rev: InstallRevie
         }))
     end
 
-    -- Only display permissions that OpenCode actually grants; stripped/unsupported permissions
+    -- Only display permissions that Brocode actually grants; stripped/unsupported permissions
     -- are disclosed under "Not supported:" below so they are never shown as granted (READER-7 F4).
     local GRANTED_PERMS: { [string]: boolean } = {
         activeTab = true,

@@ -19,7 +19,7 @@
   "error.platform": "Tato vzdálená platforma není podporována. Automatické nastavení nyní vyžaduje Linux nebo macOS na architektuře x64 či arm64.",
   "error.install": "Vzdálený server se nepodařilo nainstalovat. Zkontrolujte připojení, místo na disku a instalaci programu tar.",
   "error.unpublished": "Pro tuto verzi aplikace Desktop není publikován vzdálený server. U vývojových sestavení nainstalujte a spusťte V2 na hostiteli a zkuste to znovu.",
-  "error.service": "SSH se připojilo, ale server OpenCode nebyl připraven.",
+  "error.service": "SSH se připojilo, ale server Brocode nebyl připraven.",
   "error.host-key": "Identitu hostitele se nepodařilo ověřit. Před aktualizací známých hostitelů SSH ověřte jeho otisk.",
   "error.ssh-missing": "OpenSSH nebylo nalezeno. Nainstalujte klienta OpenSSH a ověřte, že je ssh dostupné v proměnné PATH.",
   "action.authenticate": "Ověřit",

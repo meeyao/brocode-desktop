@@ -41,7 +41,7 @@
   "site.insecure": "החיבור אינו מאובטח",
   "site.insecure.description": "אל תזין בדף זה סיסמאות או מידע פרטי אחר.",
   "site.local": "שרת מקומי",
-  "site.local.description": "כתובות מקומיות נפתחות במחשב שמריץ את שרת OpenCode.",
+  "site.local.description": "כתובות מקומיות נפתחות במחשב שמריץ את שרת Brocode.",
   "site.network": "הדפים נטענים דרך הרשת של ⁨{{server}}⁩.",
   "site.permissions": "ההרשאות חסומות",
   "site.permissions.description": "מצלמה, מיקרופון, מיקום והתראות אינם פועלים בדפדפן זה.",

@@ -39,7 +39,7 @@
   "site.insecure": "안전하지 않은 연결",
   "site.insecure.description": "이 페이지에 비밀번호나 기타 개인 정보를 입력하지 마세요.",
   "site.local": "로컬 서버",
-  "site.local.description": "로컬 주소는 OpenCode 서버를 실행하는 컴퓨터에서 열립니다.",
+  "site.local.description": "로컬 주소는 Brocode 서버를 실행하는 컴퓨터에서 열립니다.",
   "site.network": "페이지는 {{server}}의 네트워크를 통해 로드됩니다.",
   "site.permissions": "권한이 차단됨",
   "site.permissions.description": "이 브라우저에서는 카메라, 마이크, 위치, 알림이 작동하지 않습니다.",

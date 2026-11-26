@@ -41,7 +41,7 @@
   "site.insecure": "La connexion n’est pas sécurisée",
   "site.insecure.description": "Ne saisissez pas de mots de passe ni d’autres informations privées sur cette page.",
   "site.local": "Serveur local",
-  "site.local.description": "Les adresses locales s’ouvrent sur la machine qui exécute le serveur OpenCode.",
+  "site.local.description": "Les adresses locales s’ouvrent sur la machine qui exécute le serveur Brocode.",
   "site.file": "Fichier de l’espace de travail",
   "site.file.description": "Seuls les fichiers de l’espace de travail de cette session peuvent s’ouvrir ici.",
   "site.network": "Les pages se chargent via le réseau de {{server}}.",

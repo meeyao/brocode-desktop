@@ -8,7 +8,7 @@ local runtime = {}
 -- How long a `wsl.exe` command may take: long enough for a cold start, short enough to fail
 -- fast on a wedged distro.
 runtime.TIMEOUT = 20
--- Installs (WSL, a distro, OpenCode).
+-- Installs (WSL, a distro, Brocode).
 runtime.INSTALL_TIMEOUT = 15 * 60
 -- How long a started server has to answer `/api/info`.
 runtime.HEALTH_TIMEOUT = 30

@@ -94,7 +94,7 @@ pub fn held_by_another_copy() -> bool {
 
 /// What an open refused for another copy gives as its reason (`BootReport::error`): the app says
 /// it in its own words. The browser build never refuses one.
-pub const IN_USE: &str = "another copy of OpenCode has this profile open";
+pub const IN_USE: &str = "another copy of Brocode has this profile open";
 
 /// A write's outcome, for [`write_trouble`]: `error` is the failure's words, `full` when it says
 /// the disk is full.
