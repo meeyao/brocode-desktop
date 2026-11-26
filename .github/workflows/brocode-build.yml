@@ -61,6 +61,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
       - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
+      - name: nasm
+        run: brew install nasm
       - name: Brocode icns
         run: |
           mkdir -p /tmp/icon.iconset
