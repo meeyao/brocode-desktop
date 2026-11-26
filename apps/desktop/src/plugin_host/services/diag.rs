@@ -306,7 +306,7 @@ fn write(dir: &Path, before: &Json, server: Json, started: i64, now: i64) -> std
         "created": iso(now),
         "includeServer": true,
         "app": {
-            "name": "OpenCode",
+            "name": "Brocode",
             "version": crate::updater::build_version(),
             "channel": crate::updater::build_channel(),
             "durationSeconds": (now - started) as f64 / 1000.0,

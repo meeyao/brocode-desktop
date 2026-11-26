@@ -24,13 +24,13 @@ pub fn plain_error(raw: &str) -> String {
     let e = raw.to_lowercase();
     let has = |ks: &[&str]| ks.iter().any(|k| e.contains(k));
     let words = if has(&["timeout", "timed out"]) {
-        "OpenCode didn't answer in time"
+        "Brocode didn't answer in time"
     } else if has(&["refused", "connection failed"]) {
-        "OpenCode isn't running"
+        "Brocode isn't running"
     } else if has(&["connection reset", "connection aborted", "broken pipe", "unexpected eof", "stream ended"]) {
-        "OpenCode dropped the connection"
+        "Brocode dropped the connection"
     } else if has(&["failed to lookup", "dns", "no route to host", "network is unreachable"]) {
-        "Can't reach the OpenCode server"
+        "Can't reach the Brocode server"
     } else {
         return raw.to_owned();
     };

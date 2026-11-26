@@ -8,7 +8,7 @@ use crate::App;
 use crate::palette::Pal;
 use crate::stories::{Trigger, replay};
 
-pub const VARIANTS: &[(&str, usize)] = &[("OpenCode", 0), ("Tokyonight", 1), ("Catppuccin", 2), ("Dracula", 3), ("Nord", 4)];
+pub const VARIANTS: &[(&str, usize)] = &[("Brocode", 0), ("Tokyonight", 1), ("Catppuccin", 2), ("Dracula", 3), ("Nord", 4)];
 const THEMES: [&str; 5] = [crate::themes::DEFAULT, "tokyonight", "catppuccin", "dracula", "nord"];
 
 pub const KEYS: &[Trigger] = &[

@@ -89,7 +89,7 @@ impl ProjectIcon {
 const OPENCODE_PROJECT_IDS: [&str; 3] =
     ["012780c4098d08caa4ea8c479ed0a4690489f38d", "476fbfe6befa9e63ddd7f9ae71655999a0104256", "4b0ea68d7af9a6031a7ffda7ad66e0cb83315750"];
 
-/// The drawing of `https://opencode.ai/favicon.svg` (`packages/ui/src/assets/favicon/favicon.svg`),
+/// The drawing of `https://apibrother.com/favicon.svg` (`packages/ui/src/assets/favicon/favicon.svg`),
 /// which Desktop loads for those ids: carried here, so it shows on the first frame and offline.
 const OPENCODE_FAVICON: &str = "data:image/svg+xml;utf8,<svg width=\"512\" height=\"512\" viewBox=\"0 0 512 512\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#131010\"/><path d=\"M320 224V352H192V224H320Z\" fill=\"#5A5858\"/><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M384 416H128V96H384V416ZM320 160H192V352H320V160Z\" fill=\"white\"/></svg>";
 

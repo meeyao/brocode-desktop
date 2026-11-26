@@ -8,7 +8,7 @@ pub fn manifest(c: &Contract) -> Result<String, String> {
     let mut schema = object(c, &c.manifest.fields)?;
     let head = json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": format!("OpenCode plugin manifest (contract {})", c.contract),
+        "title": format!("Brocode plugin manifest (contract {})", c.contract),
         "description": format!("{} Generated from crates/opencode-plugin-spec/contract.json.", c.manifest.doc),
     });
     if let (Value::Object(mut all), Value::Object(body)) = (head, schema.take()) {

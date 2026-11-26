@@ -124,12 +124,11 @@ const MENUS: [(&str, opencode_i18n::Key, &[Row]); 6] = [
         it(opencode_i18n::key!("desktop.menu.closeWindow"), Act::CloseWindow, Keys::None),
     ]),
     ("Help", opencode_i18n::key!("desktop.menu.help"), &[
-        it(opencode_i18n::key!("desktop.menu.documentation"), Act::Open("https://opencode.ai/docs"), Keys::None),
-        it(opencode_i18n::key!("desktop.menu.supportForum"), Act::Open("https://discord.com/invite/opencode"), Keys::None),
+        it(opencode_i18n::key!("desktop.menu.documentation"), Act::Open("https://github.com/meeyao/brocode-desktop#readme"), Keys::None),
         it(opencode_i18n::key!("desktop.menu.exportLogs"), Act::ExportLogs, Keys::None),
         None,
-        it(opencode_i18n::key!("desktop.menu.shareFeedback"), Act::Open("https://github.com/anomalyco/opencode/issues/new?template=feature_request.yml"), Keys::None),
-        it(opencode_i18n::key!("desktop.menu.reportBug"), Act::Open("https://github.com/anomalyco/opencode/issues/new?template=bug_report.yml"), Keys::None),
+        it(opencode_i18n::key!("desktop.menu.shareFeedback"), Act::Open("https://github.com/meeyao/brocode-desktop/issues/new"), Keys::None),
+        it(opencode_i18n::key!("desktop.menu.reportBug"), Act::Open("https://github.com/meeyao/brocode-desktop/issues/new"), Keys::None),
     ]),
 ];
 

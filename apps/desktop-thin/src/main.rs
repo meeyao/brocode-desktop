@@ -112,7 +112,7 @@ mod thin {
             let show = if user32.is_null() { std::ptr::null_mut() } else { GetProcAddress(user32, c"MessageBoxW".as_ptr().cast()) };
             if !show.is_null() {
                 let show: extern "system" fn(*mut c_void, *const u16, *const u16, u32) -> i32 = std::mem::transmute(show);
-                show(std::ptr::null_mut(), wide(message.as_ref()).as_ptr(), wide("OpenCode".as_ref()).as_ptr(), MB_ICONERROR);
+                show(std::ptr::null_mut(), wide(message.as_ref()).as_ptr(), wide("Brocode".as_ref()).as_ptr(), MB_ICONERROR);
             }
         }
         1

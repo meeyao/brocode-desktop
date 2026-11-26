@@ -91,12 +91,27 @@ fn slot(dir: Option<&str>) -> String {
     dir.unwrap_or_default().to_owned()
 }
 
+/// brocode: a catalog read without OpenCode's own providers/models (`/api/provider`, `/api/model`).
+fn without_opencode(v: &Value, field: &str) -> Value {
+    let keep = |x: &Value| !x.get(field).and_then(Value::as_str).unwrap_or_default().starts_with("opencode");
+    let mut out = v.clone();
+    if out.get("data").is_some_and(Value::is_array) {
+        if let Some(arr) = out.get_mut("data").and_then(Value::as_array_mut) {
+            arr.retain(keep);
+        }
+    } else if let Some(arr) = out.as_array_mut() {
+        arr.retain(keep);
+    }
+    out
+}
+
 pub fn parse_providers(v: &Value) -> Vec<ProviderInfo> {
     v["data"]
         .as_array()
         .or_else(|| v.as_array())
         .into_iter()
         .flatten()
+        .filter(|p| !p["id"].as_str().unwrap_or_default().starts_with("opencode"))
         .map(|p| ProviderInfo {
             id: p["id"].as_str().unwrap_or_default().to_owned(),
             name: p["name"].as_str().unwrap_or_default().to_owned(),
@@ -151,14 +166,18 @@ pub(crate) fn fetch_read(server: &Server, dir: Option<&str>) -> CatalogRead {
 pub(crate) fn apply_read(host: &mut dyn ConnectHost, dir: Option<&str>, read: CatalogRead, tx: &mut Tx) -> bool {
     let ok = read.integrations.is_some() && read.providers.is_some() && read.models.is_some();
     if let Some(list) = read.integrations {
+        // brocode: no OpenCode Console/Go/Zen rows in this build's provider list.
+        let list: Vec<_> = list.into_iter().filter(|i| !i.id.starts_with("opencode")).collect();
         host.catalogs_mut().insert_integrations(dir, list);
     }
     if let Some(p) = &read.providers {
-        host.catalogs_mut().insert_providers(dir, parse_providers(p));
-        host.load_providers(p.get("data").unwrap_or(p));
+        let p = without_opencode(p, "id");
+        host.catalogs_mut().insert_providers(dir, parse_providers(&p));
+        host.load_providers(p.get("data").unwrap_or(&p));
     }
     if let Some((m, agents)) = &read.models {
-        host.load_models(m.get("data").unwrap_or(m));
+        let m = without_opencode(m, "providerID");
+        host.load_models(m.get("data").unwrap_or(&m));
         host.load_agents(agents.get("data").unwrap_or(agents));
     }
     tx.instant();

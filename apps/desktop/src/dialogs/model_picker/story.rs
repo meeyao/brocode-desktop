@@ -66,7 +66,7 @@ fn open(s: &mut App, _: &mut Play<App>) {
     s.composer_ext.pickers.load_live(&models, &serde_json::json!([{"id": "build"}]));
     // What the group headers say: `/api/provider`'s names, not the ids `/api/model` gives.
     s.composer_ext.pickers.load_providers(&serde_json::json!([
-        { "id": "opencode", "name": "Anomaly / OpenCode" },
+        { "id": "opencode", "name": "API Brother / Brocode" },
         { "id": "github-copilot", "name": "GitHub Copilot" },
         { "id": "openai", "name": "OpenAI" },
         { "id": "console-openai-test", "name": "Anomaly / RITB" },

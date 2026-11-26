@@ -145,7 +145,7 @@ pub fn view<H: SettingsHost + PopupHost + 'static>(s: &H, p: &Pal) -> El {
         .color(p.muted)
         .wrap()
         .spans(vec![Span::new(more_start, more_start + more.len()).color(p.accent)])
-        .link(Link::new(more_start..more_start + more.len(), "https://opencode.ai/docs/themes").role("link").label(more).hover(LinkPaint::new().color(p.accent_hover)))
+        .link(Link::new(more_start..more_start + more.len(), "https://github.com/meeyao/brocode-desktop").role("link").label(more).hover(LinkPaint::new().color(p.accent_hover)))
         .on_link(|s: &mut H, url: &str, tx: &mut Tx| crate::open_external(s, url, tx));
     let current_zoom = s.zoom();
     let zoom_pct = st.zoom_percent(current_zoom);

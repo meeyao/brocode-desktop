@@ -467,7 +467,7 @@ fn manage(p: &Pal) -> El {
 
 fn skills_link<H: SettingsHost + 'static>(p: &Pal) -> El {
     let words = t!("settings.extensions.addSkills");
-    const URL: &str = "https://opencode.ai/docs/skills";
+    const URL: &str = "https://github.com/meeyao/brocode-desktop";
     text(words)
         .key("settings-extension-link")
         .font(BODY)

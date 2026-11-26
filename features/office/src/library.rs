@@ -60,13 +60,13 @@ pub fn start(start: Start) -> Result<Library, String> {
 }
 
 fn load() -> Result<&'static Api, String> {
-    let path = path().ok_or_else(|| "The viewer for Word, Excel and PowerPoint files is missing from this install of OpenCode. Install OpenCode again to open them.".to_owned())?;
-    let entry = open(&path).map_err(|e| format!("The viewer for Word, Excel and PowerPoint files could not be loaded ({}: {e}). Install OpenCode again to open them.", path.display()))?;
+    let path = path().ok_or_else(|| "The viewer for Word, Excel and PowerPoint files is missing from this install of Brocode. Install Brocode again to open them.".to_owned())?;
+    let entry = open(&path).map_err(|e| format!("The viewer for Word, Excel and PowerPoint files could not be loaded ({}: {e}). Install Brocode again to open them.", path.display()))?;
     // SAFETY: `HOST` is a static; the entry reads `abi` during the call only and touches nothing
     // when it is not its own.
     let api = unsafe { entry(&HOST, &engine::abi()) };
     // SAFETY: a non-null answer is the library's static `Api`, and the library is never unloaded.
-    unsafe { api.as_ref() }.ok_or_else(|| format!("The viewer for Word, Excel and PowerPoint files is from another version of OpenCode ({}). Install OpenCode again to open them.", path.display()))
+    unsafe { api.as_ref() }.ok_or_else(|| format!("The viewer for Word, Excel and PowerPoint files is from another version of Brocode ({}). Install Brocode again to open them.", path.display()))
 }
 
 fn path() -> Option<PathBuf> {

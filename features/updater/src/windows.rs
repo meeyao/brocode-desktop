@@ -458,7 +458,7 @@ fn check_replaceable(root: &Path) -> Result<(), String> {
         .open(&probe)
         .map(drop)
         .and_then(|()| std::fs::remove_file(&probe))
-        .map_err(|_| format!("{} is not writable, so OpenCode can't update itself there.", parent.display()))
+        .map_err(|_| format!("{} is not writable, so Brocode can't update itself there.", parent.display()))
 }
 
 /// Windows' own bsdtar reads zip archives (a GNU tar earlier on PATH doesn't). It reads its

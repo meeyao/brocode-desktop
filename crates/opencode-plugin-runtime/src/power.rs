@@ -139,7 +139,7 @@ mod platform {
             } else {
                 (
                     "systemd-inhibit",
-                    ["--what=idle", "--who=OpenCode", "--why=Keep screen active", "sleep", "infinity"]
+                    ["--what=idle", "--who=Brocode", "--why=Keep screen active", "sleep", "infinity"]
                         .map(str::to_owned)
                         .to_vec(),
                 )

@@ -46,12 +46,12 @@ fn providers_with_accounts(s: &mut App) {
     let provider = |id: &str, name: &str, via: Option<&str>| ProviderInfo { id: id.into(), name: name.into(), integration: via.map(str::to_owned) };
     s.seed_catalogs(
         vec![
-            integration("opencode", "OpenCode", vec![account("cred-console", "Anomaly")]),
+            integration("opencode", "Brocode", vec![account("cred-console", "Anomaly")]),
             integration("anthropic", "Anthropic", vec![account("cred-claude-work", "Work"), account("cred-claude-home", "Personal")]),
         ],
         vec![
-            provider("opencode", "OpenCode Zen", None),
-            provider("opencode-go", "OpenCode Go", Some("opencode")),
+            provider("opencode", "Brocode Zen", None),
+            provider("opencode-go", "Brocode Go", Some("opencode")),
             provider("console-anomaly", "Anomaly", Some("opencode")),
             provider("anthropic", "Anthropic", None),
         ],

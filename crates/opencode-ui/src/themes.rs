@@ -74,7 +74,7 @@ fn desktop() -> &'static [Info] {
         }
         let asset = |json| Tokens::Asset { json, read: OnceLock::new() };
         let default = list.iter().find(|(h, _)| h.id == DEFAULT).map_or_else(|| Tokens::Given(Default::default()), |(_, json)| asset(*json));
-        std::iter::once(Info { id: DEFAULT.into(), name: "OpenCode".into(), tokens: default })
+        std::iter::once(Info { id: DEFAULT.into(), name: "Brocode".into(), tokens: default })
             .chain(list.into_iter().filter(|(h, _)| h.id != DEFAULT).map(|(h, json)| Info { id: h.id, name: h.name, tokens: asset(json) }))
             .collect()
     })

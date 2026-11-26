@@ -61,7 +61,7 @@ const CTRL_BREAK: &[u8] = b"\x1b[17;29;0;1;8;1_\x1b[3;70;0;1;264;1_\x1b[3;70;0;0
 /// Why an attachment stopped, as the pane words it (`terminal.tsx` `failureText`).
 pub const DISCONNECTED: &str = "Terminal disconnected";
 pub const CONNECTION_FAILED: &str = "Terminal connection failed";
-pub const OUTDATED: &str = "This server is too old for terminals; update OpenCode on it";
+pub const OUTDATED: &str = "This server is too old for terminals; update Brocode on it";
 
 /// The emulator's grid: the server's canonical size, at the pane's cell size.
 struct Grid {

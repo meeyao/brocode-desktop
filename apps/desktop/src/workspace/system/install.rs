@@ -464,9 +464,9 @@ mod dialog {
         let title = wide(&format!("Uninstall {}", p.name()));
         let instruction = wide(&format!("Uninstall {}?", p.name()));
         let content = wide(if own_data {
-            "This removes the app and its Start menu and desktop shortcuts. Your OpenCode sessions stay on the server."
+            "This removes the app and its Start menu and desktop shortcuts. Your Brocode sessions stay on the server."
         } else {
-            "This removes the app and its Start menu and desktop shortcuts. Its settings stay for the other Brocode installed, and your OpenCode sessions stay on the server."
+            "This removes the app and its Start menu and desktop shortcuts. Its settings stay for the other Brocode installed, and your Brocode sessions stay on the server."
         });
         let verification = wide("Also delete my settings, tabs, drafts and caches");
         let label = wide("Uninstall");

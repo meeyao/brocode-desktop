@@ -44,7 +44,7 @@ pub enum WireKind {
 
 /// The words an error's text carries when the answer wasn't OpenCode's, so a reading of the text
 /// never takes it for OpenCode's refusal.
-pub const NOT_OPENCODE: &str = "not OpenCode's answer";
+pub const NOT_OPENCODE: &str = "not Brocode's answer";
 
 impl WireError {
     pub fn new(method: &'static str, path: &str, kind: WireKind) -> WireError {

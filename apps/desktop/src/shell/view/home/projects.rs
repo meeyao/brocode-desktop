@@ -75,7 +75,7 @@ pub(super) fn utility(p: &Pal, stacked: bool) -> El {
         }
     });
     let help = nav_row(p, "home-help", &ic::HELP, t!("sidebar.help")).on_press_tx(|_: &mut App, tx: &mut Tx| {
-        crate::open_in::open_external(tx, "https://opencode.ai/desktop-feedback");
+        crate::open_in::open_external(tx, "https://github.com/meeyao/brocode-desktop/issues/new");
     });
     if stacked {
         return col().key("home-utility").w_full().pr(12.0).gap(4.0).child(settings.w_full()).child(help.w_full());

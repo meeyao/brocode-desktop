@@ -82,7 +82,7 @@ fn setup(s: &mut App) {
         let mut obj = json!({
             "workspace": {
                 "name": "Acme",
-                "usageURL": "https://opencode.ai/wrk_1/activity/overview",
+                "usageURL": "https://apibrother.com",
             },
             "budgets": budgets,
         });

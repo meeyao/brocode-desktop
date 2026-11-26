@@ -23,7 +23,7 @@ use crate::{App, Route};
 
 const STORAGE_NS: &str = "opencode.global.dat";
 const STORAGE_KEY: &str = "free-limit";
-const GO_URL: &str = "https://opencode.ai/go";
+const GO_URL: &str = "https://apibrother.com";
 /// OpenCode Zen always says when free usage resets; covers a refusal without a delay or out of range.
 const FALLBACK_RESET_MS: i64 = 3_600_000;
 /// `MAX_RETRY_AFTER_MS` (`usage-exceeded-dialogs.tsx:21`): 45 days.
@@ -282,7 +282,7 @@ fn scene(s: &mut App, reset_at: Option<i64>) {
         key: "opencode:big-pickle".into(),
         id: "big-pickle".into(),
         provider: "opencode".into(),
-        group: "OpenCode".into(),
+        group: "Brocode".into(),
         name: "Big Pickle".into(),
         variants: Vec::new(),
         hidden: false,

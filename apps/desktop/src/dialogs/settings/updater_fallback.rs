@@ -97,7 +97,7 @@ fn disabled_description(error: Option<&str>) -> String {
         return msg("check.isolated", "Updates are off in this isolated run (RUNE_DIRS_ROOT).");
     }
     let _ = error;
-    msg("check.unavailable", "This build is updated outside OpenCode, for example by your package manager.")
+    msg("check.unavailable", "This build is updated outside Brocode, for example by your package manager.")
 }
 
 fn updater_error(app: &App) -> Option<String> {
@@ -119,13 +119,13 @@ fn view(app: &App, p: &Pal) -> El {
         Some("checking") => ("action.checking", "Checking…", "check.description", "Manually check for updates and install if available", None),
         Some("downloading") => ("action.downloading", "Downloading…", "check.description", "Manually check for updates and install if available", None),
         Some("ready") => ("action.installRestart", "Install and restart", "check.description", "Manually check for updates and install if available", Some("install")),
-        Some("download-required") => ("action.download", "Download OpenCode", "check.description", "Manually check for updates and install if available", Some("install")),
+        Some("download-required") => ("action.download", "Download Brocode", "check.description", "Manually check for updates and install if available", Some("install")),
         Some("installing") => ("action.installing", "Installing…", "check.description", "Manually check for updates and install if available", None),
         Some("disabled") => (
             "action.unavailable",
             "Updates unavailable",
             "check.unavailable",
-            "This build is updated outside OpenCode, for example by your package manager.",
+            "This build is updated outside Brocode, for example by your package manager.",
             None,
         ),
         Some(_) => ("action.checkNow", "Check now", "check.description", "Manually check for updates and install if available", Some("check")),
@@ -162,7 +162,7 @@ fn view(app: &App, p: &Pal) -> El {
         let quit_title = msg("installOnQuit.title", "Install updates on quit");
         let quit_desc = msg(
             "installOnQuit.description",
-            "Automatically install downloaded updates when you quit OpenCode",
+            "Automatically install downloaded updates when you quit Brocode",
         );
         let mut quit_sw = rune_kit::Switch::new(quit_on)
             .web()
@@ -212,7 +212,7 @@ fn run_action(s: &mut App, tx: &mut Tx, action: &'static str) {
                         "disabled" => crate::status_toast::say(app, msg("action.unavailable", "Updates unavailable"), disabled_description(view.error.as_deref())),
                         "up-to-date" => {
                             let ver = crate::updater::display_version(app);
-                            let desc = msg("toast.latest.description", "You're running the latest version of OpenCode.")
+                            let desc = msg("toast.latest.description", "You're running the latest version of Brocode.")
                                 .replace("{{version}}", &ver);
                             crate::status_toast::succeed(app, msg("toast.latest.title", "You're up to date"), desc);
                         }
@@ -224,7 +224,7 @@ fn run_action(s: &mut App, tx: &mut Tx, action: &'static str) {
                         }
                         "download-required" => {
                             let ver = view.version.as_deref().unwrap_or_default();
-                            let desc = msg("dialog.available.message", "OpenCode {{version}} is available to download.")
+                            let desc = msg("dialog.available.message", "Brocode {{version}} is available to download.")
                                 .replace("{{version}}", ver);
                             crate::status_toast::say(app, msg("dialog.available.title", "Update Available"), desc);
                         }
@@ -232,7 +232,7 @@ fn run_action(s: &mut App, tx: &mut Tx, action: &'static str) {
                             let ver = view.version.as_deref().unwrap_or_default();
                             let desc = msg(
                                 "toast.installed.description",
-                                "Version {{version}} is installed. It will run the next time you open OpenCode.",
+                                "Version {{version}} is installed. It will run the next time you open Brocode.",
                             )
                             .replace("{{version}}", ver);
                             crate::status_toast::say(app, msg("section.title", "Updates"), desc);

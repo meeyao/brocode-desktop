@@ -57,7 +57,7 @@ use cef::{
 
 use crate::wire::{ContextKind, RemoteProxyConfig};
 
-const DEFAULT_PROXY_REALM: &str = "OpenCode Browser Proxy";
+const DEFAULT_PROXY_REALM: &str = "Brocode Browser Proxy";
 
 // CEF 156.0.26 dereferences a null `CefCompletionCallback*` (`0xC0000005` at `libcef.dll+0x2e7810`)
 // when `NetworkContext::CloseAllConnections` completes on a live `CefBrowserContext`.

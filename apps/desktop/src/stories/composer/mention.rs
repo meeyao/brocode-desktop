@@ -52,7 +52,7 @@ fn prompt(s: &mut App, tx: &mut Tx) {
             "messageID": format!("msg_zzzzmention{n:04}"),
             "text": text,
             "agents": [{ "name": "explore", "mention": at("@explore") }],
-            "skills": [{ "id": "opencode", "name": "OpenCode", "mention": at("@opencode") }],
+            "skills": [{ "id": "opencode", "name": "Brocode", "mention": at("@opencode") }],
             "files": [
                 { "uri": "file:///repo/src/stream.rs", "name": "stream.rs", "mime": "text/plain", "mention": at("@src/stream.rs") },
                 { "uri": "file:///repo/src/ui", "name": "ui", "mime": "text/plain", "mention": at("@src/ui/") },

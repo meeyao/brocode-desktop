@@ -306,7 +306,7 @@ pub fn view<H: SettingsHost + PopupHost + 'static>(s: &H, p: &Pal) -> El {
 /// `ExternalLink` adds `underline` which wins over `no-underline` in Tailwind v4 cascade, so the
 /// link rests underlined in `text-muted` and shifts to `text-base` on hover/focus.
 fn help_feedback_link<H: SettingsHost + 'static>(p: &Pal) -> El {
-    const URL: &str = "https://opencode.ai/desktop-feedback";
+    const URL: &str = "https://github.com/meeyao/brocode-desktop/issues/new";
     let words = t!("settings.helpFeedback");
     row()
         .key("settings-help-feedback")

@@ -23,7 +23,7 @@ const TITLE: TextStyle = TextStyle::new(15.0, 530.0).lh(16.0).tracking(-0.13);
 /// Featured provider order (`unpaid.tsx:19`): OpenCode, then top providers. Go connects through
 /// the OpenCode connection, so it is not featured (`#65466`).
 const FEATURED: [(&str, &str); 5] = [
-    ("opencode", "OpenCode"),
+    ("opencode", "Brocode"),
     ("openai", "OpenAI"),
     ("anthropic", "Anthropic"),
     ("google", "Google"),

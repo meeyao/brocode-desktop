@@ -1,8 +1,7 @@
 //! Settings › About (`settings/about/about.tsx`): the version (pressing it copies it), the
 //! licence, the wordmark, the credits with the count of other contributors, where it was first
-//! published and illustrated, the site, the trademark, the typefaces, the third-party notices,
-//! the tagline, the MIT and globe marks and the copyright over Anomaly's brush mark, centred in
-//! a 560 pt column.
+//! published and illustrated, the site, the typefaces, the third-party notices, the tagline,
+//! the MIT and globe marks and the copyright, centred in a 560 pt column.
 
 pub mod notices;
 
@@ -31,7 +30,6 @@ const WRITERS: [&str; 16] = [
 const ILLUSTRATORS: [&str; 4] = ["usrnk1", "ludvigrask_", "arvsrn", "iamdavidhill"];
 
 static LEGAL: Icon = Icon { name: "about-legal", view: 91.0, body: include_str!("../../assets/legal.svg.body") };
-static BRUSH: Icon = Icon { name: "about-anomaly-brush", view: 110.0, body: include_str!("../../assets/anomaly-brush.svg.body") };
 
 fn copy_version(host: &mut dyn SettingsHost, value: &str, tx: &mut Tx) {
     tx.copy(value.to_owned());
@@ -123,7 +121,7 @@ fn build_about_page<H: SettingsHost + 'static>(s: &H, p: &Pal, others: u32, vers
     let mut writers: Vec<String> = WRITERS.iter().map(|w| (*w).to_owned()).collect();
     writers.push(others_label.clone());
     let mut writer_links: Vec<(String, String)> = WRITERS.iter().map(|w| ((*w).to_owned(), profile(w))).collect();
-    writer_links.push((others_label, "https://github.com/anomalyco/opencode/graphs/contributors".to_owned()));
+    writer_links.push((others_label, "https://github.com/meeyao/brocode-desktop/graphs/contributors".to_owned()));
     let illustrator_links: Vec<(String, String)> = ILLUSTRATORS.iter().map(|w| ((*w).to_owned(), profile(w))).collect();
     let ink = p.muted;
     let (stem, weak) = (ink.alpha(ink.a * 0.2), ink.alpha(ink.a * 0.2 * 0.3));
@@ -165,7 +163,6 @@ fn build_about_page<H: SettingsHost + 'static>(s: &H, p: &Pal, others: u32, vers
                 .items_center()
                 .gap(16.0)
                 .child(line("description", t!("settings.about.description"), false))
-                .child(line("trademark", t!("settings.about.trademark"), false))
                 .child(line("typeset", t!("settings.about.typeset"), false))
                 .child(notices),
         )
@@ -177,8 +174,7 @@ fn build_about_page<H: SettingsHost + 'static>(s: &H, p: &Pal, others: u32, vers
                 .w_full()
                 .items_center()
                 .gap(12.0)
-                .child(line("copyright", t!("settings.about.copyright"), false))
-                .child(clipped("settings-about-anomaly-brush", &BRUSH, 126.72, 48.384)),
+                .child(line("copyright", t!("settings.about.copyright"), false)),
         );
     col().key("settings-about").w_full().px(24.0).items_center().child(content)
 }

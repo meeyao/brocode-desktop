@@ -74,7 +74,7 @@ pub const TERM_FONT: Knob = Knob::choice(
 .about("Monospace font family in the terminal")
 .hints(&[
     "Kit's Ghostty Commit Mono face",
-    "OpenCode bundled IBM Plex Mono",
+    "Brocode bundled IBM Plex Mono",
     "macOS SF Mono system face",
     "Desktop's JetBrainsMono Nerd Font Mono",
 ]);

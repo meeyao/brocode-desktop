@@ -117,9 +117,9 @@ impl CefRuntime {
             // Dedicated macOS Keychain item name (CEF PR #4247) so OSCrypt creates and owns its
             // own item under our Developer ID identity instead of colliding with `"Chromium Safe Storage"`.
             #[cfg(target_os = "macos")]
-            keychain_service_name: CefString::from("OpenCode Browser Safe Storage"),
+            keychain_service_name: CefString::from("Brocode Browser Safe Storage"),
             #[cfg(target_os = "macos")]
-            keychain_account_name: CefString::from("OpenCode Browser"),
+            keychain_account_name: CefString::from("Brocode Browser"),
             ..Default::default()
         };
         #[cfg(windows)]
@@ -282,7 +282,7 @@ wrap_app! {
             // host's "Pop-up blocked" bar) instead of silently swallowing them before CEF sees them.
             cmd.append_switch(Some(&"disable-popup-blocking".into()));
             // Windows keeps real DPAPI cookie encryption (silent, logon-bound).
-            // macOS uses real Keychain encryption under `"OpenCode Browser Safe Storage"` (CEF PR #4247)
+            // macOS uses real Keychain encryption under `"Brocode Browser Safe Storage"` (CEF PR #4247)
             // on valid Developer ID builds from Anomaly's team whose keychain is unlocked
             // (`mac_app::decide_cookie_key`), while keeping `--use-mock-keychain` for every other
             // signature, `OPENCODE_BROWSER_MOCK_KEYCHAIN=1` runs and a locked or missing keychain,

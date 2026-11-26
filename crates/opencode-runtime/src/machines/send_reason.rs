@@ -23,7 +23,7 @@ pub fn words(error: &WireError) -> &'static str {
         Some(413) => "message is too large",
         Some(425 | 429 | 503) => "server is busy",
         Some(500..=599) => "server error",
-        Some(400..=499) => "OpenCode rejected this message",
+        Some(400..=499) => "Brocode rejected this message",
         _ => match &error.kind {
             WireKind::TimedOut => "server didn't answer in time",
             WireKind::Unreachable(_) => "can't reach OpenCode",

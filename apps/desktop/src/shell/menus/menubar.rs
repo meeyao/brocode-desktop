@@ -141,16 +141,15 @@ fn go() -> Vec<MenuItem<App>> {
 
 fn help() -> Vec<MenuItem<App>> {
     vec![
-        MenuItem::new(t!("desktop.menu.documentation"), |s: &mut App, tx: &mut Tx| run(s, Act::Open("https://opencode.ai/docs"), tx)).id("Help/Documentation").menu("Help"),
-        MenuItem::new(t!("desktop.menu.supportForum"), |s: &mut App, tx: &mut Tx| run(s, Act::Open("https://discord.com/invite/opencode"), tx)).id("Help/SupportForum").menu("Help"),
+        MenuItem::new(t!("desktop.menu.documentation"), |s: &mut App, tx: &mut Tx| run(s, Act::Open("https://github.com/meeyao/brocode-desktop#readme"), tx)).id("Help/Documentation").menu("Help"),
         MenuItem::new(t!("desktop.menu.exportLogs"), |s: &mut App, tx: &mut Tx| run(s, Act::ExportLogs, tx)).id("Help/ExportLogs").menu("Help"),
         MenuItem::separator().menu("Help"),
         MenuItem::new(t!("desktop.menu.shareFeedback"), |s: &mut App, tx: &mut Tx| {
-            run(s, Act::Open("https://github.com/anomalyco/opencode/issues/new?template=feature_request.yml"), tx)
+            run(s, Act::Open("https://github.com/meeyao/brocode-desktop/issues/new"), tx)
         })
         .id("Help/ShareFeedback")
         .menu("Help"),
-        MenuItem::new(t!("desktop.menu.reportBug"), |s: &mut App, tx: &mut Tx| run(s, Act::Open("https://github.com/anomalyco/opencode/issues/new?template=bug_report.yml"), tx))
+        MenuItem::new(t!("desktop.menu.reportBug"), |s: &mut App, tx: &mut Tx| run(s, Act::Open("https://github.com/meeyao/brocode-desktop/issues/new"), tx))
             .id("Help/ReportBug")
             .menu("Help"),
     ]

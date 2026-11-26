@@ -42,7 +42,7 @@ pub use view::{status, toolbar};
 use watch::Backend;
 
 /// Who Hex says is recording.
-const SOURCE: &str = "OpenCode";
+const SOURCE: &str = "Brocode";
 /// Holding the shortcut longer than this is push-to-talk: the recording ends when it comes up.
 pub(crate) const HOLD: f64 = 0.3;
 /// "Preparing dictation…" shows once Hex has taken this long to start, so a quick start shows
