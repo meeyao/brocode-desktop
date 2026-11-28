@@ -112,9 +112,11 @@ impl Product {
         let h = (hash & !(0xf << 76) | (0x4 << 76)) & !(0x3 << 62) | (0x2 << 62);
         format!("{{{:08x}-{:04x}-{:04x}-{:04x}-{:012x}}}", h >> 96, (h >> 80) & 0xffff, (h >> 64) & 0xffff, (h >> 48) & 0xffff, h & 0xffff_ffff_ffff)
     }
-    /// The install folder's name: the name without parentheses (`OpenCode Rune`).
+    /// The install folder's name: the name without parentheses, then ` Desktop` (`Brocode Desktop`):
+    /// the brocode CLI's installer owns `%LOCALAPPDATA%\Programs\brocode`, and Windows folder names
+    /// ignore case.
     pub fn folder(&self) -> String {
-        self.name.replace(['(', ')'], "").split_whitespace().collect::<Vec<_>>().join(" ")
+        format!("{} Desktop", self.name.replace(['(', ')'], "").split_whitespace().collect::<Vec<_>>().join(" "))
     }
 
 }

@@ -82,7 +82,13 @@ pub use upload::UploadError;
 pub use wire::{Incoming, Request, Ticket, TicketKind, Write};
 pub use worker::{connect, connect_with_idle};
 
-pub const DEFAULT_SERVER: &str = "http://127.0.0.1:4096";
+/// brocode's default service port, `0xB0B0` (brocode `oc-util` `brand::SERVICE_PORT`); Windows
+/// moves ports at or above `0x8000` into the `0x7000` block (`0x70B0`). Not OpenCode's `:4096`, so
+/// the app never lands on an OpenCode server.
+#[cfg(not(windows))]
+pub const DEFAULT_SERVER: &str = "http://127.0.0.1:45232";
+#[cfg(windows)]
+pub const DEFAULT_SERVER: &str = "http://127.0.0.1:28848";
 
 /// The server to use when no `--server` was passed: `OPENCODE_SERVER_URL` when set (a Mac that
 /// reaches another Mac's server through a tunnel sets it with `launchctl setenv`, so opening the
