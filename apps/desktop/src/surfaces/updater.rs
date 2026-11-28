@@ -7,8 +7,8 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use opencode_feature_updater::{
-    BuildInfo, StateView, Updater, UpdaterConfig, UpdaterHost, finish_quit, installs_on_quit, poll,
-    poll_owed, shared_enabled,
+    BuildInfo, StateView, Updater, UpdaterConfig, UpdaterHost, finish_quit, handoff_quit,
+    installs_on_quit, poll, poll_owed, shared_enabled,
 };
 
 #[cfg(target_arch = "wasm32")]

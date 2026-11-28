@@ -2,15 +2,19 @@
 //! verified (size, SHA-256, code signature, signing team, Gatekeeper) and unpacked into a private
 //! folder under `~/Library/Caches/com.apibrother.brocode/Updates`; Restart to update or quitting
 //! with a ready update checks the staged bundle again and swaps it in atomically (the old bundle
-//! comes back when the move fails), and Restart to update starts the app again from it as the app
-//! menu's Restart does (`Tx::relaunch`). Local dev bundles (`com.apibrother.brocode.dev`) and bare
-//! `cargo` binaries never update. A bundle this user can't replace (translocated, read-only) keeps
-//! checking and links to the DMG; `DisableUpdates` in the app's defaults domain turns updates off.
+//! comes back when the move fails), and Restart to update hands off to a detached non-GUI helper
+//! that waits for this process to exit before reopening the swapped bundle via Launch Services
+//! without `-n`, so macOS reuses any pinned ("Keep in Dock") Dock tile instead of spawning a
+//! second icon. Local dev bundles (`com.apibrother.brocode.dev`) and bare `cargo` binaries never
+//! update. A bundle this user can't replace (translocated, read-only) keeps checking and links to
+//! the DMG; `DisableUpdates` in the app's defaults domain turns updates off.
 
+use std::ffi::OsString;
 use std::io;
 use std::os::unix::fs::MetadataExt as _;
+use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -115,9 +119,9 @@ impl Mac {
         Mac { engine: Engine::new(facts), bundle, exe_rel, check_team, check_gatekeeper, staged: Mutex::new(None) }
     }
 
-    /// Swaps the staged bundle in, without opening it (`install` opens it). Writes a receipt
-    /// keyed by the placed executable's `(dev, ino)` into `Updates/` after `swap` succeeds so the
-    /// record survives even when `apply` runs after `storage::close()`.
+    /// Swaps the staged bundle in, without opening it (`install` spawns the post-exit relaunch
+    /// helper). Writes a receipt keyed by the placed executable's `(dev, ino)` into `Updates/`
+    /// after `swap` succeeds so the record survives even when `apply` runs after `storage::close()`.
     pub fn apply(&self) -> Result<(), String> {
         self.apply_inner(false)
     }
@@ -208,12 +212,15 @@ impl Platform for Mac {
     }
 
     fn install(&self) -> Result<(), String> {
-        self.apply()
+        self.apply()?;
+        self.spawn_relaunch_helper()
     }
 
-    /// The swapped bundle sits where this one ran, so the app's own relaunch opens it.
+    /// Handled by `spawn_relaunch_helper` after this process exits (not `Tx::relaunch`, which
+    /// runs `open -n` while the old process is still alive and causes macOS Dock to spawn a
+    /// second icon when the app is pinned with "Keep in Dock").
     fn relaunches(&self) -> bool {
-        true
+        false
     }
 
     /// Opt-in install-on-quit (`packages/gui-plugins/src/updater/platform.ts`, `opencode#66501`).
@@ -253,11 +260,77 @@ impl Platform for Mac {
     }
 }
 
+/// Detached POSIX shell helper spawned by `Mac::spawn_relaunch_helper`.
+///
+/// Running `/usr/bin/open -n` while the old app is still alive starts a second concurrent
+/// instance while the exiting process still owns any pinned ("Keep in Dock") tile, leaving the
+/// updated app stuck on a separate transient Dock icon. Waiting for the exiting PID to terminate
+/// and clear Launch Services first, then opening the swapped bundle without `-n`, reuses the
+/// existing Dock tile.
+const RELAUNCH_HELPER_SCRIPT: &str = r#"pid="$1"
+bundle="$2"
+shift 2
+i=0
+while /bin/kill -0 "$pid" 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -ge 600 ]; then
+        exit 0
+    fi
+    /bin/sleep 0.05
+done
+if [ -x /usr/bin/lsappinfo ]; then
+    j=0
+    while /usr/bin/lsappinfo find "pid=$pid" 2>/dev/null | /usr/bin/grep -q "ASN:"; do
+        j=$((j + 1))
+        if [ "$j" -ge 40 ]; then
+            break
+        fi
+        /bin/sleep 0.05
+    done
+fi
+/bin/sleep 0.1
+attempt=0
+while [ "$attempt" -lt 10 ]; do
+    if [ "$#" -gt 0 ]; then
+        /usr/bin/open --env "RUNE_RELAUNCH_AFTER=$pid" "$bundle" --args "$@" && exit 0
+    else
+        /usr/bin/open --env "RUNE_RELAUNCH_AFTER=$pid" "$bundle" && exit 0
+    fi
+    attempt=$((attempt + 1))
+    /bin/sleep 0.15
+done
+"#;
+
 impl Mac {
     /// The channel's DMG for this Mac (`…/opencode/desktop-rune/dev/macos-arm64-dmg`).
     fn download_url(&self) -> String {
         let facts = &self.engine.facts;
         format!("{}/{}/{}/{}/{}-dmg", facts.service.trim_end_matches('/'), super::protocol::APP_NAME, super::protocol::ARTIFACT_NAME, facts.channel, feed::target_name())
+    }
+
+    /// Spawns a detached non-GUI `/bin/sh` helper that waits for this process to exit and leave
+    /// Launch Services, then reopens `self.bundle.path` via `/usr/bin/open` without `-n`.
+    fn spawn_relaunch_helper(&self) -> Result<(), String> {
+        let pid = std::process::id().to_string();
+        let args: Vec<OsString> = rune::tooling::without_relaunch_drops(std::env::args_os().skip(1).collect())
+            .into_iter()
+            .filter(|a| !a.to_str().is_some_and(|s| s.starts_with("-psn_")))
+            .collect();
+        let mut cmd = Command::new("/bin/sh");
+        cmd.args(["-c", RELAUNCH_HELPER_SCRIPT, "opencode-updater-relaunch"])
+            .arg(&pid)
+            .arg(&self.bundle.path)
+            .args(&args)
+            .current_dir("/")
+            .env_remove("RUNE_RELAUNCH_AFTER")
+            .env_remove("RUNE_INSTANCE_HANDED")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0);
+        cmd.spawn()
+            .map(drop)
+            .map_err(|e| format!("could not start the relaunch helper: {e}"))
     }
 }
 
@@ -329,7 +402,6 @@ fn check_replaceable(app: &Path) -> Result<(), String> {
 /// 1,095,137. A run that fails, or is ended after 20 s, changes nothing: the update is staged
 /// either way.
 fn first_run(exe: &Path) {
-    use std::process::Stdio;
     use std::time::{Duration, Instant};
     let Ok(mut child) = Command::new(exe).arg("--version").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn() else { return };
     let deadline = Instant::now() + Duration::from_secs(20);

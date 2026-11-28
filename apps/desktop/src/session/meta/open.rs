@@ -60,6 +60,9 @@ impl App {
             // Read scrolled up, it comes back where it was read; otherwise on its end.
             self.timeline_fx.ends.reopen(id);
         }
+        if *self.route != Route::here(id.to_owned()) {
+            crate::shell::memory_reclaim::on_tab_switched(self);
+        }
         *self.route = Route::here(id.to_owned());
         crate::narrow::follow_route(self, tx);
         crate::session_state::opened(self, id, tx);
@@ -89,6 +92,7 @@ impl App {
             self.tabs.push(Tab::session(root.clone(), title, directory));
             self.save_tabs();
         }
+        self.record_inbox_shown();
         if let Some(pid) = self.session(&root).and_then(|s| self.project_for_session(s)).map(|p| p.id.clone()) {
             self.touch_project(&pid);
         }

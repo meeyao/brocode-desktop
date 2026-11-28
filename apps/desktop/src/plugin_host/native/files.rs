@@ -44,7 +44,7 @@ pub fn build(lua: &Lua, t: &Table) -> mlua::Result<()> {
             let files = app.kernel.slots.get(&crate::files::FILES);
             let doc = files.sessions.get(&sid).and_then(|w| w.docs.get(&path));
             let known = app.session(&sid).is_some_and(|i| !i.directory.is_empty());
-            let waiting = known && doc.is_some_and(|d| d.content().is_loading()) && !files.reads.running(&sid, &path) && !crate::files::video::is_video(&path);
+            let waiting = known && doc.is_some_and(|d| d.content().is_loading()) && !files.reads.running(&sid, &path) && !files.video_loading(&sid, &path);
             if doc.is_none() || waiting || (known && files.reads.stale(&sid, &path)) {
                 let (id, at) = (sid.clone(), path.clone());
                 app.later(Box::new(move |s: &mut App, tx: &mut Tx| {
@@ -294,8 +294,8 @@ pub fn version(app: &App, session: &str) -> u64 {
         let mut videos: Vec<_> = w.videos.iter().collect();
         videos.sort_by(|a, b| a.0.cmp(b.0));
         for (path, v) in videos {
-            let p = &v.player;
-            (path, format!("{:?} {:?} {:?}", p.state(), v.overlay, v.scrub), p.is_playing(), p.muted(), p.has_sound(), p.natural_size(), p.duration().map(f64::to_bits), (p.time() * 4.0) as u64).hash(&mut h);
+            path.hash(&mut h);
+            v.version_hash(&mut h);
         }
         app.kernel.slots.get(&crate::files::FILES).stage_size.get().map(f32::to_bits).hash(&mut h);
     }
@@ -339,8 +339,7 @@ pub fn doc_version(app: &App, session: &str, path: &str) -> u64 {
             (shown.id(), shown.is_ready(), shown.size(), img.shows(), format!("{:?}", img.zoom)).hash(&mut h);
         }
         if let Some(v) = w.videos.get(path) {
-            let p = &v.player;
-            (format!("{:?} {:?} {:?}", p.state(), v.overlay, v.scrub), p.is_playing(), p.muted(), p.has_sound(), p.natural_size(), p.duration().map(f64::to_bits), (p.time() * 4.0) as u64).hash(&mut h);
+            v.version_hash(&mut h);
         }
         if w.images.contains_key(path) || w.videos.contains_key(path) {
             app.kernel.slots.get(&crate::files::FILES).stage_size.get().map(f32::to_bits).hash(&mut h);

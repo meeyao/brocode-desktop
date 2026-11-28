@@ -44,12 +44,15 @@ pub struct Projection {
     /// Which projection made the rows: a virtual list keeps the keys of the last commit given
     /// the same one (`El::virtual_rows_version`).
     pub generation: u64,
+    /// Extra bottom tail room past the 36 pt Working lane (`rhythm::tail_extra`), cached with the
+    /// projection so `timeline()` does not re-fold the last turn on every view build.
+    pub tail_extra: f32,
 }
 
 impl Projection {
     /// `same`: the rows' keys are the previous projection's (`generation`), in the same order.
     /// `older`: messages are still to land above the first row.
-    fn new(spans: Vec<Rc<Vec<RowSpec>>>, t: &Transcript, detail: &crate::detail::Detail, same: Option<u64>, older: bool) -> Projection {
+    fn new(spans: Vec<Rc<Vec<RowSpec>>>, t: &Transcript, detail: &crate::detail::Detail, script_diffs: bool, same: Option<u64>, older: bool) -> Projection {
         let mut starts = Vec::with_capacity(spans.len());
         let mut len = 0;
         for s in &spans {
@@ -61,8 +64,8 @@ impl Projection {
             GENERATION.set(g);
             g
         });
-        let mut p = Projection { spans, starts, len, seams: Vec::new(), generation };
-        p.seams = p.space_seams(t, detail);
+        let mut p = Projection { spans, starts, len, seams: Vec::new(), generation, tail_extra: 0.0 };
+        p.seams = p.space_seams(t, detail, script_diffs);
         // The first row with messages still to land above takes no room over it: the row that
         // lands above it brings the room between them (`rhythm::space_at`), so the first row is
         // the same row before and after (official `packages/app/AGENTS.md`, "Rows that load
@@ -77,6 +80,7 @@ impl Projection {
                 None => p.seams.insert(0, (0, first)),
             }
         }
+        p.tail_extra = rhythm::tail_extra(t, detail, script_diffs, &p);
         p
     }
 
@@ -108,7 +112,7 @@ impl Projection {
     /// Where two spans meet, each span spaced its rows among themselves: the last row of the one
     /// above and the first of the one below learn what's beside them (`dividers`, `rhythm`): the
     /// upper one takes the room between them, which the lower one was built with over it.
-    fn space_seams(&self, t: &Transcript, detail: &crate::detail::Detail) -> Vec<(usize, RowSpec)> {
+    fn space_seams(&self, t: &Transcript, detail: &crate::detail::Detail, script_diffs: bool) -> Vec<(usize, RowSpec)> {
         let mut out: Vec<(usize, RowSpec)> = Vec::new();
         for &seam in self.starts.iter().skip(1).filter(|&&s| s > 0 && s < self.len) {
             let from = seam.saturating_sub(2);
@@ -116,7 +120,7 @@ impl Projection {
             let mut window: Vec<RowSpec> = (from..to).filter_map(|i| self.base(i).cloned()).collect();
             let at = seam - 1 - from..seam + 1 - from;
             dividers::stack_at(t, &mut window, at.clone());
-            rhythm::space_at(t, detail, &mut window, at.clone());
+            rhythm::space_at(t, detail, script_diffs, &mut window, at.clone());
             // A span of one row meets a span on both sides: the seam under it knows its room.
             if out.last().is_some_and(|(i, _)| *i == seam - 1) {
                 out.pop();
@@ -133,6 +137,7 @@ struct Global {
     extras: u64,
     detail: crate::detail::Detail,
     turn_diffs: bool,
+    full_codemode: bool,
     fold_user: bool,
     viewport: u32,
     revert: Option<String>,
@@ -209,7 +214,7 @@ thread_local! {
 
 /// Transcript `t`'s rows: kept while what they read holds, projected only where it doesn't.
 pub fn rows<S: TimelineHost>(s: &S, t: &Transcript) -> Rc<Projection> {
-    let whole = |s: &S| Rc::new(Projection::new(vec![Rc::new(super::project(s, t))], t, &s.timeline_detail(), None, s.more_above(&t.session)));
+    let whole = |s: &S| Rc::new(Projection::new(vec![Rc::new(super::project(s, t))], t, &s.timeline_detail(), s.full_codemode(&t.session), None, s.more_above(&t.session)));
     let Some(version) = s.transcript_version(&t.session) else { return whole(s) };
     let fold_user = s.fold_user_messages();
     // An opened prompt folds by where it stands on screen (`fold::place`): its rows move with the
@@ -223,6 +228,7 @@ pub fn rows<S: TimelineHost>(s: &S, t: &Transcript) -> Rc<Projection> {
         extras: model::prompt_extras_generation(),
         detail: inp.detail,
         turn_diffs: inp.turn_diffs,
+        full_codemode: inp.full_codemode,
         fold_user,
         viewport: crate::fold::place(s, &t.session)("").viewport.to_bits(),
         revert: inp.revert.map(str::to_owned),
@@ -375,7 +381,7 @@ fn shifted(r: &RowSpec, by: usize) -> RowSpec {
             *end += by;
         }
         TurnDiff { idle, .. } => *idle += by,
-        Pending { .. } | PendingNotice(..) | CompactionQueued(_) | TurnDivider(_) | UserImages { .. } | Lane(_) => {}
+        Pending { .. } | PendingNotice(..) | CompactionQueued(_) | TurnDivider(_) | UserImages { .. } => {}
     }
     r
 }
@@ -417,7 +423,7 @@ fn assemble(t: &Transcript, inp: &Inputs, mut k: Session) -> Session {
         && old.iter().zip(&spans).rev().skip(1).all(|(a, b)| Rc::ptr_eq(a, b))
         && old.last().zip(spans.last()).is_some_and(|(a, b)| a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.key == y.key)))
         .then_some(k.rows.generation);
-    k.rows = Rc::new(Projection::new(spans, t, &inp.detail, same, inp.older || k.top() > 0));
+    k.rows = Rc::new(Projection::new(spans, t, &inp.detail, inp.full_codemode, same, inp.older || k.top() > 0));
     k
 }
 
@@ -464,7 +470,7 @@ fn stamps_of(t: &Transcript, inp: &Inputs, ranges: &[Range<usize>], from: usize,
         let mut h = hasher();
         (span::run_at(messages, r.start), (r.start == 0).then_some(inp.older)).hash(&mut h);
         for m in &messages[r.start..end.min(messages.len())] {
-            shape(m, &inp.detail).hash(&mut h);
+            shape(m, &inp.detail, inp.full_codemode).hash(&mut h);
         }
         out[k] = h.finish();
     }
@@ -472,7 +478,7 @@ fn stamps_of(t: &Transcript, inp: &Inputs, ranges: &[Range<usize>], from: usize,
 
 /// What a row shows of message `m`, hashed: its kind and id, what makes its parts show or not
 /// and how they fold, and nothing of what the row draws from it as it builds.
-fn shape(m: &Message, detail: &crate::detail::Detail) -> u64 {
+fn shape(m: &Message, detail: &crate::detail::Detail, script_diffs: bool) -> u64 {
     let mut h = hasher();
     let step = |h: &mut _, a: &model::Assistant| {
         (&a.id, a.completed.is_some(), a.error.is_some(), a.retry.is_some(), a.failure.as_ref().map(|f| super::interrupted(&f.kind)), &a.changed, a.parts.len()).hash(h);
@@ -483,7 +489,7 @@ fn shape(m: &Message, detail: &crate::detail::Detail) -> u64 {
                 Part::Tool { id, name, status, input, metadata, files, .. } => {
                     (2u8, id, name, std::mem::discriminant(status), crate::detail::failed(name, status, metadata), metadata["jobID"].as_str(), crate::images::shows(files)).hash(h);
                     // A script's changes each place as a step of their own.
-                    if detail.placement(crate::detail::Category::Edit) != crate::detail::Placement::Hidden {
+                    if script_diffs && detail.placement(crate::detail::Category::Edit) != crate::detail::Placement::Hidden {
                         crate::activity::rules::script_changes(name, status, metadata).count().hash(h);
                     }
                     // How a call joins the calls beside it: a read's path, a skill's name.

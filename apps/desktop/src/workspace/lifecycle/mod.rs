@@ -1,3 +1,4 @@
+pub mod background_notice;
 pub mod idle;
 pub mod jobs;
 pub mod launch;

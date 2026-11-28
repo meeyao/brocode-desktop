@@ -46,7 +46,7 @@ pub fn browser_settings(background_color: u32, disable_js_clipboard: bool) -> ce
         cef::sys::cef_state_t::STATE_DEFAULT
     };
     cef::BrowserSettings {
-        windowless_frame_rate: crate::input_fps::PANE_FPS,
+        windowless_frame_rate: crate::input_fps::pane_fps(),
         background_color,
         javascript_access_clipboard: clip.into(),
         javascript_dom_paste: clip.into(),
@@ -385,6 +385,24 @@ impl TabClipboardGate {
         }
         if self.root_armed.load(Ordering::Acquire) {
             *held = None;
+            return false;
+        }
+        *held = Some(url.to_owned());
+        true
+    }
+
+    /// Holds `url` until the root session's gate script is confirmed when `agent_driven` is
+    /// true and the root script has not replied yet (e.g. a remote tab whose sign-in cookie gate
+    /// released before the root CDP script reply landed).
+    pub fn hold_until_root_armed(&self, agent_driven: bool, url: &str) -> bool {
+        if !agent_driven
+            || self.root_armed.load(Ordering::Acquire)
+            || url.trim().eq_ignore_ascii_case("about:blank")
+        {
+            return false;
+        }
+        let mut held = self.first_load.lock().unwrap();
+        if self.root_armed.load(Ordering::Acquire) {
             return false;
         }
         *held = Some(url.to_owned());

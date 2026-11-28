@@ -6,7 +6,7 @@
 mod accounts;
 mod auth;
 mod form;
-mod models;
+pub mod models;
 
 use opencode_ui::focus::FocusExt;
 use rune::{El, TextStyle, Tx, col, icon, row, spacer, text};
@@ -30,7 +30,7 @@ const CODE_DIGIT: TextStyle = TextStyle::new(28.0, 530.0).mono().lh(32.0);
 pub fn inputs_id(d: &Dialog) -> String {
     let Some(p) = &d.provider else { return "picker".into() };
     let step = match &p.step {
-        Step::Models { .. } => "models".to_owned(),
+        Step::Models => "models".to_owned(),
         Step::Accounts { .. } => "accounts".to_owned(),
         s => match s.connect() {
             Some(Conn::Form(_, f)) => format!("form:{}", f.key()),
@@ -112,7 +112,7 @@ pub fn body<H: ConnectHost + 'static>(s: &H, p: &Pal, frame: Frame) -> El {
     let kind = dialog::body(d);
     let is_methods = matches!(kind, Body::Screen(Screen::Methods));
     let content = match kind {
-        Body::Models => return models::view(s, p, &provider.id),
+        Body::Models => return col(),
         Body::Accounts => accounts::view(s, p),
         Body::Claude { checking, can_check, timed_out } => claude(s, p, checking, can_check, timed_out),
         Body::NoModels { pending, refreshing } => no_models::<H>(p, pending, refreshing),
@@ -294,7 +294,7 @@ fn copy_link(host: &mut dyn ConnectHost, tx: &mut Tx) {
 fn no_models<H: ConnectHost + 'static>(p: &Pal, pending: bool, refreshing: bool) -> El {
     let open_again = (!pending).then(|| {
         ui::button(opencode_i18n::t!("provider.connect.console.openAgain"), ButtonVariant::Ghost)
-            .on_press_tx(|s: &mut H, tx: &mut Tx| open_url(s, "https://apibrother.com/console", tx))
+            .on_press_tx(|s: &mut H, tx: &mut Tx| open_url(s, "https://apibrother.com/dashboard", tx))
             .build(kit(p))
     });
     let refresh = ui::button(opencode_i18n::t!("provider.connect.console.refresh"), ButtonVariant::Submit)

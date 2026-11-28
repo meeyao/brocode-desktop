@@ -75,6 +75,18 @@ pub struct UiSegmentedItem {
 }
 impl_record!(UiSegmentedItem, ["id", "icon", "label", "key"], [], []);
 
+/// One option of `ui.select`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct UiSelectOption {
+    /// What `onChange` receives in `event.value`.
+    pub value: String,
+    /// The option's visible text.
+    pub label: String,
+}
+impl_record!(UiSelectOption, ["value", "label"], [], []);
+
 /// The panels' shared file sidebar.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -873,8 +885,10 @@ pub struct BrowserOpenSpec {
     pub session_id: Option<String>,
     /// Opens the tab without moving the keyboard: focus stays where it is.
     pub background: Option<bool>,
+    /// The side-region pane (`side`, `split`, or `bottom`) to open the page's tab in.
+    pub pane: Option<String>,
 }
-impl_record!(BrowserOpenSpec, ["url", "sessionId", "background"], [], []);
+impl_record!(BrowserOpenSpec, ["url", "sessionId", "background", "pane"], [], []);
 
 /// Where to show a page's tab.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

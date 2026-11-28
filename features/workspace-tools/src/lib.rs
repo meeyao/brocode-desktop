@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fulltext;
+pub mod home_project_sessions;
 pub mod home_search;
 pub mod new_worktree;
 pub mod rune_mcp;

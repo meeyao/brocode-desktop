@@ -3,7 +3,33 @@
 //! browser attaches (`packages/gui-plugins/src/browser/pane.ts` `loaded`, opencode#65720), and
 //! command fetches (`experimental.browser/command`).
 
+use std::collections::BTreeSet;
 use std::sync::mpsc::Sender;
+use std::sync::{LazyLock, Mutex, PoisonError};
+
+static CONNECTED_BASES: LazyLock<Mutex<BTreeSet<String>>> =
+    LazyLock::new(|| Mutex::new(BTreeSet::new()));
+
+pub(super) fn mark_base_connected(base: &str) {
+    CONNECTED_BASES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(base.to_owned());
+}
+
+pub(super) fn clear_base_connected(base: &str) {
+    CONNECTED_BASES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .remove(base);
+}
+
+pub(super) fn is_base_connected(base: &str) -> bool {
+    CONNECTED_BASES
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .contains(base)
+}
 
 use opencode_kit::browser_rpc::AbortHandle;
 use opencode_kit::client::PluginEndpoint;

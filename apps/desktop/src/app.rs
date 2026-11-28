@@ -48,6 +48,13 @@ pub(crate) struct ViewRuns(pub(crate) std::cell::Cell<u64>);
 
 pub(crate) static VIEW_RUNS: opencode_kernel::Slot<ViewRuns> = opencode_kernel::Slot::new();
 
+/// Last reported display refresh rate in Hz (`FrameEncoded::refresh_hz`), read by
+/// `TimelineHost::display_hz` to pace streaming text bursts with the display cadence.
+#[derive(Default)]
+pub(crate) struct DisplayHz(pub(crate) std::cell::Cell<Option<f64>>);
+
+pub(crate) static DISPLAY_HZ: opencode_kernel::Slot<DisplayHz> = opencode_kernel::Slot::new();
+
 /// Per-code-block soft-wrap overrides keyed by `"{row_key}:{block_index}"` (the timeline's Wrap button).
 pub(crate) static CODE_WRAP: opencode_kernel::Slot<std::collections::HashMap<String, bool>> = opencode_kernel::Slot::new();
 /// This window's display math: its wake when an equation finishes, and its say in when cached
@@ -375,7 +382,7 @@ impl App {
                 Err(_) if fallback_fixture => return false,
                 // No answer before the first frame: the launch tries again from `poll`.
                 Err(_) => {
-                    self.launch.set_phase(ServerKey::SIDECAR, launch::Phase::Offline { retries: 0, retry_at: 0.0 });
+                    self.launch.set_phase(ServerKey::SIDECAR, launch::Phase::Offline { retries: 0, retry_at: 0.0, health_version: 0 });
                     None
                 }
             }
@@ -404,6 +411,7 @@ impl App {
             *self.zoom = z.clamp(shortcuts::ZOOM_MIN, shortcuts::ZOOM_MAX);
         }
         *self.settings = settings::load();
+        crate::background_notice::sync_keep_running(self.settings.keep_service_running);
         *self.layout = layout_state::Shell::at_rest(self.settings.effective_tab_layout());
         tabs::pins::restore(self);
         tabs::navigation_switch::restore(self);
@@ -417,6 +425,7 @@ impl App {
         }
         *self.kernel.slots.get_mut(&prompt_history::PROMPTS) = prompt_history::PromptHistory::load(attended());
         self.composer_ext.pickers.prefs = model_prefs::load();
+        launch::saved_catalog::restore_config(self);
         crate::pickers::saved::restore(self);
         telemetry::startup("launch.restore_ui", || self.restore_ui(&doc, &server.base));
         launch::saved::page_tab::note(self);
@@ -434,6 +443,8 @@ impl App {
             launch::saved_catalog::restore(self);
             launch::saved_gutters::restore(self);
         }
+        // After the saved list: a restored session's folder is its info's.
+        crate::location_missing::restore(self);
         *self.diag.status = self.live_status();
         self.resume_settings_page();
         true
@@ -514,89 +525,9 @@ impl App {
     /// for sessions no tab, route or run shows goes: their transcripts, their pages in the
     /// reader's cache, and the images only those held. A session opened again is read again,
     /// as one opened for the first time is. Nothing on screen changes.
-    pub(crate) fn rest(s: &mut App, _: &mut rune::Tx) -> bool {
-        let scheduler = s.kernel.scheduler.clone();
-        let has_rest_hooks = scheduler.rest_names().next().is_some();
-        let active_server = crate::servers::runtime::active(s).clone();
-        let other_unreported = windows::any_other_window_unreported(&s.window.id);
-        let other_shown = windows::other_windows_shown(&s.window.id, &active_server);
-        let shown: HashSet<&str> = s
-            .tabs
-            .iter()
-            .map(|t| t.id.as_str())
-            .chain(match &*s.route { Route::Session { id, .. } => Some(id.as_str()), _ => None })
-            .chain(s.running.iter().map(String::as_str))
-            .chain(other_shown.iter().map(String::as_str))
-            .collect();
-        let kept = |id: &str| s.ancestors(id).any(|a| shown.contains(a));
-        let gone: Vec<String> = if other_unreported { Vec::new() } else { s.transcripts.keys().filter(|id| !kept(id)).cloned().collect() };
-        let review_gone: Vec<String> = s.kernel.slots.get(&crate::review::REVIEW).sessions.keys().filter(|id| !kept(id)).cloned().collect();
-        let files_gone: Vec<String> = s.kernel.slots.get(&files::FILES).sessions.keys().filter(|id| !kept(id)).cloned().collect();
-        let kept_ids: HashSet<String> = shown
-            .iter()
-            .map(|id| (*id).to_owned())
-            .chain(s.sessions.iter().filter(|sess| kept(&sess.id)).map(|sess| sess.id.clone()))
-            .collect();
-        s.pages.rest(&kept);
-        s.kernel.slots.get_mut(&files::FILES).retain_reply_links(|id| kept_ids.contains(id));
-        if !gone.is_empty() {
-            let transcripts = &mut *s.transcripts;
-            for id in &gone { transcripts.remove(id); }
-        }
-        // A closed session's diffs and open files (their source lines, highlight chunks, images).
-        let keep_dirs: HashSet<String> = s
-            .sessions
-            .iter()
-            .filter(|sess| kept_ids.contains(&sess.id))
-            .map(|sess| crate::review::dir_key(&sess.directory))
-            .filter(|d| !d.is_empty())
-            .collect();
-        let review = s.kernel.slots.get_mut(&crate::review::REVIEW);
-        for id in &review_gone {
-            review.sessions.remove(id);
-        }
-        review.prune_cache(&shown, &keep_dirs);
-        if !files_gone.is_empty() {
-            for id in &files_gone {
-                let f = s.kernel.slots.get_mut(&files::FILES);
-                f.sessions.remove(id);
-                f.reads.forget_session(id);
-                files::watch::forget_session(s, id);
-            }
-        }
-        // What `opencode_kit` keeps beside each user message (files, mentions, comments, times):
-        // only for the messages of the transcripts and page caches left across all windows & peers.
-        if !other_unreported {
-            let cached = s.pages.user_message_ids();
-            let other_cached = windows::other_windows_cached_user_messages(&s.window.id);
-            let other_peer_msgs = crate::servers::runtime::other_peer_user_message_ids(&active_server);
-            let messages: HashSet<&str> = s
-                .transcripts
-                .values()
-                .flat_map(|t| t.messages.iter())
-                .filter_map(|m| match m { opencode_kit::model::Message::User { id, .. } => Some(id.as_str()), _ => None })
-                .chain(cached.iter().map(String::as_str))
-                .chain(other_cached.iter().map(String::as_str))
-                .chain(other_peer_msgs.iter().map(String::as_str))
-                .collect();
-            opencode_kit::model::retain_user_messages(&|id| messages.contains(id));
-        }
-        s.composer_ext.attach.store.rest();
-        // No session tab or draft and not on a session: pictures keep their encoded bytes, not
-        // their pixels.
-        if s.tabs.is_empty() && !matches!(&*s.route, Route::Session { .. }) {
-            s.composer_ext.attach.store.rest_pixels();
-            // Equations' bitmaps go only once no other window shows any either.
-            s.kernel.slots.get(&MATH).rest();
-        }
-        if has_rest_hooks {
-            scheduler.run_rest(s, &|id| kept_ids.contains(id));
-        }
-        // What all that freed: mimalloc purges freed pages only when some thread next allocates,
-        // and an app at rest doesn't. Forced, it gives them back now.
-        #[cfg(not(target_arch = "wasm32"))]
-        crate::purge_free_pages();
-        false
+    pub(crate) fn rest(s: &mut App, tx: &mut rune::Tx) -> bool {
+        s.hibernate_orphaned_browser_tabs();
+        crate::shell::memory_reclaim::rest_all(s, tx)
     }
 
     /// `id` and its loaded parents, up to 32 steps.
@@ -700,6 +631,15 @@ impl App {
         matches!(&*self.route, Route::Session { id, .. } if self.busy(id))
     }
 
+    /// Records the window's latest reported display refresh rate (`FrameEncoded::refresh_hz`)
+    /// without invalidating tracked view regions.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn set_display_hz(&self, hz: f64) {
+        if hz.is_finite() && hz > 0.0 {
+            self.kernel.slots.untracked(&DISPLAY_HZ).0.set(Some(hz));
+        }
+    }
+
     /// `+`, ⌘T and New session: a new "New session" draft tab, as Desktop's `openDraft`, where
     /// Settings › New sessions start in says (`start_location`): the server's default directory,
     /// or the open session's or draft's project. On Home and in Settings that's Home's project,
@@ -715,7 +655,7 @@ impl App {
             match &*self.route {
                 Route::Session { id, .. } => self.session(id).map(|s| s.directory.clone()),
                 Route::Draft(_) => Some(self.draft_dir().to_owned()),
-                Route::Home => None,
+                Route::Home | Route::Automations => None,
             }
         };
         let dir = start_location::resolve(self, here);

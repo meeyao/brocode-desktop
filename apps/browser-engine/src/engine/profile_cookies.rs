@@ -3,8 +3,11 @@
 
 use serde_json::json;
 
+use std::sync::atomic::Ordering;
+
 use super::EngineManager;
-use cef::{ImplBrowserHost, ImplRequestContext};
+use super::sign_in_gate::HeldNav;
+use cef::{CefString, ImplBrowser, ImplBrowserHost, ImplFrame, ImplRequestContext};
 
 use crate::wire::{EngineMsg, HostMsg};
 
@@ -42,9 +45,11 @@ impl EngineManager {
                     self.send_internal_cdp(&t.host, "Network.clearBrowserCache", json!({}));
                 }
                 self.clear_every_site(request_id, sites);
+                self.dispatch_sign_in_loads();
             }
             HostMsg::SetShareSignIns { enabled } => {
                 self.cookies.set_share_sign_ins(enabled, &self.contexts);
+                self.dispatch_sign_in_loads();
             }
             HostMsg::SyncRemoteCookies { request_id, partition, from_remote } => {
                 let side = if from_remote {
@@ -163,20 +168,123 @@ impl EngineManager {
             self.cookies.on_partition_dirty(&self.contexts, &partition, crate::cookies::LinkSide::Other);
         }
         self.cookies.poll(&self.contexts);
+        self.dispatch_sign_in_loads();
     }
 
-    /// A newly opened remote tab gets the profile's sign-ins when sharing is on.
+    /// A newly opened remote tab starts (or joins) the partition's initial profile -> remote
+    /// sign-in copy when sharing is on (`UP-151`, official `profile/index.ts:link`).
     pub(super) fn seed_remote_partition(&mut self, context: &crate::wire::ContextKind) {
-        if let crate::wire::ContextKind::RemoteServer { server_id, .. } = context
-            && self.cookies.share_sign_ins()
-        {
-            self.cookies.on_partition_dirty(&self.contexts, server_id, crate::cookies::LinkSide::Profile);
+        if let crate::wire::ContextKind::RemoteServer { server_id, .. } = context {
+            self.cookies.ensure_initial_copy(&self.contexts, server_id);
         }
     }
 
-    /// Releases `tab_id` from its pooled context; when that was a remote partition's last tab, the
-    /// cookie mirror for that partition stops.
+    /// Gates an already-initialized remote tab's initial URL during `open_tab` while its
+    /// partition's initial sign-in copy is still in flight.
+    pub(super) fn gate_remote_open(
+        &mut self,
+        context: &crate::wire::ContextKind,
+        tab_id: u64,
+        generation: u64,
+        url: &str,
+    ) -> bool {
+        let crate::wire::ContextKind::RemoteServer { server_id, .. } = context else {
+            return false;
+        };
+        self.cookies.gate_navigation(
+            server_id,
+            HeldNav {
+                tab_id,
+                generation,
+                url: url.to_owned(),
+            },
+        )
+    }
+
+    /// Gates a live remote tab's navigation while its partition's initial sign-in copy is in
+    /// flight; non-HTTP URLs bypass the gate and cancel any prior held HTTP load for `tab_id`.
+    pub(super) fn gate_remote_sign_in_nav(&mut self, tab_id: u64, url: &str) -> bool {
+        let Some((server_id, generation)) = self.tabs.get(&tab_id).and_then(|t| match &t.context {
+            crate::wire::ContextKind::RemoteServer { server_id, .. } => {
+                Some((server_id.clone(), t.generation))
+            }
+            _ => None,
+        }) else {
+            return false;
+        };
+        let held = self.cookies.gate_navigation(
+            &server_id,
+            HeldNav {
+                tab_id,
+                generation,
+                url: url.to_owned(),
+            },
+        );
+        self.dispatch_sign_in_loads();
+        held
+    }
+
+    /// Cancels a tab's queued sign-in navigation (leaving the partition copy running); when
+    /// `clear_loading` is true (Stop), also clears `loading` on the snapshot and emits `TabUpdate`.
+    pub(super) fn cancel_tab_sign_in_gate(&mut self, tab_id: u64, clear_loading: bool) {
+        if !self.cookies.cancel_tab_gate(tab_id) {
+            return;
+        }
+        if let Some(t) = self.tabs.get(&tab_id) {
+            t.deferred_initial.store(false, Ordering::Release);
+            if clear_loading {
+                let mut s = t.snap.lock().unwrap();
+                if s.loading {
+                    s.loading = false;
+                    let _ = self.out_tx.send(EngineMsg::TabUpdate { tab: s.clone() });
+                }
+            }
+        }
+    }
+
+    /// Marks `tab_id` as waiting for a held sign-in navigation (keeping the spinner active).
+    pub(super) fn mark_tab_waiting_sign_in(&self, tab_id: u64) {
+        if let Some(t) = self.tabs.get(&tab_id) {
+            t.deferred_initial.store(true, Ordering::Release);
+            let mut s = t.snap.lock().unwrap();
+            if !s.loading {
+                s.loading = true;
+                let _ = self.out_tx.send(EngineMsg::TabUpdate { tab: s.clone() });
+            }
+        }
+    }
+
+    /// Issues all navigations released by settled or timed-out partition sign-in gates.
+    pub(super) fn dispatch_sign_in_loads(&mut self) {
+        for nav in self.cookies.take_released_loads() {
+            self.load_released_tab_url(nav.tab_id, nav.generation, nav.url);
+        }
+    }
+
+    /// Loads `url` on `tab_id` once both its isolated context and any initial remote sign-in copy
+    /// have settled, preserving `TabClipboardGate` ordering for agent-driven tabs.
+    pub(super) fn load_released_tab_url(&mut self, tab_id: u64, generation: u64, url: String) {
+        if let Some(tab) = self.tabs.get(&tab_id)
+            && tab.generation == generation
+            && self.contexts.is_tab_ready(tab_id)
+        {
+            tab.deferred_initial.store(false, Ordering::Release);
+            if !url.trim().eq_ignore_ascii_case("about:blank")
+                && !tab
+                    .clipboard_gate
+                    .hold_until_root_armed(tab.prompts.agent_driven.load(Ordering::Relaxed), &url)
+                && let Some(frame) = tab.browser.main_frame()
+            {
+                tab.prompts.set_pending_top_url(Some(url.clone()));
+                frame.load_url(Some(&CefString::from(url.as_str())));
+            }
+        }
+    }
+
+    /// Releases `tab_id` from its pooled context and cancels any held sign-in navigation; when
+    /// that was a remote partition's last tab, the cookie mirror for that partition stops.
     pub(super) fn release_tab_context(&mut self, tab_id: u64) {
+        self.cookies.cancel_tab_gate(tab_id);
         if let Some(crate::context::ContextKey::RemoteServer(id)) = self.contexts.release_tab(tab_id) {
             self.cookies.on_partition_dropped(&id);
         }

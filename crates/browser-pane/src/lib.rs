@@ -24,6 +24,8 @@ pub mod device;
 mod download;
 #[cfg(all(feature = "engine", target_os = "linux"))]
 mod dmabuf;
+#[cfg(feature = "engine")]
+mod engine_log;
 pub mod extensions;
 #[cfg(all(feature = "engine", target_os = "linux"))]
 mod fd_lines;
@@ -45,6 +47,8 @@ pub mod preview;
 pub mod profile;
 pub mod prompts;
 pub mod protocol;
+pub mod residency;
+mod scroll_cursor;
 #[cfg(feature = "engine")]
 mod sidecar;
 mod site_zoom;
@@ -92,4 +96,5 @@ pub use prompts::{
     BlockedGuardReason, PermissionDecision, PermissionStore, SiteDecision, SitePermissions,
     SiteSetting, TabDriver,
 };
+pub use residency::{ExtensionWakeRequest, ResidencyEffects, ResidencyEvent, TabResidency};
 pub use site_zoom::ZoomStore;

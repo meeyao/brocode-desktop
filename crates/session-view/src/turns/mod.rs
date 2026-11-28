@@ -17,7 +17,7 @@
 
 mod view;
 
-pub use view::{calls, events as events_row, group, subagent as subagent_row, thoughts};
+pub use view::{block_row, calls, events as events_row, file_run_head_is_card, group, subagent as subagent_row, thoughts};
 
 use opencode_kit::model::{Assistant, Attachment, Notice, Part, ToolStatus};
 
@@ -200,6 +200,13 @@ fn launched(group: &[Step], e: &events::Event) -> bool {
 /// A turn's `entries` as rows, by `detail`. `live`: the last step is still streaming. A block's
 /// `msg` is its entry's index.
 pub fn fold_with<'a>(entries: &[Entry<'a>], live: bool, detail: &Detail) -> Vec<Block<'a>> {
+    fold_with_flags(entries, live, detail, false)
+}
+
+/// Like [`fold_with`], gated by `script_diffs` (the server's `full_codemode` flag,
+/// `packages/session-ui/src/timeline/facts.ts:126,223,283`, `opencode#66509`): without it, a
+/// script's file changes neither show nor count.
+pub fn fold_with_flags<'a>(entries: &[Entry<'a>], live: bool, detail: &Detail, script_diffs: bool) -> Vec<Block<'a>> {
     let commentary = commentary(entries, !live);
     let mut out: Vec<Block<'a>> = Vec::new();
     let mut group: Vec<Step<'a>> = Vec::new();
@@ -332,9 +339,11 @@ pub fn fold_with<'a>(entries: &[Entry<'a>], live: bool, detail: &Detail) -> Vec<
                     if rule.hidden {
                         continue;
                     }
-                    // Its changes still show: they happened (`scriptChangeItems` reads every part).
+                    // Its changes still show under `full_codemode`: they happened (`scriptChangeItems` reads every part).
                     if rules::stopped(status, metadata) && empty {
-                        place_changes(&mut out, &mut group, &mut at, &mut key, detail, (mi, pi), (&a.id, id, name, status, metadata));
+                        if script_diffs {
+                            place_changes(&mut out, &mut group, &mut at, &mut key, detail, (mi, pi), (&a.id, id, name, status, metadata));
+                        }
                         continue;
                     }
                     let failed = rules::failed(name, status, metadata);
@@ -380,7 +389,9 @@ pub fn fold_with<'a>(entries: &[Entry<'a>], live: bool, detail: &Detail) -> Vec<
                             }
                         }
                     }
-                    place_changes(&mut out, &mut group, &mut at, &mut key, detail, (mi, pi), (&a.id, id, name, status, metadata));
+                    if script_diffs {
+                        place_changes(&mut out, &mut group, &mut at, &mut key, detail, (mi, pi), (&a.id, id, name, status, metadata));
+                    }
                 }
             }
         }
@@ -617,4 +628,61 @@ fn file_like(st: &Step) -> bool {
 /// A skill call with a name that didn't fail: it joins the "Loaded" line of the skills beside it.
 fn named_skill(st: &Step) -> bool {
     matches!(st, Step::Tool { name: "skill", status, .. } if **status != ToolStatus::Error) && call(st).is_some_and(|c| crate::tools::skill_name(&c).is_some())
+}
+
+/// Computes where each `execute` script's Output row goes inside a slice of consecutive steps
+/// (`packages/session-ui/src/timeline/script-output.ts`, `opencode#66509`).
+pub fn script_output_for_steps<'a>(steps: &[Step<'a>], flat: bool) -> crate::tools::script::OutputPlacement<'a> {
+    let mut out = crate::tools::script::OutputPlacement::default();
+    if !flat {
+        return out;
+    }
+    for (i, st) in steps.iter().enumerate() {
+        let Step::Tool { id, name: "execute", status, input, metadata, .. } = st else { continue };
+        let mut last: Option<(&str, &str, usize)> = None;
+        for next in &steps[i + 1..] {
+            match next {
+                Step::Change { msg, script, index, .. } if *script == *id => last = Some((*msg, *script, *index)),
+                _ => break,
+            }
+        }
+        if let Some((msg, script, index)) = last {
+            let call = crate::tools::Call { id, name: "execute", status, input, metadata };
+            out.after_changes.insert(*id);
+            out.output_after.insert(crate::tools::script::change_id(msg, script, index), (*id, crate::tools::script_output_text(&call)));
+        }
+    }
+    out
+}
+
+/// Computes cross-block Output placement across a turn's top-level `blocks`
+/// (`packages/session-ui/src/timeline/script-output.ts:57-76`, `opencode#66509`): when a block
+/// ends on an `execute` call and the very next block is `Calls::Files` beginning with that
+/// script's changes, the script's Output row moves after its last consecutive change in that block.
+pub fn script_output_for_blocks<'a>(blocks: &[Block<'a>], flat: bool) -> crate::tools::script::OutputPlacement<'a> {
+    let mut out = crate::tools::script::OutputPlacement::default();
+    if !flat {
+        return out;
+    }
+    for (i, b) in blocks.iter().enumerate() {
+        let last_step = match b {
+            Block::Group { steps, .. } | Block::Calls { steps, .. } => steps.last(),
+            _ => None,
+        };
+        let Some(Step::Tool { id, name: "execute", status, input, metadata, .. }) = last_step else { continue };
+        let Some(Block::Calls { kind: Calls::Files, steps: next_steps, .. }) = blocks.get(i + 1) else { continue };
+        let mut last: Option<(&str, &str, usize)> = None;
+        for next in next_steps {
+            match next {
+                Step::Change { msg, script, index, .. } if *script == *id => last = Some((*msg, *script, *index)),
+                _ => break,
+            }
+        }
+        if let Some((msg, script, index)) = last {
+            let call = crate::tools::Call { id, name: "execute", status, input, metadata };
+            out.after_changes.insert(*id);
+            out.output_after.insert(crate::tools::script::change_id(msg, script, index), (*id, crate::tools::script_output_text(&call)));
+        }
+    }
+    out
 }

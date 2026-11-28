@@ -740,49 +740,26 @@ function settings.renderImportDialog(
     local profiles = if chooser then chooser.profiles else nil
     if chooser and profiles then
         local current = chooser.profile
-        local currentLabel = ""
+        local selectOptions: { ui.UiSelectOption } = {}
         for _, option in profiles do
-            if option.value == current then
-                currentLabel = option.label
-            end
+            table.insert(selectOptions, { value = option.value, label = option.label })
         end
-        local menuKey = "settings-import-profile"
-        -- `site-chooser.tsx:380-402`: "From", then the profile in a select as wide as its name.
+        -- `site-chooser.tsx:380-402`: "From", then the profile in Desktop's `Select` control.
         table.insert(body, ui.row({ key = "settings-import-from", w = "full", gap = 8, align = "center" }, {
             ui.text(i18n:T("import.from"), { size = 13, weight = "regular", lineHeight = 20, color = "text-muted", noWrap = true }),
-            ui.row({
-                key = menuKey,
-                role = "button",
+            ui.select({
+                key = "settings-import-profile",
                 label = i18n:T("sites.profile"),
-                h = 28,
-                pl = 8,
-                pr = 6,
-                gap = 8,
-                radius = 6,
-                align = "center",
+                value = current,
+                options = selectOptions,
+                disabled = busy,
                 shrink = true,
                 minW = 0,
-                fill = "bg-base",
-                border = "border-base",
-                hover = "surface-hover",
-                press = "surface-press",
-                menuTrigger = true,
-                onPress = view:Handler(function()
-                    if busy then
-                        return
-                    end
-                    local items = {}
-                    for _, option in profiles do
-                        table.insert(items, { id = option.value, title = option.label, checked = option.value == current })
-                    end
-                    local picked = chooser.Menu:OpenAsync({ anchorKey = menuKey, label = i18n:T("sites.profile"), align = "start", minWidth = 160, items = items })
-                    if type(picked) == "string" and picked ~= current then
-                        chooser.onProfile(picked)
+                onChange = view:Handler(function(ev: any)
+                    if type(ev) == "table" and type(ev.value) == "string" and ev.value ~= current then
+                        chooser.onProfile(ev.value)
                     end
                 end),
-            }, {
-                ui.text(currentLabel, { size = 13, weight = "medium", lineHeight = 16, color = "text-chrome", truncate = true, shrink = true, minW = 0 }),
-                ui.icon("select-chevron", { size = 16, color = "icon-weak" }),
             }),
         }))
     end
@@ -879,7 +856,7 @@ function settings.renderImportDialog(
                 key = "settings-import-start",
                 text = action,
                 variant = "primary",
-                disabled = not canImport,
+                disabled = not canImport or busy,
                 loading = busy,
                 onPress = view:Handler(import),
             }),
@@ -954,9 +931,8 @@ siteList = function(i18n: I18nService, view: View, chooser: SiteChooser, busy: b
         -- sites' boxes and stop at the ends, Home and End go to the ends, a typed name moves to its site,
         -- Space ticks or unticks the focused one, and Return imports. The list is as tall as its
         -- rows (`:576`, the virtualizer's total with 4 above and under) and gives way from there.
-        else ui.frame({
+        else ui.listbox({
             key = "settings-import-sites",
-            role = "list",
             label = i18n:T("sites.list"),
             focusGroup = true,
             keys = { "Enter" },
@@ -983,9 +959,10 @@ siteList = function(i18n: I18nService, view: View, chooser: SiteChooser, busy: b
             renderRow = function(index: number): ui.Node
                 local site = shown[index].site
                 local chosen = chooser.isChosen(site)
-                return ui.row({
+                return ui.option({
+                    direction = "row",
                     key = `settings-import-site-{site}`,
-                    role = "listitem",
+                    selected = chosen,
                     label = site,
                     w = "full",
                     h = SITE_ROW,
@@ -999,9 +976,7 @@ siteList = function(i18n: I18nService, view: View, chooser: SiteChooser, busy: b
                         chooser.onToggle(site)
                     end),
                 }, {
-                    ui.checkbox({ key = `settings-import-site-box-{site}`, text = "", checked = chosen, surface = "layer-1", label = site, onChange = view:Handler(function()
-                        chooser.onToggle(site)
-                    end) }),
+                    ui.checkbox({ key = `settings-import-site-box-{site}`, text = "", checked = chosen, surface = "layer-1", presentation = true }),
                     ui.text(site, { size = 13, weight = "regular", lineHeight = 20, color = "text-base", truncate = true, shrink = true, minW = 0, grow = 1, dir = "ltr" }),
                 })
             end,

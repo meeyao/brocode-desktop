@@ -37,7 +37,7 @@ pub use state::{
     adopt_child_strip, all_panels, bottom_open, bottom_stored_open, close_side_tab, dismiss_side_new_tab, find_panel,
     hide_side_tab,
     keeping_keyboard, live_new_tabs, move_side_tab, open_side_new_tab, open_side_tab, open_side_tab_for_session,
-    pane_shown_tab, panes_shown, promote_preview_tab, reopen_closed_side_tab, resolve_side_region, select_side_tab,
+    pane_shown_tab, panes_shown, promote_preview_tab, release_strip_width_holds, reopen_closed_side_tab, resolve_side_region, select_side_tab,
     session_side, session_side_mut, show_pane_tab, show_side_tab, shown_new_tab, side_mounted, side_open,
     side_stored_open, side_tab_visible, tab_state, toggle_bottom_region, toggle_side_region,
 };

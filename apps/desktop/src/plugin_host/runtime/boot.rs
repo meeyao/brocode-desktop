@@ -51,6 +51,7 @@ pub fn setup(app: &mut App, waker: Waker) {
     // plugin files weren't imported yet knows them only from stage B, so nothing starts before it.
     let known = refresh_records(app) || (crate::storage::need() && refresh_records(app));
     // Plugins start processes and compare against the app's own server's version.
+    services::process::init_resolver();
     process::warm();
     servers::read_own_version(app);
     // The servers added by address are in the registry from launch, their health checked.

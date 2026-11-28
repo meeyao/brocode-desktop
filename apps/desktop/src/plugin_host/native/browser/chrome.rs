@@ -171,6 +171,13 @@ pub(super) fn tab_methods(lua: &Lua, m: &Table) -> mlua::Result<()> {
             }
             let shift = with_app("BrowserTab:ReloadFromClick", |app| Ok(app.workspace_panes.browser.shift_held))?;
             later(lua, &this, "BrowserTab:ReloadFromClick", move |s, id, tx| {
+                s.workspace_panes.browser.host.clear_refusal(id);
+                s.workspace_panes.browser.proxy_wake_tried.remove(&id);
+                if s.workspace_panes.browser.host.tab(id).is_some_and(|t| t.residency().is_hibernated()) {
+                    s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id));
+                    return;
+                }
+                s.ensure_preview_binding(id);
                 if shift || tx.mods().shift {
                     s.workspace_panes.browser.host.reload_ignore_cache(id);
                 } else {
@@ -268,6 +275,14 @@ pub(super) fn tab_methods(lua: &Lua, m: &Table) -> mlua::Result<()> {
             let forward = forward.unwrap_or(true);
             let find_next = find_next.unwrap_or(false);
             later(lua, &this, "BrowserTab:Find", move |s, id, _| {
+                if let Some(res) = s.workspace_panes.browser.host.tab(id).map(|t| t.residency())
+                    && matches!(res, browser_pane::TabResidency::Hibernated { .. } | browser_pane::TabResidency::Waking)
+                {
+                    if res.is_hibernated() {
+                        s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id));
+                    }
+                    return;
+                }
                 s.workspace_panes.browser.host.find(id, &query, forward, false, find_next, true);
             })
         })?,
@@ -308,6 +323,12 @@ pub(super) fn tab_methods(lua: &Lua, m: &Table) -> mlua::Result<()> {
         lua.create_function(|lua, this: Table| {
             later(lua, &this, "BrowserTab:ReloadIgnoreCache", move |s, id, _| {
                 s.workspace_panes.browser.host.clear_refusal(id);
+                s.workspace_panes.browser.proxy_wake_tried.remove(&id);
+                if s.workspace_panes.browser.host.tab(id).is_some_and(|t| t.residency().is_hibernated()) {
+                    s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id));
+                    return;
+                }
+                s.ensure_preview_binding(id);
                 s.workspace_panes.browser.host.reload_ignore_cache(id);
             })
         })?,
@@ -336,10 +357,19 @@ fn clear_cache(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Result<()> {
             if let Err(err) = scope.check_tab(s, id, true) {
                 return done.complete(failed(err));
             }
+            if let Some(res) = s.workspace_panes.browser.host.tab(id).map(|t| t.residency())
+                && matches!(res, browser_pane::TabResidency::Hibernated { .. } | browser_pane::TabResidency::Waking)
+            {
+                if res.is_hibernated() && !s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id)) {
+                    return done.complete(failed("Browser tab could not be woken.".to_owned()));
+                }
+                return done.complete(failed("Tab is waking; retry once loaded.".to_owned()));
+            }
             if !s.workspace_panes.browser.host.has_live_sidecar() {
                 return done.complete(failed(not_running(&s.workspace_panes.browser.host.status())));
             }
             scope.mark_tab_driven(s, id);
+            s.workspace_panes.browser.host.freeze_tab(id, false);
             match s.workspace_panes.browser.host.clear_site_cache(id) {
                 Ok(request) => {
                     s.workspace_panes.browser.devtools.insert(

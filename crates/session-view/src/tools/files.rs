@@ -28,6 +28,22 @@ pub fn is_file_tool(c: &Call) -> bool {
     *c.status != opencode_kit::model::ToolStatus::Error && matches!(c.name, "edit" | "multiedit" | "write" | "patch" | "apply_patch")
 }
 
+/// Whether file tool `c` draws a bordered file card (0 pt vertical overhang) rather than its
+/// fallback 28 pt pending trigger (cheap check without computing a diff).
+pub fn draws_card(c: &Call) -> bool {
+    if let Some(files) = c.metadata["files"].as_array().filter(|f| !f.is_empty()) {
+        return files.iter().any(|f| changed(c, f).is_some());
+    }
+    if path(c.input).is_none() {
+        return false;
+    }
+    match c.name {
+        "edit" | "multiedit" => c.input["oldString"].as_str().zip(c.input["newString"].as_str()).is_some_and(|(o, n)| o != n),
+        "write" => field(c.input, "content").is_some(),
+        _ => false,
+    }
+}
+
 /// What a file's row says it did.
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
@@ -153,19 +169,35 @@ fn changed<'a>(c: &Call<'a>, f: &'a Value) -> Option<Entry<'a>> {
     (additions > 0 || deletions > 0).then_some(Entry { call: *c, path, kind, additions, deletions, source: Source::Patch(patch) })
 }
 
-/// A run of file tools: one card of a row per path they changed, each shut until pressed or
-/// open as Timeline detail's Edits say.
+/// A run of file tools: each changed path is its own rounded card separated by the small
+/// timeline gap (`timeline-next.css:55-79`), open as Timeline detail's Edits say.
 pub fn group<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call]) -> El {
-    group_with(s, p, cx, calls, s.timeline_detail().expanded(crate::detail::Category::Edit))
+    group_with(s, p, cx, calls, s.timeline_detail().expanded(crate::detail::Category::Edit), false)
+}
+
+/// A script's consecutive diff-bearing file changes (`ScriptChangeGroup`, `tool-renderer.tsx:1245`,
+/// `timeline-next.css:58-59`, `opencode#66751`): one stacked patch group with shared outer corners,
+/// 1 pt overlapped dividers (`accordion.css:15`), and per-file disclosure keyed by each path's
+/// first change id.
+pub fn stacked_group<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call]) -> El {
+    group_with(s, p, cx, calls, s.timeline_detail().expanded(crate::detail::Category::Edit), true)
 }
 
 /// [`group`] with each file shut until pressed, whatever Timeline detail says, as Changed files
 /// lists them (its `fileOpen` is only what was pressed).
 pub fn shut_group<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call]) -> El {
-    group_with(s, p, cx, calls, false)
+    group_with(s, p, cx, calls, false, false)
 }
 
-fn group_with<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call], open: bool) -> El {
+/// Outer-corner and border-overlap shape for one row in a file group.
+#[derive(Clone, Copy)]
+struct RowShape {
+    first: bool,
+    last: bool,
+    overlap: bool,
+}
+
+fn group_with<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call], open: bool, stacked: bool) -> El {
     let Some(first) = calls.first() else { return col() };
     let mut items: Vec<Item> = Vec::new();
     for e in calls.iter().flat_map(entries) {
@@ -185,23 +217,32 @@ fn group_with<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call], open: bo
         let d = Display::of(s, cx, pending, false);
         return still(trigger(s, p, cx, first, d, Trigger { title: title.into(), ..Default::default() }, Press::None, None));
     }
-    // Each changed file is its own rounded card, separated by the small timeline gap
-    // (`timeline-next.css:53-68`).
-    let mut card = col().key("files").w_full().gap(crate::timeline::rhythm::S);
+    // Direct file edits draw each file as its own rounded card separated by `rhythm::S`; a
+    // script's changes stay one stacked group (`timeline-next.css:55-88`, `opencode#66751`).
+    let mut card = col().key("files").w_full();
+    if !stacked {
+        card = card.gap(crate::timeline::rhythm::S);
+    }
+    let len = items.len();
     let mut keyed: Vec<&str> = Vec::new();
     for (i, item) in items.iter().enumerate() {
         let owner = item.entries[0].call;
         // The first row a call shows carries its key, so opening the call from the host keeps it in view.
         let row_key = if keyed.contains(&owner.id) { format!("file-{}-{i}", first.id) } else { format!("tool-{}", owner.id) };
         keyed.push(owner.id);
-        card = card.child(file_item(s, p, cx, first.id, item, row_key, open));
+        // In a script patch group, each file opens by the id of its first change so a later
+        // change to the same file keeps the row's disclosure state (`tool-renderer.tsx:1268`).
+        let disc_group = if stacked { owner.id } else { first.id };
+        let shape = RowShape { first: !stacked || i == 0, last: !stacked || i + 1 == len, overlap: stacked && i > 0 };
+        card = card.child(file_item(s, p, cx, disc_group, item, row_key, open, shape));
     }
     card
 }
 
-/// One file's card, and under it the change while open, and the file's errors.
+/// One file's card (or row inside a stacked script patch group), and under it the change while
+/// open, and the file's errors.
 #[allow(clippy::too_many_arguments)]
-fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item, row_key: String, default_open: bool) -> El {
+fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item, row_key: String, default_open: bool, shape: RowShape) -> El {
     let shown = super::session_relative(s, cx.session, item.path);
     let k = sub_key(group, format!("file:{shown}"));
     // Until pressed, `default_open` decides: Timeline detail's Edits, or shut in Changed files.
@@ -210,8 +251,8 @@ fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item,
     let errors = diagnostics(p, owner.metadata, path(owner.input).unwrap_or(item.path));
     // The card's bottom corners round whichever section ends it: the errors, the change or the row.
     let end = errors.is_none();
-    let top = RADIUS;
-    let bottom = if end && !open { RADIUS } else { 0.0 };
+    let top = if shape.first { RADIUS } else { 0.0 };
+    let bottom = if shape.last && end && !open { RADIUS } else { 0.0 };
     let (dir, name) = match shown.rfind(['/', '\\']) {
         Some(at) => (&shown[..=at], &shown[at + 1..]),
         None => ("", shown),
@@ -224,7 +265,10 @@ fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item,
     }
     words = words.child(text(name.to_owned()).key("file").font(PATH).color(p.text).truncate_fade().shrink().min_w(0.0));
     let change = change(p, item);
-    let toggle = || crate::disclosure::set::<S>(k.clone(), open, row_key.clone());
+    // File diffs open and close without animating their parent group's fold glide
+    // (`packages/session-ui/src/timeline-next/tools/patch.tsx` `FileAccordionItem`,
+    // `packages/ui/src/data-display/accordion/accordion.css`).
+    let toggle = || crate::disclosure::set_instant::<S>(k.clone(), open, row_key.clone());
     // `apply-patch-file-info` (`patch.tsx:77-105`, `timeline-next.css:89-105`): the change counts
     // follow the file's name, and the grabber sits 4 pt closer to the right edge so its arrows
     // balance the file icon on the left.
@@ -275,15 +319,21 @@ fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item,
     // rounded corners.
     let header = row().key("head").w_full().fill(p.bg_base).sticky_top(cx.sticky).child(trigger);
     // A key holds no `/`, which separates the parts of a path.
-    let mut out = col().key(format!("item-{}", shown.replace(['/', '\\'], ":"))).w_full().child(header);
+    let mut out = col().key(format!("item-{}", shown.replace(['/', '\\'], ":"))).w_full();
+    if shape.overlap {
+        // Stacked accordion items overlap by 1 pt so adjacent borders stay 1 pt (`accordion.css:15`).
+        out = out.mt(-1.0);
+    }
+    out = out.child(header);
     if open {
-        let corner = if end { RADIUS } else { 0.0 };
+        let corner = if shape.last && end { RADIUS } else { 0.0 };
         let diffs = item.diffs();
         let views = col().key("views").w_full().children(diffs.into_iter().map(|fd| super::diff::view::<S>(p, fd)));
         // Flush under the row, a hairline over the change (`edit-content`); the row's bottom
-        // border is the content's top, which has none of its own (`border-top: 0`).
-        out = out.child(crate::disclosure::reveal(
-            s.knobs(),
+        // border is the content's top, which has none of its own (`border-top: 0`). No reveal
+        // transition: official mounts the diff directly (`patch.tsx:157-167`, `accordion.css`)
+        // without re-animating sibling rows or the enclosing group.
+        out = out.child(
             col()
                 .key("content")
                 .w_full()
@@ -292,15 +342,17 @@ fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item,
                 .fill(p.layer1)
                 .corners([0.0, 0.0, corner, corner])
                 .clip_corners([0.0, 0.0, corner, corner])
+                .transition(rune::Transition::none())
                 .child(rule(0.5, p.border_muted).key("hairline"))
                 .child(readable(p, views)),
-        ));
+        );
     }
     if let Some(errors) = errors {
         // An intentional Rune extra: Desktop lists a file's errors under a lone edit or write but
         // never in a group's file card. Here they close the file's part of the card, 1 pt up so
         // their divider stands in for the bottom border of the row or the change above.
-        let inner = (RADIUS - 1.0).max(0.0);
+        let err_r = if shape.last { RADIUS } else { 0.0 };
+        let inner = (err_r - 1.0).max(0.0);
         out = out.child(
             col()
                 .key("errors")
@@ -309,8 +361,8 @@ fn file_item<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, group: &str, item: &Item,
                 .border_sides([0.0, 1.0, 1.0, 1.0], p.border)
                 .border_layout()
                 .fill(p.bg_base)
-                .corners([0.0, 0.0, RADIUS, RADIUS])
-                .clip_corners([0.0, 0.0, RADIUS, RADIUS])
+                .corners([0.0, 0.0, err_r, err_r])
+                .clip_corners([0.0, 0.0, err_r, err_r])
                 .child(errors.corners([0.0, 0.0, inner, inner])),
         );
     }

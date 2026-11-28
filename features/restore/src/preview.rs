@@ -59,33 +59,18 @@ fn turn_of(messages: &[Message], at: usize) -> usize {
 /// up to [`PLACE_BYTES`] (the place's turn whole if it alone is more, up to [`BYTES`]).
 pub fn encode(messages: &[Message], turn: Option<usize>) -> Vec<u8> {
     let users: Vec<usize> = messages.iter().enumerate().filter(|(_, m)| matches!(m, Message::User { .. })).map(|(i, _)| i).collect();
-    let mut start = users.len().checked_sub(2).map_or(0, |i| users[i]);
+    let start = users.len().checked_sub(2).map_or(0, |i| users[i]);
     if let Some(place) = turn.filter(|&t| t < start) {
         // From the turn before the place's, so the place isn't the transcript's first row, which
         // the history's loading look above it would move. The place's turn ends at the next
         // prompt.
         let turn = users.iter().copied().rev().find(|&u| u < place).unwrap_or(place);
         let own = users.iter().copied().find(|&u| u > place).unwrap_or(messages.len());
-        let mut end = own;
-        let mut bytes = preview::encode(&messages[turn..end]);
-        while end < messages.len() {
-            let more = preview::encode(&messages[turn..end + 1]);
-            if more.len() > PLACE_BYTES {
-                break;
-            }
-            (bytes, end) = (more, end + 1);
-        }
-        if bytes.len() <= BYTES {
+        if let Some(bytes) = preview::encode_prefix_within(&messages[turn..], own - turn, PLACE_BYTES, BYTES) {
             return bytes;
         }
     }
-    loop {
-        let bytes = preview::encode(&messages[start..]);
-        if bytes.len() <= BYTES || start + 1 >= messages.len() {
-            return bytes;
-        }
-        start += 1;
-    }
+    preview::encode_suffix_within(&messages[start..], BYTES)
 }
 
 /// The boot packet's preview of the window's shown session, decoded into its transcript: the

@@ -117,7 +117,7 @@ pub fn strip_dir<'a>(path: &'a str, dir: &str) -> Option<&'a str> {
 }
 
 /// `a` and `b` name the same path: separators match each other, and Windows paths ignore case.
-fn same(a: &str, b: &str) -> bool {
+pub fn same(a: &str, b: &str) -> bool {
     let fold = windows(a) || windows(b);
     let sep = |c: u8| c == b'/' || c == b'\\';
     a.len() == b.len() && a.bytes().zip(b.bytes()).all(|(x, y)| x == y || (fold && ((sep(x) && sep(y)) || x.eq_ignore_ascii_case(&y))))

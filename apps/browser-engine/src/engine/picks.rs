@@ -3,7 +3,7 @@
 
 use std::sync::atomic::Ordering;
 
-use cef::{CefString, ImplBrowser, ImplBrowserHost, ImplFrame};
+use cef::{ImplBrowser, ImplBrowserHost};
 use serde_json::json;
 
 use super::EngineManager;
@@ -35,16 +35,11 @@ impl EngineManager {
         for outcome in self.contexts.drain_ready_loads() {
             match outcome {
                 crate::context::DeferredOutcome::Load { tab_id, generation, url } => {
-                    if let Some(tab) = self.tabs.get(&tab_id)
-                        && tab.generation == generation
+                    if self.tabs.get(&tab_id).is_some_and(|t| t.generation == generation)
                         && self.contexts.is_tab_ready(tab_id)
+                        && !self.gate_remote_sign_in_nav(tab_id, &url)
                     {
-                        tab.deferred_initial.store(false, Ordering::Release);
-                        if !url.trim().eq_ignore_ascii_case("about:blank")
-                            && let Some(frame) = tab.browser.main_frame()
-                        {
-                            frame.load_url(Some(&CefString::from(url.as_str())));
-                        }
+                        self.load_released_tab_url(tab_id, generation, url);
                     }
                 }
                 crate::context::DeferredOutcome::Refuse { tab_id, generation, reason } => {

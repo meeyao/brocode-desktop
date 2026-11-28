@@ -40,16 +40,20 @@ pub fn dialog(s: &App, p: &Pal, cx: &rune::Cx<App>) -> Vec<El> {
         card = card.child(text(d.clone()).font(UI).color(p.muted).wrap().mt(6.0));
     }
     card = card.child(text(plugin.origin.describe()).font(crate::view::UI_SMALL).color(p.faint).wrap().selectable(true).mt(6.0));
-    let (later, ok) = (id.clone(), id);
-    card = card.child(
-        row()
-            .key("luau-trust-footer")
-            .gap(8.0)
-            .mt(14.0)
-            .child(spacer())
-            .child(button("luau-trust-later", "Not now", p.text, None).on_press_tx(move |s: &mut App, tx: &mut Tx| answer(s, &later, TrustEvent::Later, tx)))
-            .child(button("luau-trust-enable", "Enable", p.on_fill, Some(p.bg_accent)).on_press_tx(move |s: &mut App, tx: &mut Tx| answer(s, &ok, TrustEvent::Accept, tx))),
-    );
+    let (later, ok, esc) = (id.clone(), id.clone(), id);
+    card = card
+        .role("dialog")
+        .label(format!("Enable plugin \"{name}\"?"))
+        .modal_tx(false, move |s: &mut App, tx: &mut Tx| answer(s, &esc, TrustEvent::Later, tx))
+        .child(
+            row()
+                .key("luau-trust-footer")
+                .gap(8.0)
+                .mt(14.0)
+                .child(spacer())
+                .child(button("luau-trust-later", "Not now", p.text, None).on_press_tx(move |s: &mut App, tx: &mut Tx| answer(s, &later, TrustEvent::Later, tx)))
+                .child(button("luau-trust-enable", "Enable", p.on_fill, Some(p.bg_accent)).on_press_tx(move |s: &mut App, tx: &mut Tx| answer(s, &ok, TrustEvent::Accept, tx))),
+        );
     // No Desktop counterpart: a confirmation, so the normal size.
     let card = crate::widgets::sized(card, crate::widgets::DialogSize::Normal, crate::widgets::Fit::Content, crate::widgets::dialog_window(cx, *s.zoom));
     vec![

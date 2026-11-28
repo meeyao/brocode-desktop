@@ -41,6 +41,7 @@ const GL_EXTENSIONS: u32 = 0x1F03;
 pub const BGRA_EXT: u32 = 0x80E1;
 pub const RGBA: u32 = 0x1908;
 pub const UNSIGNED_BYTE: u32 = 0x1401;
+pub const NO_ERROR: u32 = 0;
 
 const GBM_BO_USE_RENDERING: u32 = 1 << 2;
 
@@ -124,6 +125,7 @@ api! {
     blit_framebuffer: "glBlitFramebuffer" => fn(i32, i32, i32, i32, i32, i32, i32, i32, u32, u32);
     flush: "glFlush" => fn();
     read_pixels: "glReadPixels" => fn(i32, i32, i32, i32, u32, u32, *mut c_void);
+    get_error: "glGetError" => fn() -> u32;
     get_string: "glGetString" => fn(u32) -> *const c_char;
     gbm_create_device: "gbm_create_device" => fn(i32) -> *mut c_void;
     gbm_device_destroy: "gbm_device_destroy" => fn(*mut c_void);

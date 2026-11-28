@@ -142,6 +142,11 @@ impl Downloads {
         self.next_tab_gen.fetch_add(1, Ordering::Relaxed)
     }
 
+    /// Whether `tab_id` currently owns any staged agent download files on disk.
+    pub fn has_tab_files(&self, tab_id: u64) -> bool {
+        self.files.lock().unwrap().keys().any(|&(tid, _, _)| tid == tab_id)
+    }
+
     pub fn set_download_save_enabled(&self, enabled: bool) {
         self.download_save_enabled.store(enabled, Ordering::Release);
     }

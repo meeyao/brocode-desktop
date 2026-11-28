@@ -1,7 +1,8 @@
-commit f8878eddda59054b99fa33077c6243ad80f4c468
-rune 5342f14d1ed4ad67939ce391ff08a9410656d96e
+commit 90664c5e5109cf26e9ccee3a0671ac4b6528a7ce
+rune 360ee51055f06d81838d3f0b6d67beb5aa57bd92
 rustc rustc 1.99.1 (58cf8f9c3 2026-10-13)
 processes 53
-Total functions: 18689
 launches 26 (weight 1)
-built by PR CI: #1255 at 14847c85d8401cfc5e3d8392ec6a1216cbe7bfe9
+built by PR CI: #1350 at 0e347b89d1f38fb5f98b5ea0eeb63ffa7737c142
+Total functions: 17192
+re-keyed: 17192 of 17196 functions kept, 3 dropped (their code changed), 1 gone

@@ -24,6 +24,9 @@ use crate::{TimelineHost, copied, diagram, disclosure, images, jump, line_reveal
 pub trait TimelineClock {
     fn knobs(&self) -> &Knobs;
     fn clock(&self) -> f64;
+    fn display_hz(&self) -> Option<f64> {
+        None
+    }
     fn now_ms(&self) -> i64 {
         0
     }
@@ -43,6 +46,10 @@ impl<T: TimelineHost> TimelineClock for T {
 
     fn clock(&self) -> f64 {
         TimelineHost::clock(self)
+    }
+
+    fn display_hz(&self) -> Option<f64> {
+        TimelineHost::display_hz(self)
     }
 
     fn now_ms(&self) -> i64 {
@@ -104,6 +111,9 @@ pub trait TranscriptSource {
     fn session_revert(&self, _session: &str) -> Option<&str> {
         None
     }
+    fn full_codemode(&self, _session: &str) -> bool {
+        false
+    }
     fn for_each_tracked_session(&self, mut f: impl FnMut(&str)) {
         if let Some(id) = Self::active_session_id(self) {
             f(id);
@@ -146,6 +156,10 @@ impl<T: TimelineHost> TranscriptSource for T {
 
     fn is_session_live(&self, session: &str) -> bool {
         TimelineHost::is_session_live(self, session)
+    }
+
+    fn full_codemode(&self, session: &str) -> bool {
+        TimelineHost::full_codemode(self, session)
     }
 
     fn is_session_stopped(&self, session: &str) -> bool {

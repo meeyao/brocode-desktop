@@ -49,6 +49,25 @@ pub(super) fn service_env(isolated: bool) -> BTreeMap<String, String> {
     env
 }
 
+/// Full user environment merged with the cached Unix login-shell environment, for plugin child
+/// processes that need the user's shell `PATH` on GUI-launched macOS/Linux apps without sidecar-
+/// specific overrides. Returns `None` on Windows or when the login shell probe is unavailable.
+pub(super) fn login_env() -> Option<BTreeMap<String, String>> {
+    #[cfg(unix)]
+    {
+        let shell_env = SHELL_ENV.get_or_init(load_unix_shell_env).as_ref()?;
+        let mut env: BTreeMap<String, String> = std::env::vars().collect();
+        for (k, v) in shell_env {
+            env.insert(k.clone(), v.clone());
+        }
+        Some(env)
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
 /// Merges `127.0.0.1,localhost,::1` into both `NO_PROXY` and `no_proxy`
 /// (`packages/desktop/src/main/lifecycle/environment.ts:136-147`).
 fn apply_loopback_no_proxy(env: &mut BTreeMap<String, String>) {

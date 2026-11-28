@@ -19,15 +19,14 @@ use crate::{AuthHost, ConnectHost, Open};
 /// The search dialog's title and description (`#64882`): 13 on a 20 line.
 const TITLE: TextStyle = TextStyle::new(13.0, 440.0).lh(20.0).tracking(-0.04);
 const DESCRIPTION: TextStyle = TextStyle::new(13.0, 440.0).lh(20.0).tracking(-0.04);
-/// A provider step's title (`dialog-header-title` at 15, tracking -0.13).
-const STEP_TITLE: TextStyle = TextStyle::new(15.0, 530.0).lh(16.0).tracking(-0.13);
 /// The list's group labels: 12 on 18 at 440, tracking 0.05, faint.
 const GROUP: TextStyle = TextStyle::new(12.0, 440.0).lh(18.0).tracking(0.05);
 
 /// The integrations the list offers, in the TUI's groups: connected first by name, then the
 /// popular ones in their order, then the rest by name. MCP sign-ins live in the MCPs dialog.
 /// Go is listed only with a saved Go key, before OpenCode (`providers/connect/dialog.tsx`, `#65466`).
-const POPULAR: [&str; 6] = ["opencode-go", "opencode", "openai", "github-copilot", "anthropic", "google"];
+// `packages/app/src/providers/catalog/order.ts` (`opencode#66736`).
+const POPULAR: [&str; 9] = ["opencode-go", "opencode", "openai", "anthropic", "claude-agent", "github-copilot", "google", "openrouter", "vercel"];
 
 /// Muted note beside OpenCode Go while unconnected (`providerNote`, `#65466`).
 fn provider_note(id: &str) -> Option<&'static str> {
@@ -196,14 +195,31 @@ pub fn dialog<H: ConnectHost + 'static>(s: &H, p: &Pal, win: [f32; 2]) -> Vec<El
     let frame = dialog::frame(&open.dialog);
     let authorizing = open.dialog.provider.as_ref().and_then(|p| p.step.connect()).is_some_and(crate::machine::authorizing);
     let label = title(s);
-    let head = header(s, open, p, frame, &label);
-    let content = match frame {
-        Frame::Picker => picker(s, open, p),
-        _ => build_focus_host(label.clone(), crate::steps::body(s, p, frame)),
+    let surface = if frame == Frame::Models {
+        let id = open.dialog.provider.as_ref().map(|pr| pr.id.clone()).unwrap_or_default();
+        let pname = step_name(s, &id);
+        let body = crate::steps::models::view(s, open, p, &id, &pname, remote_label(s, p, &id));
+        ui::overlay(p, col())
+            .key("connect-dialog")
+            .role("dialog")
+            .label(label)
+            .radius(12.0)
+            .fill(p.bg_base)
+            .clip_soft(0.0)
+            .transition(Transition::none())
+            .motion(Spring::NONE)
+            .child(body)
+            .modal(true, move |s: &mut H| close_on_backdrop(s, authorizing))
+    } else {
+        let head = header(s, open, p, frame);
+        let content = match frame {
+            Frame::Picker => picker(s, open, p),
+            _ => build_focus_host(label.clone(), crate::steps::body(s, p, frame)),
+        };
+        build_dialog_surface(p, label, head, content)
+            // A stray press beside it mustn't drop a sign-in the user is finishing in the browser.
+            .modal(true, move |s: &mut H| close_on_backdrop(s, authorizing))
     };
-    let surface = build_dialog_surface(p, label, head, content)
-        // A stray press beside it mustn't drop a sign-in the user is finishing in the browser.
-        .modal(true, move |s: &mut H| close_on_backdrop(s, authorizing));
     // `<Dialog size="large" fit>` (`providers/connect/dialog.tsx`, `#64882`): every step fits its
     // content within the large height, and the top edge stays put.
     ui::sized_modal("connect", p, DialogSize::Large, Fit::Content, win, surface)
@@ -261,15 +277,12 @@ fn crumb<H: ConnectHost + 'static>(content: El, key: &'static str, name: String,
     }
 }
 
-fn header<H: ConnectHost + 'static>(s: &H, open: &Open, p: &Pal, frame: Frame, label: &str) -> El {
+fn header<H: ConnectHost + 'static>(s: &H, open: &Open, p: &Pal, frame: Frame) -> El {
     let close = close_button::<H>(p);
     match frame {
         // `.search-dialog`: 10 pt above and at the end, 14 before, 6 below.
         Frame::Picker => build_picker_header(p, close),
-        Frame::Models => {
-            let id = open.dialog.provider.as_ref().map(|p| p.id.clone()).unwrap_or_default();
-            build_models_header(p, &id, label, remote_label(s, p, &id), close)
-        }
+        Frame::Models => el(),
         Frame::Provider | Frame::Accounts => {
             let Some(provider) = open.dialog.provider.as_ref() else { return row() };
             let root = opencode_i18n::t!("provider.connect.breadcrumb.root");
@@ -314,28 +327,6 @@ fn build_picker_header(p: &Pal, close: El) -> El {
                 .child(text(opencode_i18n::t!("dialog.provider.title")).font(TITLE).color(p.text))
                 .child(text(opencode_i18n::t!("dialog.provider.description")).font(DESCRIPTION).color(p.muted)),
         )
-        .child(close.mr(-2.0))
-}
-
-fn build_models_header(p: &Pal, id: &str, label: &str, remote: Option<El>, close: El) -> El {
-    // `dialog.tsx:128-129` (`#64882`): `!px-4 !pt-3.5` across frames; models frame keeps bottom inset.
-    row()
-        .key("connect-header")
-        .w_full()
-        .pt(14.0)
-        .px(16.0)
-        .pb(16.0)
-        .child(
-            row()
-                .grow(1.0)
-                .shrink()
-                .h(16.0)
-                .gap(8.0)
-                .center_y()
-                .child(ui::provider_mark(id, p.icon))
-                .child(text(label.to_owned()).font(STEP_TITLE).color(p.text)),
-        )
-        .children(remote)
         .child(close.mr(-2.0))
 }
 

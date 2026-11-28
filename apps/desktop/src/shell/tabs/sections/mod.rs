@@ -2,8 +2,8 @@
 //! ⌘-click and ⇧-click, acts on together from a right-click, and gathers under quiet named
 //! headers (⌘G). Off, nothing here runs: no state is read or saved and no tab moves.
 //!
-//! The window keeps its sections in `sidebar.sections` beside its tabs; a closed tab leaves its
-//! section, and a section left empty goes.
+//! The window keeps its sections in `sidebar.sections` beside its tabs, and its tab order is the
+//! list's (`model`): a closed tab leaves its section, and a section left empty goes.
 
 pub mod drag;
 pub mod model;
@@ -13,11 +13,12 @@ pub mod select;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use opencode_kernel::{EscapeLayer, Feature, KernelBuilder, OverlayRegistration, Slot};
-use rune::{KeyEvent, TextEdit, Tx};
+use rune::{KeyEvent, Live as RuneLive, ScrollPos, TextEdit, Tx};
 
-pub use model::{Doc, Drop, Laid, Section};
+pub use model::{Doc, Drop, Entry, Laid, Section};
 pub use ops::*;
 
 use crate::App;
@@ -38,13 +39,26 @@ pub struct SectionsState {
 
 pub static SECTIONS: Slot<SectionsState> = Slot::new();
 
-/// What the rows read without redrawing: where each was laid out (window points) and the
-/// modifiers held now (`home_modifiers`), for a press to read as it lands.
-#[derive(Default)]
+/// What the rows and scroll viewport report without redrawing: laid-out rects, scroll viewport
+/// rect + offset for drag auto-scroll, and live modifiers (`home_modifiers`).
 pub struct Live {
     pub rects: RefCell<HashMap<String, [f32; 4]>>,
+    pub scroll_rect: RuneLive<[f32; 4]>,
+    pub scroll_pos: Rc<Cell<ScrollPos>>,
     pub cmd: Cell<bool>,
     pub shift: Cell<bool>,
+}
+
+impl Default for Live {
+    fn default() -> Self {
+        Self {
+            rects: RefCell::new(HashMap::new()),
+            scroll_rect: RuneLive::new([0.0; 4]),
+            scroll_pos: Rc::new(Cell::new(ScrollPos::default())),
+            cmd: Cell::new(false),
+            shift: Cell::new(false),
+        }
+    }
 }
 
 pub static LIVE: Slot<Live> = Slot::new();
@@ -53,6 +67,8 @@ const ROW: &str = "sidebar.sections";
 pub const OVERLAY_ID: &str = "sidebar.sections";
 /// The name field's key.
 pub const FIELD: &str = "sidebar-section-name";
+/// The scroll viewport's key.
+pub const SCROLL_KEY: &str = "sidebar-sections-scroll";
 
 pub struct SidebarSectionsFeature;
 
@@ -68,6 +84,25 @@ impl Feature<App> for SidebarSectionsFeature {
         // ⌘G gathers the selection before Find reads it as Find next (Find closed); no layer
         // draws here, so it takes the last band (`with_key_in`).
         builder.register_overlay(OverlayRegistration::<App>::new(OVERLAY_ID).with_key_in(crate::overlays::key_band::LOW, key));
+        builder.register_escape_layer(EscapeLayer::<App>::new(
+            "escape.sidebar_sections_drag",
+            crate::overlays::escape_band::CHROME,
+            |s| state(s).drag.is_gesture(),
+            |s, _, tx| {
+                if drag::step(&mut state_mut(s).drag, drag::Event::Cancel) == drag::Effect::Redraw {
+                    tx.animated();
+                }
+            },
+        ));
+        builder.register_escape_layer(EscapeLayer::<App>::new(
+            "escape.sidebar_sections_naming",
+            crate::overlays::escape_band::CHROME,
+            |s| state(s).naming.editing().is_some(),
+            |s, _, tx| {
+                naming_step(s, naming::Event::Cancel, tx);
+                tx.blur();
+            },
+        ));
         builder.register_escape_layer(EscapeLayer::<App>::new(
             "escape.sidebar_sections",
             crate::overlays::escape_band::FALLBACK,
@@ -86,7 +121,7 @@ pub(crate) fn state_mut(s: &mut App) -> &mut SectionsState {
 }
 
 /// Whether the sidebar lists its tabs in sections now: the setting is on and side tabs show the
-/// plain list (Organize › List or Consolidated, with no tab groups of either kind).
+/// plain list (Organize › List, Projects, or Consolidated, with no tab groups of either kind).
 pub fn on(s: &App) -> bool {
     use crate::settings::Organize;
     if !s.settings.sidebar_sections() || s.tab_layout() != crate::layout_state::TabLayout::Vertical || s.narrow() {
@@ -117,23 +152,52 @@ pub fn visible_uids(s: &App) -> Option<Vec<String>> {
     Some(laid(s).visible().filter_map(|i| s.tabs.get(i).map(Tab::uid)).collect())
 }
 
-/// Every listed tab, sections first, folded ones too: the order a group of tabs keeps.
-pub(crate) fn listed_uids(s: &App) -> Vec<String> {
-    let l = laid(s);
-    l.sections.iter().flat_map(|(_, t)| t.iter().copied()).chain(l.ungrouped.iter().copied()).filter_map(|i| s.tabs.get(i).map(Tab::uid)).collect()
+/// Next visible tab UID when closing `uid` while sidebar sections are active, keeping collapsed
+/// sections closed instead of stepping into a hidden member tab.
+pub fn next_visible_after_closing(s: &App, uid: &str) -> Option<String> {
+    let visible = visible_uids(s)?;
+    let at = visible.iter().position(|u| u == uid)?;
+    visible.get(at + 1).or_else(|| at.checked_sub(1).and_then(|p| visible.get(p))).cloned()
 }
 
-/// Reads the window's row (from the boot packet at launch).
+/// Every listed tab, folded ones too: the order a group of tabs keeps.
+pub(crate) fn listed_uids(s: &App) -> Vec<String> {
+    laid(s).all().filter_map(|i| s.tabs.get(i).map(Tab::uid)).collect()
+}
+
+/// Reads the window's row (from the boot packet at launch). A row saved before the list was one
+/// order showed every section above the other tabs: the tabs take that order here, in memory, and
+/// keep it once anything in the list changes (`persists()` reads false this early).
 pub fn restore(s: &mut App) {
     let ns = opencode_storage::window_namespace(&s.window.id);
-    let mut doc = crate::storage::json(&ns, ROW).map(|v| Doc::from_json(&v)).unwrap_or_default();
+    let saved = crate::storage::json(&ns, ROW);
+    let mut doc = saved.as_ref().map(Doc::from_json).unwrap_or_default();
     let uids: Vec<String> = s.tabs.iter().map(Tab::uid).collect();
     if !uids.is_empty() {
         doc.retain_open(&uids);
     }
+    let legacy = saved.as_ref().is_some_and(|v| v["v"].as_u64() != Some(2));
+    if legacy && !doc.sections.is_empty() && s.settings.sidebar_sections() {
+        let order = model::legacy_order(&doc, &uids);
+        arrange_tabs(s, &order, false);
+    }
+    let seen = s.tabs.iter().map(Tab::uid).collect();
     let st = state_mut(s);
     st.doc = doc;
-    st.seen = uids;
+    st.seen = seen;
+}
+
+/// The window's tabs in `order` (uids); saved when `save` and anything moved.
+pub(crate) fn arrange_tabs(s: &mut App, order: &[String], save: bool) {
+    let rank: HashMap<&str, usize> = order.iter().enumerate().map(|(i, u)| (u.as_str(), i)).collect();
+    let mut sorted: Vec<Tab> = s.tabs.to_vec();
+    sorted.sort_by_key(|t| rank.get(t.uid().as_str()).copied().unwrap_or(usize::MAX));
+    if sorted != *s.tabs {
+        *s.tabs = sorted;
+        if save {
+            s.save_tabs();
+        }
+    }
 }
 
 fn save(s: &App) {
@@ -154,11 +218,45 @@ pub fn modifiers(s: &App, mods: rune::Mods) {
     live.shift.set(mods.shift);
 }
 
-fn poll(s: &mut App, tx: &mut Tx) -> bool {
-    if !s.settings.sidebar_sections() {
-        return false;
+/// Resets held modifier flags and cancels any in-flight drag when the window loses focus.
+pub fn window_left(s: &mut App, tx: &mut Tx) {
+    let live = s.kernel.slots.untracked(&LIVE);
+    live.cmd.set(false);
+    live.shift.set(false);
+    if s.kernel.slots.untracked(&SECTIONS).drag.is_gesture() {
+        state_mut(s).drag = drag::DragState::Idle;
+        tx.animated();
     }
+}
+
+fn poll(s: &mut App, tx: &mut Tx) -> bool {
+    let active = on(s);
     let mut changed = false;
+    if !active {
+        let (has_sel, has_naming, has_drag) = {
+            let u = s.kernel.slots.untracked(&SECTIONS);
+            (!u.selection.is_empty(), u.naming.editing().is_some(), !u.drag.is_idle())
+        };
+        if has_sel {
+            clear_selection(s);
+            changed = true;
+        }
+        if has_naming {
+            naming_step(s, naming::Event::Cancel, tx);
+            changed = true;
+        }
+        if has_drag {
+            state_mut(s).drag = drag::DragState::Idle;
+            changed = true;
+        }
+        if !s.settings.sidebar_sections() {
+            return changed;
+        }
+    }
+    if matches!(s.kernel.slots.untracked(&SECTIONS).drag, drag::DragState::Dropped { .. }) {
+        drag::step(&mut state_mut(s).drag, drag::Event::Press);
+        changed = true;
+    }
     let uids: Vec<String> = s.tabs.iter().map(Tab::uid).collect();
     if uids != s.kernel.slots.untracked(&SECTIONS).seen {
         let gone: Vec<String> = s.kernel.slots.untracked(&SECTIONS).seen.iter().filter(|u| !uids.contains(u)).cloned().collect();
@@ -170,11 +268,7 @@ fn poll(s: &mut App, tx: &mut Tx) -> bool {
         st.seen = uids;
         changed = true;
     }
-    if !on(s) && !s.kernel.slots.untracked(&SECTIONS).selection.is_empty() {
-        clear_selection(s);
-        changed = true;
-    }
-    if let Some(focused) = s.kernel.slots.untracked(&SECTIONS).naming.focused() {
+    if active && let Some(focused) = s.kernel.slots.untracked(&SECTIONS).naming.focused() {
         let arming = matches!(s.kernel.slots.untracked(&SECTIONS).naming, naming::Naming::Arming { .. });
         if arming || !focused {
             naming_step(s, naming::Event::Focused(focused), tx);

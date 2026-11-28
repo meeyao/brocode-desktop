@@ -1,4 +1,4 @@
--- Brocode plugin contract 1.11: global types for luau-lsp.
+-- Brocode plugin contract 1.13: global types for luau-lsp.
 -- Generated from crates/opencode-plugin-spec/contract.json by `cargo run -p opencode-plugin-spec -- --write`. Do not edit.
 -- Load it with `luau-lsp analyze --definitions=@opencode=plugins/opencode.d.luau`.
 
@@ -91,7 +91,7 @@ export type MenuName = "session.panel" | "server.add" | "server.row"
 export type MenubarMenu = "app" | "file" | "edit" | "view" | "go" | "window" | "help"
 
 --- A fixed place in the app's shell that a slot fills.
-export type SlotName = "window.bottom" | "session.header" | "session.location.menu" | "session.panel.end"
+export type SlotName = "window.bottom" | "session.header" | "session.location.menu" | "session.panel.end" | "session.panel.new" | "session.panel.new.list"
 
 --- A host settings page a settings page can add a section to.
 export type HostSettingsPage = "general" | "servers"
@@ -1620,6 +1620,8 @@ export type UiCheckboxProps = {
     indeterminate: boolean?,
     --- The background the box sits on: `base` (the default) or `layer-1`, as Desktop's `surface`; an unticked box takes its fill.
     surface: ("base" | "layer-1")?,
+    --- Draws only the checkbox box visually with no role, focus or click handler, for use inside an `option` row (Desktop's `Checkbox presentation`).
+    presentation: boolean?,
     --- Cannot change; drawn at half opacity.
     disabled: boolean?,
     --- Runs with the new state in `event.checked`.
@@ -1814,6 +1816,368 @@ export type UiSegmentedItem = {
     label: string,
     --- Its element's key. Defaults to `id`.
     key: string?,
+}
+
+--- `ui.listbox` props: a listbox container (`role="listbox"`) holding `ui.option` rows.
+export type UiListboxProps = {
+    --- Identity among siblings across renders, and the anchor key for popovers and menus.
+    key: string?,
+    --- Width.
+    w: UiSize?,
+    --- Height.
+    h: UiSize?,
+    --- Minimum width.
+    minW: number?,
+    --- Minimum height.
+    minH: number?,
+    --- Maximum width.
+    maxW: number?,
+    --- Maximum height.
+    maxH: number?,
+    --- Share of a stack's free space.
+    grow: number?,
+    --- May shrink below its content size.
+    shrink: boolean?,
+    --- Padding on every side.
+    pad: number?,
+    --- Left and right padding.
+    px: number?,
+    --- Top and bottom padding.
+    py: number?,
+    --- Top padding.
+    pt: number?,
+    --- Right padding.
+    pr: number?,
+    --- Bottom padding.
+    pb: number?,
+    --- Left padding.
+    pl: number?,
+    --- Margin on every side.
+    m: number?,
+    --- Left and right margin.
+    mx: number?,
+    --- Top and bottom margin.
+    my: number?,
+    --- Top margin.
+    mt: number?,
+    --- Right margin.
+    mr: number?,
+    --- Bottom margin.
+    mb: number?,
+    --- Left margin.
+    ml: number?,
+    --- Takes the node out of flow, at these offsets from its parent's edges.
+    pin: UiPin?,
+    --- 0 to 1.
+    opacity: number?,
+    --- The accessibility role.
+    role: Role?,
+    --- The accessible name.
+    label: string?,
+    --- A tooltip.
+    help: string?,
+    --- Where the tooltip shows. Defaults to below.
+    helpSide: Side?,
+    --- Keeps the tooltip showing while true, whatever the pointer does, as Desktop's `Tooltip forceOpen`: a Copy button's "Copied" for a moment after the press.
+    helpOpen: boolean?,
+    --- Which way the subtree reads, as HTML's `dir` does: `ltr` or `rtl` keeps a figure or a path in that order inside a window running the other way, `auto` takes a text's first strong direction (a name). On `ui.field` it is the value's direction, as on an `input`: `auto` starts an Arabic name at the right, `ltr` keeps an address or a host left to right. Defaults to the window's.
+    dir: ("ltr" | "rtl" | "auto")?,
+    --- The pointer's shape over the node and over what is inside it that sets none, by its CSS `cursor` name. Desktop shows the arrow on controls; set this only where its style sheet names another cursor, as the browser's address field does (`text`).
+    cursor: ("default" | "pointer" | "text" | "grab" | "grabbing" | "not-allowed" | "move" | "col-resize" | "row-resize" | "ew-resize" | "ns-resize" | "nwse-resize" | "nesw-resize" | "crosshair" | "cell" | "zoom-in" | "zoom-out")?,
+    --- Space between children.
+    gap: number?,
+    --- How children sit across the axis.
+    align: UiAlign?,
+    --- How children sit along the axis.
+    justify: UiJustify?,
+    --- Centers children on both axes.
+    center: boolean?,
+    --- Children wrap onto more lines.
+    wrap: boolean?,
+    --- Background.
+    fill: Color?,
+    --- Background under the pointer.
+    hover: Color?,
+    --- Background while pressed.
+    press: Color?,
+    --- Draws the `surface-selected` fill and reports the selected state to assistive technology.
+    selected: boolean?,
+    --- Border color.
+    border: Color?,
+    --- Border width. Defaults to 1 when `border` is set.
+    borderWidth: number?,
+    --- Corner radius.
+    radius: number?,
+    --- Per-corner radii: top-left, top-right, bottom-right, bottom-left.
+    corners: { number }?,
+    --- A shadow from the app's elevation scale.
+    shadow: Elevation?,
+    --- Clips children to the box.
+    clip: boolean?,
+    --- Scrolls vertical overflow.
+    scrollY: boolean?,
+    --- Scrolls horizontal overflow.
+    scrollX: boolean?,
+    --- With `scrollY`: stays scrolled to the bottom as content grows, as a log or a chat does, until the reader scrolls up.
+    stickBottom: boolean?,
+    --- Takes keyboard focus.
+    focusable: boolean?,
+    --- Takes no presses.
+    disabled: boolean?,
+    --- Runs on a press.
+    onPress: UiHandler?,
+    --- Its `onPress` opens a menu, as Kobalte's `Menu.Trigger` does: a mouse runs it as the button goes down, and that press's release runs nothing. A key, a screen reader's Invoke or a tap run it on the click. Contract 1.1; a 1.0 host ignores it with one warning and opens on the click.
+    menuTrigger: boolean?,
+    --- Runs on a middle click, as a browser's `auxclick`: a tab closes, a row opens in the background. A `middle-press` event, with the modifier keys.
+    onMiddlePress: UiHandler?,
+    --- Runs as the pointer enters and leaves.
+    onHover: UiHandler?,
+    --- How hover and press fills change.
+    hoverTransition: HoverTransition?,
+    --- Starts a hover group: descendants with `hoverGroupColor` or `revealOnHover` react while this box is hovered.
+    hoverGroup: boolean?,
+    --- The text or icon color while the nearest hover group is hovered.
+    hoverGroupColor: Color?,
+    --- Shows only while the nearest hover group is hovered or focused.
+    revealOnHover: boolean?,
+    --- The default text and icon color for descendants.
+    color: Color?,
+    --- Stack direction: `"col"` (default), `"row"` or `"box"`.
+    direction: UiDirection?,
+    --- Per-side border widths in points: `{ top, right, bottom, left }`. Overrides `borderWidth`.
+    borderSides: { number }?,
+    --- The key of the element that takes focus when this frame leaves while focus is on it or inside it: one view of a popover handing focus to the control that leads back to it. That element, or its first focusable child; nothing happens when none shows.
+    focusReturn: string?,
+    --- One Tab stop for the focusable controls inside, which the arrow keys move between, as a roving `tabindex` does: Up and Down with `role` `list`, `listbox`, `menu` or `tree`, Left and Right as well otherwise. Home and End go to the ends; a `list` or `tree` stops at its ends, the others wrap. In a `list`, `listbox`, `menu`, `tree` or `tablist`, typing moves to the first control whose label starts with it. Space presses the focused control, and in a list Return does too.
+    focusGroup: boolean?,
+    --- Keys `onKey` takes while focus is on the frame or inside it, outside a text field, pressed with no modifier: any of `Enter`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Home`, `End`, `PageUp`, `PageDown`, `Delete` and `Backspace`. A key it takes does nothing else there: Return in a `focusGroup` list then no longer presses the focused control.
+    keys: { string }?,
+    --- Runs as a key `keys` names is pressed, with its name in `event.keyName`.
+    onKey: UiHandler?,
+}
+
+--- `ui.option` props: one selectable option row (`role="option"`) inside a `ui.listbox`.
+export type UiOptionProps = {
+    --- Identity among siblings across renders, and the anchor key for popovers and menus.
+    key: string?,
+    --- Width.
+    w: UiSize?,
+    --- Height.
+    h: UiSize?,
+    --- Minimum width.
+    minW: number?,
+    --- Minimum height.
+    minH: number?,
+    --- Maximum width.
+    maxW: number?,
+    --- Maximum height.
+    maxH: number?,
+    --- Share of a stack's free space.
+    grow: number?,
+    --- May shrink below its content size.
+    shrink: boolean?,
+    --- Padding on every side.
+    pad: number?,
+    --- Left and right padding.
+    px: number?,
+    --- Top and bottom padding.
+    py: number?,
+    --- Top padding.
+    pt: number?,
+    --- Right padding.
+    pr: number?,
+    --- Bottom padding.
+    pb: number?,
+    --- Left padding.
+    pl: number?,
+    --- Margin on every side.
+    m: number?,
+    --- Left and right margin.
+    mx: number?,
+    --- Top and bottom margin.
+    my: number?,
+    --- Top margin.
+    mt: number?,
+    --- Right margin.
+    mr: number?,
+    --- Bottom margin.
+    mb: number?,
+    --- Left margin.
+    ml: number?,
+    --- Takes the node out of flow, at these offsets from its parent's edges.
+    pin: UiPin?,
+    --- 0 to 1.
+    opacity: number?,
+    --- The accessibility role.
+    role: Role?,
+    --- The accessible name.
+    label: string?,
+    --- A tooltip.
+    help: string?,
+    --- Where the tooltip shows. Defaults to below.
+    helpSide: Side?,
+    --- Keeps the tooltip showing while true, whatever the pointer does, as Desktop's `Tooltip forceOpen`: a Copy button's "Copied" for a moment after the press.
+    helpOpen: boolean?,
+    --- Which way the subtree reads, as HTML's `dir` does: `ltr` or `rtl` keeps a figure or a path in that order inside a window running the other way, `auto` takes a text's first strong direction (a name). On `ui.field` it is the value's direction, as on an `input`: `auto` starts an Arabic name at the right, `ltr` keeps an address or a host left to right. Defaults to the window's.
+    dir: ("ltr" | "rtl" | "auto")?,
+    --- The pointer's shape over the node and over what is inside it that sets none, by its CSS `cursor` name. Desktop shows the arrow on controls; set this only where its style sheet names another cursor, as the browser's address field does (`text`).
+    cursor: ("default" | "pointer" | "text" | "grab" | "grabbing" | "not-allowed" | "move" | "col-resize" | "row-resize" | "ew-resize" | "ns-resize" | "nwse-resize" | "nesw-resize" | "crosshair" | "cell" | "zoom-in" | "zoom-out")?,
+    --- Space between children.
+    gap: number?,
+    --- How children sit across the axis.
+    align: UiAlign?,
+    --- How children sit along the axis.
+    justify: UiJustify?,
+    --- Centers children on both axes.
+    center: boolean?,
+    --- Children wrap onto more lines.
+    wrap: boolean?,
+    --- Background.
+    fill: Color?,
+    --- Background under the pointer.
+    hover: Color?,
+    --- Background while pressed.
+    press: Color?,
+    --- Whether this option is selected (`aria-selected`).
+    selected: boolean?,
+    --- Border color.
+    border: Color?,
+    --- Border width. Defaults to 1 when `border` is set.
+    borderWidth: number?,
+    --- Corner radius.
+    radius: number?,
+    --- Per-corner radii: top-left, top-right, bottom-right, bottom-left.
+    corners: { number }?,
+    --- A shadow from the app's elevation scale.
+    shadow: Elevation?,
+    --- Clips children to the box.
+    clip: boolean?,
+    --- Scrolls vertical overflow.
+    scrollY: boolean?,
+    --- Scrolls horizontal overflow.
+    scrollX: boolean?,
+    --- With `scrollY`: stays scrolled to the bottom as content grows, as a log or a chat does, until the reader scrolls up.
+    stickBottom: boolean?,
+    --- Takes keyboard focus.
+    focusable: boolean?,
+    --- Takes no presses.
+    disabled: boolean?,
+    --- Runs on a press.
+    onPress: UiHandler?,
+    --- Its `onPress` opens a menu, as Kobalte's `Menu.Trigger` does: a mouse runs it as the button goes down, and that press's release runs nothing. A key, a screen reader's Invoke or a tap run it on the click. Contract 1.1; a 1.0 host ignores it with one warning and opens on the click.
+    menuTrigger: boolean?,
+    --- Runs on a middle click, as a browser's `auxclick`: a tab closes, a row opens in the background. A `middle-press` event, with the modifier keys.
+    onMiddlePress: UiHandler?,
+    --- Runs as the pointer enters and leaves.
+    onHover: UiHandler?,
+    --- How hover and press fills change.
+    hoverTransition: HoverTransition?,
+    --- Starts a hover group: descendants with `hoverGroupColor` or `revealOnHover` react while this box is hovered.
+    hoverGroup: boolean?,
+    --- The text or icon color while the nearest hover group is hovered.
+    hoverGroupColor: Color?,
+    --- Shows only while the nearest hover group is hovered or focused.
+    revealOnHover: boolean?,
+    --- The default text and icon color for descendants.
+    color: Color?,
+    --- Stack direction: `"col"` (default), `"row"` or `"box"`.
+    direction: UiDirection?,
+    --- Per-side border widths in points: `{ top, right, bottom, left }`. Overrides `borderWidth`.
+    borderSides: { number }?,
+    --- The key of the element that takes focus when this frame leaves while focus is on it or inside it: one view of a popover handing focus to the control that leads back to it. That element, or its first focusable child; nothing happens when none shows.
+    focusReturn: string?,
+    --- One Tab stop for the focusable controls inside, which the arrow keys move between, as a roving `tabindex` does: Up and Down with `role` `list`, `listbox`, `menu` or `tree`, Left and Right as well otherwise. Home and End go to the ends; a `list` or `tree` stops at its ends, the others wrap. In a `list`, `listbox`, `menu`, `tree` or `tablist`, typing moves to the first control whose label starts with it. Space presses the focused control, and in a list Return does too.
+    focusGroup: boolean?,
+    --- Keys `onKey` takes while focus is on the frame or inside it, outside a text field, pressed with no modifier: any of `Enter`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Home`, `End`, `PageUp`, `PageDown`, `Delete` and `Backspace`. A key it takes does nothing else there: Return in a `focusGroup` list then no longer presses the focused control.
+    keys: { string }?,
+    --- Runs as a key `keys` names is pressed, with its name in `event.keyName`.
+    onKey: UiHandler?,
+}
+
+--- One option of `ui.select`.
+export type UiSelectOption = {
+    --- What `onChange` receives in `event.value`.
+    value: string,
+    --- The option's visible text.
+    label: string,
+}
+
+--- `ui.select` props: Desktop's `Select` dropdown control (`select-v2`). Desktop's plugin API calls it `Select`.
+export type UiSelectProps = {
+    --- Identity among siblings across renders, and the anchor key for popovers and menus.
+    key: string?,
+    --- Width.
+    w: UiSize?,
+    --- Height.
+    h: UiSize?,
+    --- Minimum width.
+    minW: number?,
+    --- Minimum height.
+    minH: number?,
+    --- Maximum width.
+    maxW: number?,
+    --- Maximum height.
+    maxH: number?,
+    --- Share of a stack's free space.
+    grow: number?,
+    --- May shrink below its content size.
+    shrink: boolean?,
+    --- Padding on every side.
+    pad: number?,
+    --- Left and right padding.
+    px: number?,
+    --- Top and bottom padding.
+    py: number?,
+    --- Top padding.
+    pt: number?,
+    --- Right padding.
+    pr: number?,
+    --- Bottom padding.
+    pb: number?,
+    --- Left padding.
+    pl: number?,
+    --- Margin on every side.
+    m: number?,
+    --- Left and right margin.
+    mx: number?,
+    --- Top and bottom margin.
+    my: number?,
+    --- Top margin.
+    mt: number?,
+    --- Right margin.
+    mr: number?,
+    --- Bottom margin.
+    mb: number?,
+    --- Left margin.
+    ml: number?,
+    --- Takes the node out of flow, at these offsets from its parent's edges.
+    pin: UiPin?,
+    --- 0 to 1.
+    opacity: number?,
+    --- The accessibility role.
+    role: Role?,
+    --- The accessible name.
+    label: string?,
+    --- A tooltip.
+    help: string?,
+    --- Where the tooltip shows. Defaults to below.
+    helpSide: Side?,
+    --- Keeps the tooltip showing while true, whatever the pointer does, as Desktop's `Tooltip forceOpen`: a Copy button's "Copied" for a moment after the press.
+    helpOpen: boolean?,
+    --- Which way the subtree reads, as HTML's `dir` does: `ltr` or `rtl` keeps a figure or a path in that order inside a window running the other way, `auto` takes a text's first strong direction (a name). On `ui.field` it is the value's direction, as on an `input`: `auto` starts an Arabic name at the right, `ltr` keeps an address or a host left to right. Defaults to the window's.
+    dir: ("ltr" | "rtl" | "auto")?,
+    --- The pointer's shape over the node and over what is inside it that sets none, by its CSS `cursor` name. Desktop shows the arrow on controls; set this only where its style sheet names another cursor, as the browser's address field does (`text`).
+    cursor: ("default" | "pointer" | "text" | "grab" | "grabbing" | "not-allowed" | "move" | "col-resize" | "row-resize" | "ew-resize" | "ns-resize" | "nwse-resize" | "nesw-resize" | "crosshair" | "cell" | "zoom-in" | "zoom-out")?,
+    --- The selected option's `value`.
+    value: string?,
+    --- Text shown when no option matches `value`.
+    placeholder: string?,
+    --- The options, in order.
+    options: { UiSelectOption },
+    --- Cannot open; drawn at half opacity.
+    disabled: boolean?,
+    --- Runs when an option is picked, with its value in `event.value`.
+    onChange: UiHandler?,
 }
 
 --- `ui.segmented` props: the app's segmented control of icon items.
@@ -4434,6 +4798,8 @@ export type BrowserOpenSpec = {
     sessionId: string?,
     --- Opens the tab without moving the keyboard: focus stays where it is.
     background: boolean?,
+    --- The side-region pane (`side`, `split`, or `bottom`) to open the page's tab in.
+    pane: string?,
 }
 
 --- Where to show a page's tab.
@@ -5150,6 +5516,12 @@ export type SlotProps = {
     compact: boolean?,
     --- `session.location.menu`: the menu is open.
     shown: boolean?,
+    --- New tab slots: the pane (`side`, `split`, or `bottom`).
+    pane: string?,
+    --- New tab slots: the pane's available width in points.
+    width: number?,
+    --- New tab slots: incremented when the user explicitly asked for this New tab, so its first field takes focus once.
+    focusToken: number?,
 }
 
 --- Content for one of the shell's slots. Desktop's plugin API calls it `Slot`.
@@ -5382,7 +5754,7 @@ export type ModelsService = {
     Changed: Signal<()>,
 }
 
---- The Brocode server this window works with: the server of the session or draft it shows, so a panel in a tab from another server talks to that server. A path that starts with `local:` goes to the app's own server. In the app half, the app's own server. Both halves: `ctx:GetService("Server")`.
+--- The OpenCode server this window works with: the server of the session or draft it shows, so a panel in a tab from another server talks to that server. A path that starts with `local:` goes to the app's own server. In the app half, the app's own server. Both halves: `ctx:GetService("Server")`.
 export type ServerService = {
     --- Sends a request with a JSON body, off the UI thread. Yields: call it from a handler, a task or a signal callback.
     RequestAsync: (self: ServerService, method: HttpMethod, path: string, body: any?) -> ServerResponse,
@@ -6056,6 +6428,12 @@ export type UiLibrary = {
     radio: (props: UiRadioProps) -> UiNode,
     --- The app's own text field.
     field: (props: UiFieldProps) -> UiNode,
+    --- A listbox container (`role="listbox"`) of selectable `ui.option` rows.
+    listbox: (props: UiListboxProps?, children: { UiNode }?) -> UiNode,
+    --- One selectable option row (`role="option"`) inside a `ui.listbox`.
+    option: (props: UiOptionProps?, children: { UiNode }?) -> UiNode,
+    --- Desktop's select dropdown control.
+    select: (props: UiSelectProps) -> UiNode,
     --- The app's segmented control.
     segmented: (props: UiSegmentedProps) -> UiNode,
     --- The app's spinner.

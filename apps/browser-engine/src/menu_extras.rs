@@ -10,11 +10,20 @@
 //! (`EngineMsg::CopiedImage`). The isolated world keeps the page's own scripts from replacing the
 //! functions the re-encode uses.
 
-use cef::{CefString, ImplListValue, ImplPreferenceManager, ImplValue, RequestContext};
+use std::sync::atomic::{AtomicI32, Ordering};
+
+use cef::{
+    CefString, ImplBrowser, ImplBrowserHost, ImplFrame, ImplListValue, ImplPreferenceManager,
+    ImplValue, RequestContext,
+};
 use serde_json::{Value, json};
 
 /// The largest image (as base64) the engine reads or sends: inside the wire's 32 MiB line bound.
 pub const MAX_COPIED_IMAGE_B64: usize = 24 * 1024 * 1024;
+
+/// The largest plain-text selection copied or pasted over IPC (4 MiB, well inside the 16 MiB CDP
+/// and 32 MiB wire caps).
+pub const MAX_COPIED_TEXT_BYTES: usize = 4 * 1024 * 1024;
 
 const SPELLCHECK_PREF: &str = "browser.enable_spellchecking";
 const DICTIONARIES_PREF: &str = "spellcheck.dictionaries";
@@ -158,4 +167,188 @@ pub fn encode_request(id: i32, world: &Value, b64: &str) -> Option<String> {
 pub fn png_result(result: &Value) -> Option<String> {
     let png = result.get("result")?.get("value")?.as_str()?;
     (png.len() <= MAX_COPIED_IMAGE_B64 && png.starts_with("iVBORw0KGgo")).then(|| png.to_owned())
+}
+
+/// Truncates `s` to at most `max_bytes` on a UTF-8 character boundary.
+pub fn truncate_utf8(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_owned();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s[..end].to_owned()
+}
+
+/// Starts the 3-step Copy image DevTools pipeline for a held context menu.
+pub(crate) fn start_copy_image(
+    t: &crate::engine::ManagedTab,
+    next_cdp_id: &AtomicI32,
+    url: &str,
+    frame_id: Option<String>,
+) {
+    // The menu's own frame when the engine knows it on the tab's session,
+    // else the main frame (an image in an out-of-process frame is not read).
+    let frame = {
+        let ledger = t.cdp_ledger.lock().unwrap();
+        frame_id.filter(|f| ledger.is_root_session_frame(f)).or_else(|| ledger.main_frame_id())
+    };
+    if let Some(frame) = frame {
+        let msg_id = next_cdp_id.fetch_add(1, Ordering::Relaxed);
+        t.cdp_id_map
+            .lock()
+            .unwrap()
+            .insert(msg_id, crate::handlers::CdpPending::CopyImageContent { frame_id: frame.clone() });
+        let raw = resource_request(msg_id, &frame, url);
+        t.host.send_dev_tools_message(Some(raw.as_bytes()));
+    }
+}
+
+/// Step 1 of host-bridged Copy/Cut: create an isolated world in the focused frame.
+pub fn copy_selection_world_request(id: i32, frame_id: &str, session_id: Option<&str>) -> String {
+    let mut msg = json!({
+        "id": id,
+        "method": "Page.createIsolatedWorld",
+        "params": { "frameId": frame_id, "worldName": "opencode-clipboard" },
+    });
+    if let Some(sid) = session_id {
+        msg["sessionId"] = Value::String(sid.to_owned());
+    }
+    msg.to_string()
+}
+
+/// Step 2 of host-bridged Copy/Cut: read the selected text (and whether it is editable/cuttable)
+/// inside the isolated world without triggering CEF's OS clipboard or page `copy` listeners.
+pub fn copy_selection_eval_request(id: i32, world: &Value, session_id: Option<&str>) -> Option<String> {
+    let context_id = world.get("executionContextId").and_then(Value::as_i64)?;
+    let expression = r#"(() => {
+  let doc = document;
+  let win = window;
+  let root = doc;
+  let active = doc.activeElement;
+  for (let depth = 0; depth < 16 && active; depth++) {
+    if (active.shadowRoot && active.shadowRoot.activeElement) {
+      root = active.shadowRoot;
+      active = active.shadowRoot.activeElement;
+      continue;
+    }
+    if (active.tagName === "IFRAME") {
+      try {
+        if (active.contentDocument && active.contentWindow) {
+          doc = active.contentDocument;
+          win = active.contentWindow;
+          root = doc;
+          active = doc.activeElement;
+          continue;
+        }
+      } catch {}
+    }
+    break;
+  }
+  const cap = (s) => (s.length > 4194304 ? s.slice(0, 4194304) : s);
+  if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT")) {
+    const type = String(active.type || "").toLowerCase();
+    if (type === "password") return { text: "", canCut: false };
+    const start = typeof active.selectionStart === "number" ? active.selectionStart : 0;
+    const end = typeof active.selectionEnd === "number" ? active.selectionEnd : 0;
+    if (end > start) {
+      return { text: cap(String(active.value || "").slice(start, end)), canCut: !active.readOnly && !active.disabled };
+    }
+  }
+  let sel = (root && typeof root.getSelection === "function") ? root.getSelection() : null;
+  if (!sel || !sel.toString()) sel = win.getSelection();
+  const text = sel ? sel.toString() : "";
+  if (!text) return { text: "", canCut: false };
+  let canCut = doc.designMode === "on" || Boolean(active && active.isContentEditable);
+  if (!canCut && sel && sel.rangeCount > 0) {
+    for (const raw of [sel.anchorNode, sel.focusNode]) {
+      let node = raw;
+      if (node && node.nodeType === 3) node = node.parentElement;
+      if (node && node.isContentEditable) { canCut = true; break; }
+    }
+  }
+  return { text: cap(text), canCut };
+})()"#;
+    let mut msg = json!({
+        "id": id,
+        "method": "Runtime.evaluate",
+        "params": { "expression": expression, "contextId": context_id, "returnByValue": true },
+    });
+    if let Some(sid) = session_id {
+        msg["sessionId"] = Value::String(sid.to_owned());
+    }
+    Some(msg.to_string())
+}
+
+/// Parses `{ text, canCut }` returned by `copy_selection_eval_request`.
+pub fn copy_selection_result(result: &Value) -> Option<(String, bool)> {
+    let val = result.get("result")?.get("value")?;
+    let text = val.get("text")?.as_str()?;
+    let can_cut = val.get("canCut").and_then(Value::as_bool).unwrap_or(false);
+    Some((truncate_utf8(text, MAX_COPIED_TEXT_BYTES), can_cut))
+}
+
+/// Starts host-bridged selection copy/cut on the focused frame (including attached OOPIFs).
+pub(crate) fn start_copy_selection(t: &crate::engine::ManagedTab, next_cdp_id: &AtomicI32, cut: bool) {
+    let focused_id = t
+        .browser
+        .focused_frame()
+        .or_else(|| t.browser.main_frame())
+        .map(|f| CefString::from(&f.identifier()).to_string())
+        .filter(|s| !s.is_empty());
+    let (frame_id, session_id) = {
+        let ledger = t.cdp_ledger.lock().unwrap();
+        if let Some(fid) = focused_id {
+            if let Some(sid) = ledger.session_for_frame(&fid) {
+                (Some(fid), Some(sid))
+            } else if ledger.is_root_session_frame(&fid) {
+                (Some(fid), None)
+            } else {
+                (ledger.main_frame_id(), None)
+            }
+        } else {
+            (ledger.main_frame_id(), None)
+        }
+    };
+    if let Some(frame_id) = frame_id {
+        let msg_id = next_cdp_id.fetch_add(1, Ordering::Relaxed);
+        t.cdp_id_map.lock().unwrap().insert(
+            msg_id,
+            crate::handlers::CdpPending::CopySelectionWorld { cut, session_id: session_id.clone() },
+        );
+        let raw = copy_selection_world_request(msg_id, &frame_id, session_id.as_deref());
+        t.host.send_dev_tools_message(Some(raw.as_bytes()));
+    }
+}
+
+/// Runs a standard Blink edit command (`HostMsg::EditCmd`) on the focused (or main) frame.
+pub(crate) fn run_edit_cmd(t: &crate::engine::ManagedTab, cmd: &str) {
+    let Some(frame) = t.browser.focused_frame().or_else(|| t.browser.main_frame()) else {
+        return;
+    };
+    match cmd {
+        "select_all" => frame.select_all(),
+        "copy" => frame.copy(),
+        "paste" => frame.paste(),
+        "paste_plain" => frame.paste_and_match_style(),
+        "cut" => frame.cut(),
+        "undo" => frame.undo(),
+        "redo" => frame.redo(),
+        _ => {}
+    }
+}
+
+/// Inserts plain text from the host clipboard into the focused widget without touching CEF's OS clipboard.
+pub(crate) fn paste_host_text(t: &crate::engine::ManagedTab, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    let bounded = truncate_utf8(text, MAX_COPIED_TEXT_BYTES);
+    let normalized = if bounded.contains('\r') {
+        bounded.replace("\r\n", "\n").replace('\r', "\n")
+    } else {
+        bounded
+    };
+    t.host.ime_commit_text(Some(&CefString::from(normalized.as_str())), None, 0);
 }

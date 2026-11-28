@@ -52,20 +52,11 @@ struct Runtime {
     /// `retry` callers whose every probe answered, until they ask ([`resolved`]).
     resolved: HashSet<u64>,
     version: u64,
-    /// The reach watcher's comebacks taken so far (`opencode_kit::client::reach_back`).
-    reach_seen: u64,
-    /// Servers that accept connections again, whose next probe waits out their start ([`PATIENCE`]).
-    patient: HashSet<ServerKey>,
 }
-
-/// How long a probe of a server that accepts connections again keeps asking while it doesn't
-/// answer: a server accepts a while before it answers (1.1-5.4 s for the harness's), and past this
-/// the 10 s poll asks anyway.
-const PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl Default for Runtime {
     fn default() -> Self {
-        Runtime { state: health::State::default(), timer: Timer::Stopped, inputs: Vec::new(), conns: HashMap::new(), hostnames: HashMap::new(), homes: HashMap::new(), answers: channel(), waiters: 0, resolved: HashSet::new(), version: 0, reach_seen: 0, patient: HashSet::new() }
+        Runtime { state: health::State::default(), timer: Timer::Stopped, inputs: Vec::new(), conns: HashMap::new(), hostnames: HashMap::new(), homes: HashMap::new(), answers: channel(), waiters: 0, resolved: HashSet::new(), version: 0 }
     }
 }
 
@@ -120,6 +111,18 @@ pub fn retry(s: &App, tx: &mut Tx) -> Option<u64> {
     Some(id)
 }
 
+/// Probes every server now without registering a waiter ID (for fire-and-forget callers such as
+/// network-change recovery, avoiding leaking unconsumed IDs in `resolved`).
+pub fn retry_quiet(s: &App, tx: &mut Tx) {
+    if !s.live() {
+        return;
+    }
+    let keys: Vec<ServerKey> = HEALTH.with_borrow(|h| h.conns.keys().cloned().collect());
+    for key in keys {
+        nudge(s, &key, tx);
+    }
+}
+
 /// Probes server `key` now: its event stream dropped or came back, so Home's mark and the
 /// server's tabs follow at once rather than at the next 10 s poll.
 pub fn nudge(s: &App, key: &ServerKey, tx: &mut Tx) {
@@ -129,9 +132,8 @@ pub fn nudge(s: &App, key: &ServerKey, tx: &mut Tx) {
     dispatch(s, Event::Nudged(key.clone()), tx);
 }
 
-/// Server `key`'s event stream opened (`up`) or dropped: while it's up the 10 s poll leaves the
-/// server be, so a window idle on a live server wakes for nothing (its heartbeat says enough);
-/// dropped, it's probed now and polled again.
+/// Server `key`'s event stream opened (`up`) or dropped: nudges an immediate probe on drop (or
+/// on open while health was not yet Healthy); the 10 s poll keeps running per official `health-machine.ts`.
 pub fn streaming(s: &App, key: &ServerKey, up: bool, tx: &mut Tx) {
     if !s.live() {
         return;
@@ -164,17 +166,6 @@ pub fn poll(s: &App, tx: &mut Tx) -> bool {
     });
     if let Some((prev, fx)) = synced {
         run(s, prev, fx, tx);
-    }
-    // A server that refused connections accepts again: probe it now, not at the next poll.
-    let back = HEALTH.with_borrow_mut(|h| opencode_kit::client::reach_back(&mut h.reach_seen));
-    if !back.is_empty() {
-        let keys: Vec<ServerKey> = HEALTH.with_borrow(|h| h.conns.iter().filter(|(_, c)| super::registry::server_for(c).is_some_and(|sv| back.contains(&sv.base))).map(|(k, _)| k.clone()).collect());
-        for key in keys {
-            HEALTH.with_borrow_mut(|h| h.patient.insert(key.clone()));
-            nudge(s, &key, tx);
-            // A server the nudge didn't probe (no endpoint) leaves nothing for a later one.
-            HEALTH.with_borrow_mut(|h| h.patient.remove(&key));
-        }
     }
     let answers: Vec<Answer> = HEALTH.with_borrow(|h| h.answers.1.try_iter().collect());
     for a in answers {
@@ -284,60 +275,63 @@ fn shown(h: &Runtime) -> Shown {
     h.state.entries.iter().map(|(k, slot)| (k.clone(), slot.health(), h.hostnames.get(k).cloned())).collect()
 }
 
-/// `checkServerHealth` on a worker: healthy with the version and hostname `/api/info` reports,
-/// unauthorized on 401, unreachable otherwise. A server that answers for the first time is asked
-/// where it runs too (`/api/location`, `loadPathQuery`), for its home.
-///
-/// A server whose address refused every connection the reach watcher tried in the last second
-/// answers Unreachable at once, with no request (the watcher sees it come back sooner than this
-/// poll would): the answer, for the caller to settle.
-fn probe(s: &App, key: &ServerKey, attempt: Attempt) -> Option<ProbeResult> {
-    let server = HEALTH.with_borrow(|h| h.conns.get(key).cloned()).and_then(|c| super::registry::server_for(&c))?;
-    let discover_sidecar = key.is_sidecar() && crate::arg("--server").is_none();
-    // The windows' quiet poll: answers landing together wake the window once, and draw only if
-    // something changed.
-    let wake = s.launch.inbox_wake.clone().or_else(|| (*s.waker).clone());
-    let patient = HEALTH.with_borrow_mut(|h| h.patient.remove(key));
-    if !patient && !discover_sidecar && server.refusing() {
-        server.watch_reach(wake);
-        return Some(ProbeResult::Unreachable);
+/// `checkServerHealth` (`packages/app/src/runtime/server/health.ts:26-143`): 30 s timeout, 2
+/// transport retries (100 ms, 200 ms), 401 -> Unauthorized, validated `ServerInfo` JSON.
+fn probe_http(server: &opencode_kit::client::Server, conn: &ServerConn) -> ProbeResult {
+    if let Some(http) = conn.http().filter(|_| !conn.builtin()) {
+        return opencode_kit::servers::probe::probe(http);
     }
+    // Sidecar carries its resolved Basic auth header on `server`, so probe with the same
+    // 2-retry / 100 ms linear backoff policy on transport errors as `checkServerHealth`.
+    let deadline = rune::time::Instant::now() + opencode_kit::servers::probe::PROBE_TIMEOUT;
+    let mut count = 0u32;
+    loop {
+        match server.get("/api/info") {
+            Ok(v) => match opencode_kit::servers::probe::ServerInfo::from_json(&v) {
+                Some(info) => return ProbeResult::Healthy {
+                    version: Some(info.version),
+                    hostname: info.hostname.filter(|h| !h.is_empty()),
+                },
+                None => return ProbeResult::Unreachable,
+            },
+            Err(e) if e.status() == Some(401) => return ProbeResult::Unauthorized,
+            Err(e) if count < opencode_kit::servers::probe::PROBE_RETRIES
+                && matches!(e.kind, opencode_kit::wire_error::WireKind::Unreachable(_) | opencode_kit::wire_error::WireKind::Dropped(_) | opencode_kit::wire_error::WireKind::Tls(_)) =>
+            {
+                count += 1;
+                let wait = opencode_kit::servers::probe::PROBE_RETRY_DELAY * count;
+                if rune::time::Instant::now() + wait >= deadline {
+                    return ProbeResult::Unreachable;
+                }
+                rune::task::sleep(wait);
+            }
+            Err(_) => return ProbeResult::Unreachable,
+        }
+    }
+}
+
+/// Runs `checkServerHealth` on a worker thread and fetches `/api/location` once on first healthy
+/// answer to infer the server's home folder (`loadPathQuery`).
+fn probe(s: &App, key: &ServerKey, attempt: Attempt) -> Option<ProbeResult> {
+    let conn = HEALTH.with_borrow(|h| h.conns.get(key).cloned())?;
+    let server = super::registry::server_for(&conn)?;
+    let discover_sidecar = key.is_sidecar() && crate::arg("--server").is_none();
+    let wake = s.launch.inbox_wake.clone().or_else(|| (*s.waker).clone());
     let ask_home = HEALTH.with_borrow(|h| !h.homes.contains_key(key));
     let send = HEALTH.with_borrow(|h| h.answers.0.clone());
     let key = key.clone();
     crate::plugin_host::tasks::run(move || {
-        let started = rune::time::Instant::now();
-        let (server, result) = loop {
-            let current = if discover_sidecar {
-                opencode_kit::local_service::discover_local_server(&server)
-            } else {
-                server.clone()
-            };
-            let result = match current.get("/api/info") {
-                Ok(v) => {
-                    let text = |k: &str| v[k].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
-                    ProbeResult::Healthy { version: text("version"), hostname: text("hostname") }
-                }
-                Err(e) if e.status() == Some(401) => ProbeResult::Unauthorized,
-                Err(_) => ProbeResult::Unreachable,
-            };
-            if !patient || result != ProbeResult::Unreachable || started.elapsed() >= PATIENCE {
-                break (current, result);
-            }
-            rune::task::sleep(std::time::Duration::from_millis(250));
+        let current = if discover_sidecar {
+            opencode_kit::local_service::discover_local_server(&server)
+        } else {
+            server.clone()
         };
+        let (server, result) = (current.clone(), probe_http(&current, &conn));
         #[cfg(not(target_arch = "wasm32"))]
         let (server, result) = if result == ProbeResult::Unreachable && discover_sidecar && super::sidecar::managed() {
             match super::sidecar::reconnect() {
                 Ok(restarted) => {
-                    let res = match restarted.get("/api/info") {
-                        Ok(v) => {
-                            let text = |k: &str| v[k].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
-                            ProbeResult::Healthy { version: text("version"), hostname: text("hostname") }
-                        }
-                        Err(e) if e.status() == Some(401) => ProbeResult::Unauthorized,
-                        Err(_) => ProbeResult::Unreachable,
-                    };
+                    let res = probe_http(&restarted, &conn);
                     (restarted, res)
                 }
                 Err(_) => (server, result),
@@ -345,9 +339,6 @@ fn probe(s: &App, key: &ServerKey, attempt: Attempt) -> Option<ProbeResult> {
         } else {
             (server, result)
         };
-        if result == ProbeResult::Unreachable && !discover_sidecar {
-            server.watch_reach(wake.clone());
-        }
         let healthy = matches!(result, ProbeResult::Healthy { .. });
         let discovered = discover_sidecar.then(|| server.clone());
         send.send(Answer::Probe { key: key.clone(), attempt, result, discovered }).ok();

@@ -22,13 +22,13 @@ use crate::style::readable;
 
 /// `question-header-title`: 13 px on the compact line height.
 const HEAD: TextStyle = TextStyle::new(13.0, 440.0).lh(16.0);
-const QUESTION: TextStyle = TextStyle::new(13.0, 530.0).lh(16.0);
+pub(super) const QUESTION: TextStyle = TextStyle::new(13.0, 530.0).lh(16.0);
 const HINT: TextStyle = TextStyle::new(13.0, 440.0).lh(20.0);
-const LABEL: TextStyle = TextStyle::new(13.0, 440.0).lh(20.0).tracking(-0.04);
+pub(super) const LABEL: TextStyle = TextStyle::new(13.0, 440.0).lh(20.0).tracking(-0.04);
 /// `option-description`: compact leading (OpenCode ee5dfa9d41, `question-prompt.css`).
-const DESC: TextStyle = TextStyle::new(12.0, 440.0).lh(16.0).tracking(0.05);
+pub(super) const DESC: TextStyle = TextStyle::new(12.0, 440.0).lh(16.0).tracking(0.05);
 /// `question-custom-input`: 13 px on an 18 px line (`question-prompt.css:397-420`).
-const INPUT: TextStyle = TextStyle::new(13.0, 440.0).lh(18.0);
+pub(super) const INPUT: TextStyle = TextStyle::new(13.0, 440.0).lh(18.0);
 /// A number key's cap (`keybind-v2` at the shortcut's 10 px, regular).
 const KEY: TextStyle = TextStyle::new(10.0, 400.0).lh(11.0).tracking(0.05).features("\"tnum\", \"lnum\"");
 fn custom_label() -> &'static str {
@@ -39,8 +39,8 @@ const TRAY_H: f32 = 57.0;
 /// How far the tray tucks up under the body (`margin-block-start: -9px`).
 const TUCK: f32 = 9.0;
 /// The gap the dock keeps from the top of the pane (`measure`'s `gap`), and its floor.
-const PANE_GAP: f32 = 8.0;
-const MIN_H: f32 = 240.0;
+pub(super) const PANE_GAP: f32 = 8.0;
+pub(super) const MIN_H: f32 = 240.0;
 /// The fold's spring (`useSpring`, 0.3 s without bounce).
 const FOLD: Spring = Spring::new(0.3, 0.0);
 const MAC: bool = cfg!(target_os = "macos");
@@ -219,7 +219,7 @@ pub fn face<S: DockHost>(s: &S, p: &Pal) -> Option<Vec<El>> {
 
 /// How the cards' feedback eases (`question-prompt.css`: `--question-feedback-duration: 120ms`,
 /// `ease`), and at once while keys drive the dock (`[data-keyboard="true"]` sets it to 0s).
-fn feedback(keyboard: bool) -> Anim {
+pub(super) fn feedback(keyboard: bool) -> Anim {
     if keyboard { Anim::INSTANT } else { Anim::new(Curve::tween(0.12, Easing::EASE)) }
 }
 
@@ -247,7 +247,7 @@ fn card(p: &Pal, picked: bool, ring: bool, keyboard: bool) -> El {
 }
 
 /// The header's progress: a bar per question, accent once answered, muted on the current one.
-fn progress<S: DockHost>(s: &S, p: &Pal, f: &Form, tab: usize, live: bool) -> El {
+pub(super) fn progress<S: DockHost>(s: &S, p: &Pal, f: &Form, tab: usize, live: bool) -> El {
     row().key("q-progress").gap(2.0).center_y().children((0..f.fields.len()).map(|i| {
         let color = if i == tab { p.icon_muted } else if answered(s, f, i) { p.bg_accent } else { p.q.layer4 };
         let seg = el()
@@ -303,7 +303,7 @@ fn chevron<S: DockHost>(p: &Pal, minimized: bool, live: bool) -> El {
 
 /// An answer's mark (`question-option-check`): a circle for one answer, a square for many,
 /// accent with a dot or a tick once picked.
-fn mark(p: &Pal, multi: bool, picked: bool, keyboard: bool) -> El {
+pub(super) fn mark(p: &Pal, multi: bool, picked: bool, keyboard: bool) -> El {
     // The box's fill isn't transitioned: it turns accent at once (`Spring::NONE`).
     let b = el().key("box").size(16.0, 16.0).center().radius(if multi { 4.0 } else { 8.0 }).motion(Spring::NONE);
     let b = if picked {
@@ -326,7 +326,7 @@ fn mark(p: &Pal, multi: bool, picked: bool, keyboard: bool) -> El {
 /// An answer's number key (`keybind-v2`): filled, or outlined once picked. Its `background-color`
 /// and `box-shadow` ease on `feedback` (`--keybind-transition-duration`, `keybind.css`): the fill
 /// and the outline are two layers that cross-fade.
-fn shortcut(p: &Pal, n: usize, picked: bool, keyboard: bool) -> El {
+pub(super) fn shortcut(p: &Pal, n: usize, picked: bool, keyboard: bool) -> El {
     let ease = feedback(keyboard);
     let layer = |key: &'static str, on: bool| el().key(key).absolute(0.0, 0.0).w_full().h_full().radius(2.0).opacity(if on { 1.0 } else { 0.0 }).opacity_motion(ease);
     let fill = layer("fill", !picked).fill(p.layer3);
@@ -431,7 +431,7 @@ fn custom<S: DockHost>(s: &S, p: &Pal, f: &Form, tab: usize, multi: bool, editin
 }
 
 /// Back: ⌘[ on a Mac, Alt+← elsewhere.
-fn back(ev: &KeyEvent) -> bool {
+pub(super) fn back(ev: &KeyEvent) -> bool {
     let m = ev.mods;
     if MAC {
         return matches!(ev.key, Key::Command('[')) && !m.ctrl && !m.alt;
@@ -439,7 +439,7 @@ fn back(ev: &KeyEvent) -> bool {
     ev.key == Key::Left && m.alt && !m.ctrl && !m.cmd
 }
 
-fn advance(ev: &KeyEvent) -> bool {
+pub(super) fn advance(ev: &KeyEvent) -> bool {
     ev.key == Key::Enter && (ev.mods.cmd || ev.mods.ctrl) && !ev.mods.alt
 }
 
@@ -565,7 +565,7 @@ pub fn key<S: DockHost>(s: &mut S, ev: &KeyEvent, tx: &mut Tx) -> bool {
 
 /// Puts the caret in the typed answer's field without picking that answer: typing in it does
 /// (`session-question-dock-classic.tsx:730-735`).
-fn enter_field<S: DockHost>(s: &mut S, f: &Form, tab: usize) {
+pub(super) fn enter_field<S: DockHost>(s: &mut S, f: &Form, tab: usize) {
     s.composer_edit_mut().focused = false;
     s.dock_mut().typed_mut(&f.id, &f.fields[tab].key).focused = true;
 }

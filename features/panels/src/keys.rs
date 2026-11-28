@@ -12,7 +12,8 @@ use crate::host::PanelsHost;
 use crate::state::{
     CloseTabGuardEffect, CloseTabGuardEvent, EdgeFlightEffect, EdgeFlightEvent, ResolvedEntry, ResolvedRegion,
     SideMenu, adopt_child_strip, all_panels, bottom_open, close_side_tab, dismiss_side_new_tab, open_side_new_tab,
-    reopen_closed_side_tab, resolve_side_region, routed_unlisted, select_side_tab, shown_new_tab, side_open, sync_empty_side,
+    release_pane_width_hold, reopen_closed_side_tab, resolve_side_region, routed_unlisted, select_side_tab, shown_new_tab,
+    side_open, sync_empty_side,
     toggle_bottom_region, toggle_side_region,
 };
 use crate::tabs::{SessionTabs, panel_key};
@@ -250,6 +251,7 @@ pub fn panels_key(host: &mut dyn PanelsHost, ev: &KeyEvent, tx: &mut Tx) -> bool
         });
         if let Some(nt) = shown_new_tab(host, &sid, pane, pane_act.as_deref()).cloned() {
             tx.instant();
+            release_pane_width_hold(host, pane);
             dismiss_side_new_tab(host, &nt.id);
             if !side_open(host) {
                 host.side_mut().close_guard.step(CloseTabGuardEvent::Emptied);
@@ -265,6 +267,7 @@ pub fn panels_key(host: &mut dyn PanelsHost, ev: &KeyEvent, tx: &mut Tx) -> bool
                 host.side_mut().close_guard.step(CloseTabGuardEvent::Emptied);
                 return true;
             }
+            release_pane_width_hold(host, pane);
             close_side_tab(host, &act_key, tx);
             if !side_open(host) && pane != SessionPane::Bottom {
                 host.side_mut().close_guard.step(CloseTabGuardEvent::Emptied);

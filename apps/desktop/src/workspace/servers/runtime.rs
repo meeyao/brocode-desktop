@@ -122,6 +122,45 @@ pub(crate) fn peer(key: &ServerKey) -> Option<Rc<ServerPeer>> {
     RUNTIME.with_borrow(|r| r.peers.get(key).cloned())
 }
 
+/// Weak handles to every `Pages` prefetch cache in this window (active and parked servers).
+pub(crate) fn all_cache_refs(s: &App) -> Vec<crate::session_pages::CacheRef> {
+    s.pages
+        .cache_ref()
+        .into_iter()
+        .chain(s.checkout.parked.iter().filter_map(|(_, _, half)| half.pages.cache_ref()))
+        .collect()
+}
+
+/// True when `refs` already matches the exact set of `Pages` pools in this window (avoids
+/// reallocating `Open::pages` on every turn).
+pub(crate) fn same_cache_refs(s: &App, refs: &[crate::session_pages::CacheRef]) -> bool {
+    let expected = usize::from(s.pages.has_pool()) + s.checkout.parked.iter().filter(|(_, _, h)| h.pages.has_pool()).count();
+    if refs.len() != expected {
+        return false;
+    }
+    let mut i = 0;
+    if s.pages.has_pool() {
+        if !s.pages.same_pool(&refs[i]) { return false; }
+        i += 1;
+    }
+    for (_, _, half) in &s.checkout.parked {
+        if half.pages.has_pool() {
+            if !half.pages.same_pool(&refs[i]) { return false; }
+            i += 1;
+        }
+    }
+    true
+}
+
+/// User message ids held by every parked server half's `Pages` cache and local transcripts.
+pub(crate) fn parked_user_message_ids(s: &App) -> Vec<String> {
+    s.checkout
+        .parked
+        .iter()
+        .flat_map(|(_, _, half)| half.pages.user_message_ids().into_iter().chain(half.store.local_user_message_ids()))
+        .collect()
+}
+
 /// User message ids held by every other server's shared peer (outside `active`), so `App::rest`
 /// never prunes process-global user-message metadata belonging to another server's transcripts.
 pub(crate) fn other_peer_user_message_ids(active: &ServerKey) -> Vec<String> {
@@ -255,8 +294,8 @@ pub fn reported(probe: &opencode_servers::health::Probe) {
 fn server_for(conn: &ServerConn, own: &Server) -> Server {
     let Some(http) = conn.http().filter(|_| !conn.builtin()) else { return own.clone() };
     // Added and plugin servers have the same passive page readers as the initial server.
-    let mut server = Server::new(&http.url);
-    if let Some(p) = &http.password {
+    let mut server = Server::anonymous(&http.url);
+    if let Some(p) = http.password.as_deref().filter(|p| !p.is_empty()) {
         server = server.with_password(p);
     }
     if conn.local(Some(&own.base)) { server } else { server.with_remote_files() }
@@ -502,7 +541,7 @@ pub fn desired(s: &App) -> ServerKey {
     match &*s.route {
         Route::Session { server, .. } => server.clone(),
         Route::Draft(id) => s.tabs.iter().find(|t| t.id == *id).map_or_else(|| crate::projects::home::server(s), |t| t.server.clone()),
-        Route::Home => crate::projects::home::server(s),
+        Route::Home | Route::Automations => crate::projects::home::server(s),
     }
 }
 
@@ -595,7 +634,7 @@ fn new_half(s: &mut App, key: &ServerKey, adopt: bool) -> (Meta, Half) {
         None if key.is_sidecar() => (Meta::default(), own_server().unwrap_or_else(|| Server::new(opencode_kit::client::DEFAULT_SERVER))),
         None => (Meta::default(), Server::new(&format!("http://{}.invalid", key.as_str().replace([':', '/'], "-"))).with_remote_files()),
     };
-    let phase = if listed.is_some() { crate::launch::Phase::Waiting { beta_tabs: false, fallback_fixture: false } } else { crate::launch::Phase::Offline { retries: 0, retry_at: f64::INFINITY } };
+    let phase = if listed.is_some() { crate::launch::Phase::Waiting { beta_tabs: false, fallback_fixture: false } } else { crate::launch::Phase::Unlisted };
     s.launch.set_phase(key.as_str(), phase);
     let wake = s.launch.inbox_wake.clone().or_else(|| (*s.waker).clone());
     let store = peer(key).filter(|_| adopt).map(|p| peer::member(p, wake)).unwrap_or_default();

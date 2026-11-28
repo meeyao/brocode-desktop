@@ -114,8 +114,12 @@ pub fn app(s: &App, cx: &mut Cx<App>) -> El {
     if s.plugins.force_focus {
         cx.force_focus_rings();
     }
-    // Tooltips are Desktop's compact `Tooltip` (`tooltip.css`), placed and timed as its Kobalte.
-    cx.help_look(rune_kit::TooltipStyle::from_kit(crate::palette::kit(p), rune_kit::TooltipAppearance::Compact).help_look());
+    // Tooltips are Desktop's compact `Tooltip` (`tooltip.css`, `opencode#66789`), placed and timed
+    // as its Kobalte: 4px 6px padding and `--line-height-compact` (16px) line-height.
+    let tip = rune_kit::TooltipStyle::from_kit(crate::palette::kit(p), rune_kit::TooltipAppearance::Compact);
+    let tip_font = opencode_ui::tooltip::compact_text_style(tip.text_style());
+    let (tip_px, tip_py) = opencode_ui::tooltip::COMPACT_PADDING;
+    cx.help_look(tip.padding(tip_px, tip_py).font(tip_font).help_look());
     // A quote's source stays lit in the timeline while its comment is written.
     cx.mark_texts(crate::quote::marks(s));
     crate::icons::prepare(s, cx);
@@ -137,7 +141,16 @@ pub fn app(s: &App, cx: &mut Cx<App>) -> El {
     // Arabic, Hebrew, Persian, Urdu… mirror the whole window, as Desktop's `dir` on the
     // document root does (`language.tsx:397`); the caption buttons Rune draws stay put.
     let root = root.dir(ui_direction());
-    root.on_key_up(|s: &mut App, ev, tx| crate::dictation::key_up(s, ev, tx))
+    root.on_key_preview(|s: &mut App, ev, tx| {
+            s.sidebar_inbox.focus.note_key(ev);
+            tx.live_only();
+            false
+        })
+        .on_any_press(|s: &mut App, _, _, tx| {
+            s.sidebar_inbox.focus.note_pointer();
+            tx.live_only();
+        })
+        .on_key_up(|s: &mut App, ev, tx| crate::dictation::key_up(s, ev, tx))
         .on_window_focus(|s: &mut App, focused, tx| {
             s.plugins.window_blurred.set(!focused);
             if !focused {
@@ -146,6 +159,8 @@ pub fn app(s: &App, cx: &mut Cx<App>) -> El {
                 s.clear_app_link_reviews();
                 s.clear_preview(tx);
                 crate::tab_hints::window_left(s, tx);
+                crate::tabs::sections::window_left(s, tx);
+                crate::panels::release_strip_width_holds(s);
             }
             if focused { crate::launch::network_available(s, tx); }
             // The coordinator's `tip` opens on the window's `focus`.
@@ -195,7 +210,7 @@ fn shell(s: &App, cx: &mut Cx<App>) -> El {
     } else {
         0.0
     };
-    let need_panel_sz = (!s.settings_open() && matches!(*s.route, Route::Draft(_) | Route::Home)) || s.composer_ext.attach.drop.present();
+    let need_panel_sz = (!s.settings_open() && matches!(*s.route, Route::Draft(_) | Route::Home | Route::Automations)) || s.composer_ext.attach.drop.present();
     let panel_sz = if need_panel_sz {
         cx.layout_size("panel").map_or((0.0, 0.0), |[w, h]| (w, h))
     } else {
@@ -265,6 +280,7 @@ fn shell(s: &App, cx: &mut Cx<App>) -> El {
         .on_drop_hover(crate::dropzone::hover)
         .child(if s.settings_open() { crate::settings::page(s, p, settings_sz) } else { match &*s.route {
             Route::Home => home(s, p, [panel_sz.0, panel_sz.1], cx.layout_size("zoom").unwrap_or([0.0, 0.0])),
+            Route::Automations => crate::automations::view::page(s, p, [panel_sz.0, panel_sz.1]),
             Route::Session { id, .. } => session_page(s, p, id),
             Route::Draft(_) => draft_page(s, p, panel_sz.0),
         } })

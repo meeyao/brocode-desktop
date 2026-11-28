@@ -72,7 +72,7 @@ pub struct Say {
 pub struct Speech {
     /// A request arrived on the open page: the key that takes focus, when focus is in the prompt
     /// the dock replaces, or nowhere. A keyboard user's, with or without a screen reader.
-    focus_dock: Option<&'static str>,
+    focus_dock: Option<String>,
     /// Whether an assistive client reads the window, and the speech state kept while it does.
     mode: Mode,
 }
@@ -325,7 +325,11 @@ pub fn step(turn: Turn, heard: Heard) -> (Turn, Option<Say>) {
 /// Feeds one stream event to the machine (from `App::react`).
 pub fn event(app: &mut App, ty: &str, data: &Value, sid: &str) {
     if matches!(ty, "permission.asked" | "form.created") && open_root(app).is_some_and(|r| r == app.root_of(sid)) {
-        let key = if ty == "permission.asked" { session_view::dock::permission::PERMISSION_FOCUS } else { "q-opt-0" };
+        let key = if ty == "permission.asked" {
+            session_view::dock::permission::PERMISSION_FOCUS.to_owned()
+        } else {
+            session_view::dock::question::initial_focus(app)
+        };
         app.kernel.slots.get_mut(&SPEECH).focus_dock = Some(key);
     }
     if !listening(app) {
@@ -381,7 +385,7 @@ fn poll_inner(app: &mut App, tx: &mut Tx) {
         if let Some((_, words, focus)) = &shown {
             l.queued.push(Say { words: words.clone(), how: LiveRegion::Assertive });
             if l.in_prompt {
-                tx.focus(*focus, tx.focus_visible());
+                tx.focus(focus.clone(), tx.focus_visible());
             }
         }
         l.dock = shown.map(|(id, _, _)| id);
@@ -443,14 +447,14 @@ pub fn terminal_key(app: &mut App, wk: &str, id: &str) {
 
 /// The request the open page's dock shows: its id, what a reader hears, and the key of what
 /// takes focus.
-fn dock_request(app: &App) -> Option<(String, String, &'static str)> {
+fn dock_request(app: &App) -> Option<(String, String, String)> {
     if let Some(Pending::Permission { id, action, resources, .. }) = session_view::dock::permission::asked(app) {
-        return Some((id, permission_words(&action, resources.first().map(String::as_str)), session_view::dock::permission::PERMISSION_FOCUS));
+        return Some((id, permission_words(&action, resources.first().map(String::as_str)), session_view::dock::permission::PERMISSION_FOCUS.to_owned()));
     }
     let form = session_view::dock::question::asking(app)?;
     let field = form.fields.first();
     let ask = field.map(|f| if f.description.is_empty() { f.title.as_str() } else { f.description.as_str() }).unwrap_or("");
-    Some((form.id.clone(), format!("{}. {ask}", opencode_i18n::t!("notification.question.title")), "q-opt-0"))
+    Some((form.id.clone(), format!("{}. {ask}", opencode_i18n::t!("notification.question.title")), session_view::dock::question::initial_focus(app)))
 }
 
 /// "Permission required. Run shell commands. git push origin main".

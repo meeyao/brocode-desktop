@@ -39,7 +39,9 @@ use crate::style::{HOVER_FADE, TOOL_CODE, UI, arrow, readable};
 
 pub use console::{console_open, follow as shell_follow};
 pub use details::overlay as details_overlay;
-pub use files::{group as file_group, is_file_tool, shut_group};
+pub use files::{draws_card as file_draws_card, group as file_group, is_file_tool, shut_group};
+pub use execute::script_output_text;
+pub(crate) use execute::has_calls as execute_has_calls;
 pub use lists::{read_group, skill_group, skill_name};
 pub use plain::strip_ansi;
 
@@ -158,6 +160,12 @@ pub fn sub_key(id: &str, part: impl std::fmt::Display) -> String {
 /// Whether call `c` shows a body below its 28 pt trigger line (so its visual foot sits at its
 /// box's bottom rather than 6 pt inside the trigger).
 pub fn shows_body<S: TimelineHost>(s: &S, cx: Ctx, c: &Call) -> bool {
+    shows_body_with(s, cx, c, false)
+}
+
+/// Like [`shows_body`], with `after_changes` indicating whether a flat `execute` call's Output
+/// row moved after its script file changes (`opencode#66509`).
+pub fn shows_body_with<S: TimelineHost>(s: &S, cx: Ctx, c: &Call, after_changes: bool) -> bool {
     let cx = if opencode_kit::model::shell_message(c.metadata) { Ctx { live: true, ..cx } } else { cx };
     let stopped_shell = matches!(c.name, "shell" | "bash") && crate::activity::rules::stopped(c.status, c.metadata);
     if *c.status == ToolStatus::Error && c.name != "execute" && !stopped_shell {
@@ -171,12 +179,13 @@ pub fn shows_body<S: TimelineHost>(s: &S, cx: Ctx, c: &Call) -> bool {
         }
         "shell" | "bash" => matches!(log::Excerpt::new(console::current_output(s, c)), log::Excerpt::Ends { .. }) || Display::of(s, cx, c, true).open(),
         "execute" => {
-            let calls = execute::calls(c.metadata);
-            let err = execute::error(c);
-            let out = if err.is_some() { "" } else { output(c).trim() };
-            Display::of(s, cx, c, !calls.is_empty() || err.is_some() || !out.is_empty()).open()
+            let flat = s.full_codemode(cx.session);
+            let opens = execute::has_calls(c.metadata)
+                || execute::has_error(c)
+                || (!(flat && after_changes) && !execute::script_output_text(c).is_empty());
+            if flat { opens } else { Display::of(s, cx, c, opens).open() }
         }
-        "edit" | "multiedit" | "write" | "patch" | "apply_patch" => true,
+        "edit" | "multiedit" | "write" | "patch" | "apply_patch" => files::draws_card(c),
         "websearch" => {
             let out = output(c);
             let opens = !busy(c.status, cx.live) && (out.len() > 8192 || !plain::urls(out).is_empty());
@@ -190,6 +199,12 @@ pub fn shows_body<S: TimelineHost>(s: &S, cx: Ctx, c: &Call) -> bool {
 /// when what it shows changes. A shimmering title isn't cached, so its sweep keeps the run's
 /// rhythm.
 pub fn view<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call) -> El {
+    view_with(s, p, cx, c, false)
+}
+
+/// Like [`view`]; `after_changes` moves a flat `execute` script's Output row after its file
+/// changes (`opencode#66509`).
+pub fn view_with<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call, after_changes: bool) -> El {
     // A shell command run from the composer runs whether or not its session does: its title
     // shimmers while the command runs (`SessionShellMessage` passes its own status).
     let cx = if opencode_kit::model::shell_message(c.metadata) { Ctx { live: true, ..cx } } else { cx };
@@ -203,7 +218,7 @@ pub fn view<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call) -> El {
         match c.name {
             "shell" if opencode_kit::model::shell_message(c.metadata) => shell_message(s, p, cx, c),
             "shell" | "bash" => console::shell(s, p, cx, c),
-            "execute" => execute::execute(s, p, cx, c),
+            "execute" => execute::execute(s, p, cx, c, after_changes),
             "edit" | "multiedit" | "write" | "patch" | "apply_patch" => files::group(s, p, cx, &[*c]),
             "read" => lists::read(s, p, cx, c),
             "list" | "glob" | "grep" => lists::search(s, p, cx, c),
@@ -213,7 +228,7 @@ pub fn view<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call) -> El {
             _ => lists::generic(s, p, cx, c),
         }
     };
-    cached(s, p, cx, &[*c], build)
+    cached_with(s, p, cx, &[*c], after_changes, build)
 }
 
 /// A shell command run from the composer (`SessionShellMessage`): its shell call, and under it
@@ -245,17 +260,28 @@ fn shell_message<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call) -> El {
 /// `build` for `calls`, kept until one of them, the parts of them held open, their copy
 /// buttons, the host's buttons beside them or the look changes.
 pub fn cached<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call], build: impl FnOnce() -> El) -> El {
+    cached_with(s, p, cx, calls, false, build)
+}
+
+fn cached_with<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call], after_changes: bool, build: impl FnOnce() -> El) -> El {
     let Some(first) = calls.first() else { return col() };
     if !s.reduced_motion() && calls.iter().any(|c| busy(c.status, cx.live)) {
         return build();
     }
     let mut h = std::hash::DefaultHasher::new();
     (cx.session, cx.live, cx.sticky.to_bits(), crate::scroller::device_scale().to_bits(), p.theme, p.generation, p.dark, opencode_i18n::locale().id(), crate::style::hover_none(), s.reduced_motion(), s.session_directory(cx.session), s.timeline_detail()).hash(&mut h);
+    (s.full_codemode(cx.session), after_changes).hash(&mut h);
+    let flat = s.full_codemode(cx.session);
     let copied = crate::copied::current(s);
     for c in calls {
         (c.id, c.name, std::mem::discriminant(c.status), s.tool_row_action_version(c.id)).hash(&mut h);
         fingerprint(c.input, &mut h);
-        fingerprint(c.metadata, &mut h);
+        if c.name == "execute" {
+            let (_, shown) = execute::shown_calls(s, c.id);
+            fingerprint_execute_metadata(c, shown, flat, &mut h);
+        } else {
+            fingerprint(c.metadata, &mut h);
+        }
         // The output the host read from the call's shell (`console::follow`).
         console::follow(c, |_| false).and_then(|(id, _)| s.shell_output(id)).map(str::len).hash(&mut h);
         // Each part of it the reader touched, and how: one shut where it opens by default reads
@@ -268,6 +294,52 @@ pub fn cached<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, calls: &[Call], build: i
     }
     // The memo keys its root with its own id, so the row keeps its keys one level down.
     rune::memo(format!("tm-{}", first.id), h.finish(), || col().w_full().child(build()))
+}
+
+/// Fingerprints an `execute` call's `metadata`, deeply hashing only the last `shown` valid
+/// `toolCalls` entries (those with string `tool`) that `execute::execute` renders while
+/// tracking total valid count (and hidden error positions when non-flat or errored).
+fn fingerprint_execute_metadata(c: &Call, shown: usize, flat: bool, h: &mut impl Hasher) {
+    let Some(o) = c.metadata.as_object() else {
+        fingerprint(c.metadata, h);
+        return;
+    };
+    (5u8, o.len()).hash(h);
+    let need_error_scan = !flat || execute::has_error(c);
+    for (k, x) in o {
+        k.hash(h);
+        if k == "toolCalls"
+            && let Value::Array(a) = x
+        {
+            // Walk backward to locate the exact start of the last `shown` string-`tool` calls.
+            let mut valid_tail = 0usize;
+            let mut start = a.len();
+            for (idx, item) in a.iter().enumerate().rev() {
+                if item["tool"].is_string() {
+                    valid_tail += 1;
+                    start = idx;
+                    if valid_tail == shown {
+                        break;
+                    }
+                }
+            }
+            let valid_before = a[..start].iter().filter(|v| v["tool"].is_string()).count();
+            (4u8, a.len(), valid_before + valid_tail).hash(h);
+            for item in a[start..].iter().filter(|v| v["tool"].is_string()) {
+                fingerprint(item, h);
+            }
+            if need_error_scan && start > 0 {
+                let first_err = a[..start].iter().position(|v| v["tool"].is_string() && v["status"] == "error");
+                let last_err = a[..start].iter().rposition(|v| v["tool"].is_string() && v["status"] == "error");
+                (first_err, last_err).hash(h);
+                if let Some(i) = first_err {
+                    fingerprint(&a[i], h);
+                }
+            }
+        } else {
+            fingerprint(x, h);
+        }
+    }
 }
 
 /// A cheap stand-in for `v`'s content: its shape, numbers, and each string's length and ends.

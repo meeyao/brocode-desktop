@@ -57,8 +57,9 @@ pub fn plugins(app: &App, record: impl Fn(&str) -> Option<opencode_plugin_runtim
         (Some(_), _) => true,
     };
     // The debug plugin's one slot is its bar (`window.bottom`), counted above: hidden, it draws nothing.
+    // The browser plugin's slots live only on the side panel's New tab (`session.panel.new*`), counted in `empty_side` below.
     // A link handler draws nothing: it answers when a link is opened, which starts it (`commands::open_link`).
-    out.extend(sources::builtin_ids().filter(|id| (*id != "debug" && has(id, &["Slot"])) || (has(id, &["CodeBlock"]) && draws_block(id))));
+    out.extend(sources::builtin_ids().filter(|id| (*id != "debug" && *id != "browser" && has(id, &["Slot"])) || (has(id, &["CodeBlock"]) && draws_block(id))));
     let side_state = app.kernel.slots.get(&crate::panels::SIDE);
     // A subagent's page draws its root's strip (`App::panel_root`).
     let side = side_state.sessions.get(app.panel_root(session));
@@ -83,7 +84,7 @@ pub fn plugins(app: &App, record: impl Fn(&str) -> Option<opencode_plugin_runtim
     });
     let empty_side = side_open && !has_side_tab;
     if !with_tabs.is_empty() || empty_side {
-        let launcher = |id: &str| has(id, &["Panel", "MenuItem"]) && record(id).is_none_or(|record| super::dormant::launcher_needs(&record));
+        let launcher = |id: &str| (has(id, &["Panel", "MenuItem"]) || id == "browser") && record(id).is_none_or(|record| super::dormant::launcher_needs(&record));
         out.extend(sources::builtin_ids().filter(|id| with_tabs.contains(id) || (files && has(id, &["FileViewer"])) || (empty_side && launcher(id))));
     }
     out.sort_unstable();

@@ -150,14 +150,21 @@ pub fn unwind_check_if_asked() {
     .ok();
     std::process::exit(if caught && alone && dropped == 34 { 0 } else { 1 });
 }
-/// Window title (`"Brocode"` on `main`, `"Brocode · <branch>"` on PR builds).
+/// Window title, with the build's version: `Brocode Desktop 0.3.1`, so a window says which of
+/// the two Brocode apps it is (the legacy Electron app is also called BROcode), and a PR build
+/// `Brocode · <branch> 0.3.1`.
 pub fn window_title() -> &'static str {
-    // Stable and beta builds name themselves after their channel (`win_install::default_name`).
-    #[cfg(not(target_arch = "wasm32"))]
-    let fallback = win_install::default_name(option_env!("OPENCODE_RUNE_BUILD_CHANNEL"));
-    #[cfg(target_arch = "wasm32")]
-    let fallback = "Brocode";
-    option_env!("OPENCODE_RUNE_WINDOW_TITLE").unwrap_or(fallback)
+    static TITLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    TITLE.get_or_init(|| {
+        // Stable and beta builds name themselves after their channel (`win_install::default_name`).
+        #[cfg(not(target_arch = "wasm32"))]
+        let base = win_install::default_name(option_env!("OPENCODE_RUNE_BUILD_CHANNEL"));
+        #[cfg(target_arch = "wasm32")]
+        let base = "Brocode";
+        let name = option_env!("OPENCODE_RUNE_WINDOW_TITLE").unwrap_or(base);
+        let version = crate::updater::build_version();
+        if name.contains(version) { name.to_owned() } else { format!("{name} {version}") }
+    })
 }
 
 /// The build's identity: its name, its app id (the Windows AppUserModelID, the uninstall
@@ -318,9 +325,6 @@ pub struct Ready {
     pub server: Option<Server>,
     pub beta_tabs: Option<Vec<crate::tabs::Tab>>,
     pub first: Option<Result<First, String>>,
-    /// Nothing accepted a connection at the address, and the reach watcher tries it from now on
-    /// (`Server::watch_reach`): the launch waits for it rather than trying on a timer.
-    pub refused: bool,
     /// The restored session's newest page, asked for beside the first reads, for the session's
     /// reader to take up when the window connects (`Pages::live`).
     pub page: Option<session_pages::Early>,
@@ -500,7 +504,7 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
                 let early = ask_page(&candidate, page.clone());
                 if let Ok(first @ Ok(_)) = head.first.recv() {
                     let beta_tabs = beta_tabs.then(crate::tabs::from_beta).flatten();
-                    out.send(Ready { server: Some(candidate), beta_tabs, first: Some(first), refused: false, page: early }).ok();
+                    out.send(Ready { server: Some(candidate), beta_tabs, first: Some(first), page: early }).ok();
                     if let Some(w) = wake {
                         w();
                     }
@@ -527,6 +531,7 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
                 let (actual, reached) = probe(&server, discover_local, Duration::ZERO, registered_up);
                 (actual, reached, Some(err))
             }
+            None if !discover_local => (server.clone(), true, None),
             None => {
                 let (actual, reached) = probe(&server, discover_local, grace, registered_up);
                 (actual, reached, None)
@@ -534,28 +539,25 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
         };
         let ready = if !reached {
             if fallback {
-                Ready { server: None, beta_tabs: None, first: None, refused: false, page: None }
+                Ready { server: None, beta_tabs: None, first: None, page: None }
             } else {
                 let msg = start_err.unwrap_or_else(|| format!("No brocode server responded at {}", actual.base));
-                // `service.json` may name another port next time, so a discovered server keeps
-                // its timer.
-                let refused = !discover_local;
-                if refused {
-                    actual.watch_reach(wake.clone());
-                }
-                Ready { server: Some(actual), beta_tabs: None, first: Some(Err(msg)), refused, page: None }
+                Ready { server: Some(actual), beta_tabs: None, first: Some(Err(msg)), page: None }
             }
         } else {
-            // The window counts its patience from here (`poll`).
-            REACHED.store(true, Ordering::Relaxed);
-            took.set(Instant::now()).ok();
-            if let Some(w) = &wake {
-                w();
+            if discover_local {
+                // Only set `REACHED` / `took` after a verified local reach so remote timeouts
+                // never stand in sidecar's saved list or falsely report `Link::Slow`.
+                REACHED.store(true, Ordering::Relaxed);
+                took.set(Instant::now()).ok();
+                if let Some(w) = &wake {
+                    w();
+                }
             }
             let beta_tabs = beta_tabs.then(crate::tabs::from_beta).flatten();
             let page = ask_page(&actual, page);
             let first = First::fetch(&actual);
-            Ready { server: Some(actual), beta_tabs, first: Some(first), refused: false, page }
+            Ready { server: Some(actual), beta_tabs, first: Some(first), page }
         };
         out.send(ready).ok();
         if let Some(w) = wake {
@@ -647,7 +649,7 @@ impl App {
         // A fresh profile has used no projects yet: Home lists none, as Desktop's
         // `usedProjectIDs` starts empty.
         let saved_projects = match &*self.source {
-            Source::Live { server, .. } => Some(crate::tabs::load_projects(&server.base).unwrap_or_default()),
+            Source::Live { server, .. } => Some(crate::tabs::load_projects_for_key(crate::servers::runtime::active(self), &server.base).unwrap_or_default()),
             Source::Fixture => None,
         };
         self.init_used_projects(saved_projects);
@@ -672,7 +674,7 @@ pub(super) fn connect(s: &mut App, tx: &mut Tx) {
     missing.dedup();
     s.set_media_fetch();
     if let (Source::Live { server, requests, writes, .. }, Some(waker)) = (&mut *s.source, (*s.waker).clone()) {
-        s.pages.set(session_pages::Pages::live(server.clone(), waker.clone(), s.launch.early_page.take()));
+        s.pages.set(session_pages::Pages::live(server.clone(), waker.clone(), s.launch.early_page.take(), s.composer_ext.attach.store.image_cache()));
         let inbox_wake = s.launch.inbox_wake.clone().unwrap_or(waker);
         let (r, w, inbox) = crate::windows::connect(server, inbox_wake.clone());
         *writes = Some(w);
@@ -688,11 +690,11 @@ pub(super) fn connect(s: &mut App, tx: &mut Tx) {
         crate::windows::peer::join(s, Some(inbox_wake.clone()));
         // A window that started in its opener's copy was woken plainly until now.
         crate::windows::peer::set_waker(s, inbox_wake);
-        // Home's provider tip waits for the default location's integrations (`home::tip`), which
-        // are otherwise read only when Connect or Settings opens: with only the free models, read them now.
-        if !s.composer_ext.pickers.models.iter().any(|m| m.provider != "opencode") {
-            s.sync_catalogs(None);
-        }
+        // Home's provider tip waits for the default location's integrations (`home::tip`) and the
+        // pickers need the server's providers and configured model (a clean profile otherwise
+        // starts on the ids it knows, never brocode/pro); both are otherwise read only when
+        // Connect or Settings opens. Models already on screen may be a previous launch's copy.
+        s.sync_catalogs(None);
         super::onboarding::first_launch(s, tx);
         // The session open at last quit (see `restore`) subscribes like a click on its tab.
         if let Route::Session { id, server } = (*s.route).clone()

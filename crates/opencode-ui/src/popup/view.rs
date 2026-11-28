@@ -48,9 +48,10 @@ pub fn view<S: PopupHost + 'static>(s: &S, p: &Pal) -> Vec<El> {
             }
         }
     }
+    let over_modal = s.over_modal();
     // Desktop's context menu is not modal (Kobalte `ContextMenu`: `body` keeps `pointer-events: auto`), so
     // what the pointer rests on beside it stays hovered: a tab keeps its close button under its own menu.
-    let scrim = scrim::<S>(matches!(shown.anchor, PopupAnchor::Point(..)) && !shown.menu.pointer_trigger);
+    let scrim = scrim::<S>(!over_modal && matches!(shown.anchor, PopupAnchor::Point(..)) && !shown.menu.pointer_trigger);
     // The pointer's spot is physical, so it stays unmirrored in a right-to-left window.
     let rtl = opencode_i18n::direction() == opencode_i18n::Direction::Rtl;
     let (anchor, point, align, side) = match &shown.anchor {
@@ -76,7 +77,7 @@ pub fn view<S: PopupHost + 'static>(s: &S, p: &Pal) -> Vec<El> {
         if let Some((o, Entry::Sub(sub))) = sub {
             layer.push(popover::place(s.knobs(), standard::sub::<S>(p, &sub.menu, o.active, hair), &row_key(&sub.id), Side::Right, Align::Start, 0.0));
         }
-        return layer;
+        return wrap_modal::<S>(over_modal, layer);
     }
     // A searchable menu lists what matches the field as it is now.
     let fresh = shown.search.as_ref().map(|search| {
@@ -108,7 +109,27 @@ pub fn view<S: PopupHost + 'static>(s: &S, p: &Pal) -> Vec<El> {
         layer.push(popover::place(s.knobs(), build(Some(s), p, &sub.menu, o.active, open, k + 1, None), &row_key(&sub.id), Side::Right, Align::Start, gap));
         parent = &sub.menu;
     }
-    layer
+    wrap_modal::<S>(over_modal, layer)
+}
+
+/// Wraps `layer` in a raised modal scope when another Rune modal is mounted beneath it, so the
+/// drawn menu, its submenus, and its outside-dismiss scrim stay above the modal in both paint
+/// order and Rune's active-modal hit/focus filter.
+fn wrap_modal<S: PopupHost + 'static>(over_modal: bool, layer: Vec<El>) -> Vec<El> {
+    if !over_modal {
+        return layer;
+    }
+    vec![
+        el().key("popup-modal")
+            .role("none")
+            .absolute(0.0, 0.0)
+            .w_full()
+            .h_full()
+            .transition(rune::Transition::none())
+            .modal_tx(false, |s: &mut S, tx: &mut Tx| close(s, None, focus::Reason::Keys, tx))
+            .children(layer)
+            .raise(),
+    ]
 }
 
 /// `menu` as a drawn surface, row `active` lit. Its rows light and pick the open menu's, so a

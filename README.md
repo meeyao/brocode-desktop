@@ -34,7 +34,9 @@ Upstream stays the source of engine fixes; rebase this fork on its `dev` branch.
 
 ## Downloads
 
-The build workflow publishes unsigned desktop builds to `dl.apibrother.com`:
+Every push to `dev` builds and publishes unsigned desktop builds to `dl.apibrother.com` (see
+[`docs/releasing.md`](docs/releasing.md)). The Windows download is a per-user setup with the
+brocode CLI inside, so there is nothing else to install:
 
 | Platform | Download |
 | --- | --- |
@@ -89,7 +91,9 @@ changes branding and packaging. Upstream project: https://github.com/anomalyco/o
 
 ## Downloads
 
-The build workflow publishes unsigned desktop builds to `dl.apibrother.com`:
+Every push to `dev` builds and publishes unsigned desktop builds to `dl.apibrother.com` (see
+[`docs/releasing.md`](docs/releasing.md)). The Windows download is a per-user setup with the
+brocode CLI inside, so there is nothing else to install:
 
 | Platform | Download |
 | --- | --- |
@@ -101,8 +105,6 @@ Version, sizes and SHA-256: [brocode-desktop-latest.json](https://dl.apibrother.
 The zips are ad-hoc signed, not notarized: right-click → Open, or `xattr -dr com.apple.quarantine Brocode.app`.
 
 ## Run from source
-
-Start an OpenCode server locally (`opencode serve --service` or **OpenCode Desktop**), then run:
 
 ```sh
 cargo run -p opencode-desktop -- --live

@@ -152,6 +152,10 @@ string_enum! {
         SessionLocationMenu = "session.location.menu",
         /// The actions after the side panel's tabs.
         SessionPanelEnd = "session.panel.end",
+        /// The top of the side panel's New tab view, above its launchers.
+        SessionPanelNew = "session.panel.new",
+        /// Below the launchers of the side panel's New tab view, before Recently closed.
+        SessionPanelNewList = "session.panel.new.list",
     }
 }
 

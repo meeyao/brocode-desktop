@@ -34,9 +34,8 @@ name: Brocode Release
 # A run always releases the commit it runs on (github.sha): there is no ref input, every job
 # checks out github.sha, and the plan fails unless that is the commit it checked out on dev.
 
+# brocode: upstream runs this on Blacksmith runners this fork lacks; run by hand only.
 on:
-  schedule:
-    - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:
       channel:

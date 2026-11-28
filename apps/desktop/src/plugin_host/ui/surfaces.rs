@@ -182,6 +182,40 @@ pub fn slot_with(app: &App, p: &Pal, name: &str, session: &str, active: bool, co
     all.into_iter().map(|(_, el)| el).collect()
 }
 
+/// What plugins put in a side-panel New tab slot (`session.panel.new`, `session.panel.new.list`).
+pub fn new_tab_slot(
+    app: &App,
+    p: &Pal,
+    name: &str,
+    session: &str,
+    pane: &str,
+    width: f32,
+    focus_token: Option<u64>,
+) -> Vec<El> {
+    let directory = app.session(session).map_or("", |s| s.directory.as_str()).to_owned();
+    let found = each::<(), _>(app, |c| {
+        c.slots.iter().filter(|s| s.spec.at.as_str() == name).map(|s| (s.spec.clone(), s.f("render").cloned())).collect()
+    });
+    want_asleep(app, &found, true);
+    let mut all = found
+        .into_iter()
+        .filter_map(|(i, (spec, f))| {
+            let mut props = map([
+                ("sessionId", Data::String(session.to_owned())),
+                ("directory", Data::String(directory.clone())),
+                ("pane", Data::String(pane.to_owned())),
+                ("width", Data::Number(f64::from(width))),
+            ]);
+            if let (Some(tok), Data::Map(m)) = (focus_token, &mut props) {
+                m.insert("focusToken".into(), Data::Integer(tok as i64));
+            }
+            Some((spec.order.unwrap_or(0), render(app, p, i, &format!("slot:{name}:{}:{session}:{pane}", spec.id), &f?, props)))
+        })
+        .collect::<Vec<_>>();
+    all.sort_by_key(|(order, _)| *order);
+    all.into_iter().map(|(_, el)| el).collect()
+}
+
 /// Titlebar items: each plugin's `show()` answer as a [`titlebar_pill`](super::titlebar_pill),
 /// in the titlebar or, `vertical`, the sidebar's footer.
 fn titlebar_pills(app: &App, p: &Pal, vertical: bool) -> Vec<El> {
@@ -305,7 +339,7 @@ pub fn popover_view(app: &App, p: &Pal) -> Vec<El> {
             .elevate(p.floating)
             .on_press(|_: &mut App| {})
             .child(content);
-        return vec![scrim, crate::popover::place(&app.diag.knobs, card, anchor, rune::Side::Top, rune::Align::Start, 8.0)];
+        return wrap_popover_modal(app, vec![scrim, crate::popover::place(&app.diag.knobs, card, anchor, rune::Side::Top, rune::Align::Start, 8.0)]);
     }
     let Overlay::Popover { anchor, side, align, gap, flyout, .. } = &app.plugins.overlay else { return Vec::new() };
     let found = half.contribs.borrow().popovers.iter().find(|c| c.spec.id == *id).map(|c| (c.key, c.f("render").cloned()));
@@ -314,7 +348,27 @@ pub fn popover_view(app: &App, p: &Pal) -> Vec<El> {
     let content = col().key(format!("plugin-popover-{key}")).on_press(|_: &mut App| {}).child(content);
     let mut out = vec![scrim, crate::popover::place(&app.diag.knobs, content, anchor, *side, *align, *gap)];
     out.extend(flyout_view(app, p, i, flyout));
-    out
+    wrap_popover_modal(app, out)
+}
+
+/// Wraps a plugin popover's scrim and surface in a raised modal scope when another Rune modal sits
+/// beneath `PLUGIN_TOP` and no `CHROME_POPUP` menu is open above the dialog, so outside clicks and
+/// the popover surface are not blocked by the modal underneath.
+fn wrap_popover_modal(app: &App, out: Vec<El>) -> Vec<El> {
+    if !crate::popup::modal_open_below_popup(app) || app.popup.is_open() {
+        return out;
+    }
+    vec![
+        el().key("plugin-popover-modal")
+            .role("none")
+            .absolute(0.0, 0.0)
+            .w_full()
+            .h_full()
+            .transition(rune::Transition::none())
+            .modal_tx(false, requests::close_popover)
+            .children(out)
+            .raise(),
+    ]
 }
 
 /// The list a popover row opened, hung beside its row (drawn after the popover that holds the

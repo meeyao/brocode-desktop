@@ -24,5 +24,6 @@ pub mod style;
 pub mod tab;
 pub mod themes;
 pub mod toast;
+pub mod tooltip;
 pub mod video_overlay;
 pub mod widgets;

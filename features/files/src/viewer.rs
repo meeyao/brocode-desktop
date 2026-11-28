@@ -340,7 +340,7 @@ pub fn code_area<H: FilesHost + PopupHost + 'static>(
     }
     // One that can't play shows as another binary file, as Desktop's `decode.failed` does.
     if let Some(v) = clip.filter(|v| !matches!(v.player.state(), rune::PlayerState::Failed(_))) {
-        return out.child(video::stage(s, p, v));
+        return out.child(video::stage(s, p, session_id, path, v));
     }
     if rendered && markdown::is_markdown(path) && let Some(d) = doc {
         return out.child(over(

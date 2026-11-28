@@ -14,19 +14,21 @@ use super::{Incoming, Request, Server, Write, encode_component, list};
 use crate::model;
 use crate::wire_error::{WireError, WireKind};
 
-/// Initial retry delay after a drop or first failure, doubled up to [`BACKOFF_MAX_MS`].
-pub(super) const BACKOFF_MIN_MS: u64 = 250;
-pub(super) const BACKOFF_MAX_MS: u64 = 3_000;
+/// Official `connectTimeout = 2_000` (`packages/client/src/solid/connection.ts:32`): how long
+/// TCP connect + HTTP headers may take before aborting and retrying.
+pub(super) const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
+/// Official `reconnectDelay = 1_000` (`packages/client/src/solid/connection.ts:33`): flat 1 s
+/// delay between failed or dropped stream attempts, and the minimum uptime that resets `attempt`.
+pub(super) const RECONNECT_DELAY_MS: u64 = 1_000;
 
-/// Lifecycle of one `/api/event` stream worker.
-///
-/// Compared with the official app's `packages/client/src/solid/connection.ts`:
-/// - Matches `defaultIdleTimeout = 45_000` (`EVENTS_IDLE`), gating readiness on the first
-///   `server.connected` event, and distinguishing initial open (`Incoming::Opened`) from
+/// Lifecycle of one `/api/event` stream worker, matching `packages/client/src/solid/connection.ts`:
+/// - `connectTimeout = 2_000` (`CONNECT_TIMEOUT`), `reconnectDelay = 1_000` (`RECONNECT_DELAY_MS`),
+///   `defaultIdleTimeout = 45_000` (`EVENTS_IDLE`).
+/// - Readiness gated on `server.connected`; distinguishes initial open (`Incoming::Opened`) from
 ///   reconnects (`Incoming::Reconnected`).
-/// - Deliberately differs in backoff (`250 ms` doubling to `3_000 ms`, reset on `server.connected`
-///   rather than official's flat `1_000 ms` reset after 1 s connected), native reach-watcher
-///   parking (`PARKED = 30 s` while TCP refuses), and error-wake deduplication (`last_error`).
+/// - Resets `attempt` to 0 only after a connection lasted at least `RECONNECT_DELAY_MS`.
+/// - Retries every `RECONNECT_DELAY_MS` with no exponential cap or 30 s reach-watcher parking;
+///   deliberate resyncs (`wake_reconnects` / `streams::verify`) interrupt the wait immediately.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum StreamState {
     /// First attempt of a fresh stream, awaiting HTTP headers and `server.connected`.
@@ -35,17 +37,15 @@ pub(super) enum StreamState {
     /// Subsequent attempt (after a failure, drop, or `streams::verify` takeover), awaiting HTTP
     /// headers and `server.connected`. Handshake emits `Incoming::Reconnected`.
     Reconnecting {
-        /// Delay (ms) to wait if this attempt fails before opening.
-        backoff_ms: u64,
+        attempt: u32,
         /// Failure last reported to the window; an identical consecutive failure skips `wake()`.
         last_error: Option<WireError>,
     },
-    /// `server.connected` received; forwarding events to the inbox.
-    Open,
-    /// Waiting between failed or dropped attempts before opening the next connection.
+    /// `server.connected` received at `connected_at`; forwarding events to the inbox.
+    Open { connected_at: rune::time::Instant, attempt: u32 },
+    /// Waiting `RECONNECT_DELAY_MS` before opening the next connection.
     Waiting {
-        /// Backoff (ms) carried into the next `Reconnecting` attempt (`(wait_ms * 2).min(3000)`).
-        next_backoff_ms: u64,
+        attempt: u32,
         last_error: WireError,
     },
     /// Terminated (inbox closed or superseded by a newer epoch in `streams::verify`).
@@ -55,10 +55,10 @@ pub(super) enum StreamState {
 pub(super) enum StreamEvent {
     /// A non-heartbeat SSE `data:` frame parsed from the stream; `connected` is true iff its
     /// `type` is `"server.connected"`.
-    Frame { connected: bool },
+    Frame { connected: bool, now: rune::time::Instant },
     /// The connection attempt failed, timed out, returned an unexpected response, rejected
     /// handshake, or ended (EOF).
-    Failed(WireError),
+    Failed { error: WireError, now: rune::time::Instant },
     /// The retry sleep elapsed or was interrupted early by `wake_reconnects()`.
     WaitElapsed,
     /// The inbox closed or a newer `streams::verify` epoch took over.
@@ -80,54 +80,53 @@ pub(super) enum StreamEffect {
     RejectHandshake(WireError),
     /// Report `Incoming::StreamDown(error)` to `inbox`, waking the window iff `wake`.
     ReportDown { error: WireError, wake: bool },
-    /// Register the server with the reach watcher (no-op on `wasm32`).
-    WatchReach,
-    /// Wait `backoff_ms` (or `PARKED` on native when `server.refusing()`), interruptible by
-    /// `wake_reconnects()`, then feed `StreamEvent::WaitElapsed`.
-    Wait { backoff_ms: u64 },
+    /// Wait `delay_ms`, interruptible by `wake_reconnects()`, then feed `StreamEvent::WaitElapsed`.
+    Wait { delay_ms: u64 },
 }
 
 pub(super) fn stream_step(state: &mut StreamState, event: StreamEvent) -> Effects<StreamEffect> {
     match (std::mem::replace(state, StreamState::Closed), event) {
         (_, StreamEvent::Closed) | (StreamState::Closed, _) => Effects::none(),
-        (StreamState::Initial, StreamEvent::Frame { connected: true }) => {
-            *state = StreamState::Open;
+        (StreamState::Initial, StreamEvent::Frame { connected: true, now }) => {
+            *state = StreamState::Open { connected_at: now, attempt: 0 };
             Effects::two(StreamEffect::DeliverHandshake(Handshake::Opened), StreamEffect::DeliverFrame)
         }
-        (StreamState::Initial, StreamEvent::Frame { connected: false }) => {
+        (StreamState::Initial, StreamEvent::Frame { connected: false, .. }) => {
             *state = StreamState::Initial;
             Effects::one(StreamEffect::RejectHandshake(handshake_error()))
         }
-        (StreamState::Reconnecting { .. }, StreamEvent::Frame { connected: true }) => {
-            *state = StreamState::Open;
+        (StreamState::Reconnecting { attempt, .. }, StreamEvent::Frame { connected: true, now }) => {
+            *state = StreamState::Open { connected_at: now, attempt };
             Effects::two(StreamEffect::DeliverHandshake(Handshake::Reconnected), StreamEffect::DeliverFrame)
         }
-        (StreamState::Reconnecting { backoff_ms, last_error }, StreamEvent::Frame { connected: false }) => {
-            *state = StreamState::Reconnecting { backoff_ms, last_error };
+        (StreamState::Reconnecting { attempt, last_error }, StreamEvent::Frame { connected: false, .. }) => {
+            *state = StreamState::Reconnecting { attempt, last_error };
             Effects::one(StreamEffect::RejectHandshake(handshake_error()))
         }
-        (StreamState::Open, StreamEvent::Frame { .. }) => {
-            *state = StreamState::Open;
+        (StreamState::Open { connected_at, attempt }, StreamEvent::Frame { .. }) => {
+            *state = StreamState::Open { connected_at, attempt };
             Effects::one(StreamEffect::DeliverFrame)
         }
-        (StreamState::Initial | StreamState::Open, StreamEvent::Failed(error)) => {
-            let backoff_ms = BACKOFF_MIN_MS;
-            let next_backoff_ms = (backoff_ms * 2).min(BACKOFF_MAX_MS);
-            *state = StreamState::Waiting { next_backoff_ms, last_error: error.clone() };
-            let mut effects = Effects::two(StreamEffect::ReportDown { error, wake: true }, StreamEffect::WatchReach);
-            effects.push(StreamEffect::Wait { backoff_ms });
-            effects
+        (StreamState::Open { connected_at, attempt }, StreamEvent::Failed { error, now }) => {
+            // Reset attempt counter only when the stream stayed connected >= reconnectDelay
+            // (`packages/client/src/solid/connection.ts:158-159`).
+            let base = if now.duration_since(connected_at) >= Duration::from_millis(RECONNECT_DELAY_MS) { 0 } else { attempt };
+            let next_attempt = base.saturating_add(1);
+            *state = StreamState::Waiting { attempt: next_attempt, last_error: error.clone() };
+            Effects::two(StreamEffect::ReportDown { error, wake: true }, StreamEffect::Wait { delay_ms: RECONNECT_DELAY_MS })
         }
-        (StreamState::Reconnecting { backoff_ms, last_error }, StreamEvent::Failed(error)) => {
+        (StreamState::Initial, StreamEvent::Failed { error, .. }) => {
+            *state = StreamState::Waiting { attempt: 1, last_error: error.clone() };
+            Effects::two(StreamEffect::ReportDown { error, wake: true }, StreamEffect::Wait { delay_ms: RECONNECT_DELAY_MS })
+        }
+        (StreamState::Reconnecting { attempt, last_error }, StreamEvent::Failed { error, .. }) => {
             let wake = last_error.as_ref() != Some(&error);
-            let next_backoff_ms = (backoff_ms * 2).min(BACKOFF_MAX_MS);
-            *state = StreamState::Waiting { next_backoff_ms, last_error: error.clone() };
-            let mut effects = Effects::two(StreamEffect::ReportDown { error, wake }, StreamEffect::WatchReach);
-            effects.push(StreamEffect::Wait { backoff_ms });
-            effects
+            let next_attempt = attempt.saturating_add(1);
+            *state = StreamState::Waiting { attempt: next_attempt, last_error: error.clone() };
+            Effects::two(StreamEffect::ReportDown { error, wake }, StreamEffect::Wait { delay_ms: RECONNECT_DELAY_MS })
         }
-        (StreamState::Waiting { next_backoff_ms, last_error }, StreamEvent::WaitElapsed) => {
-            *state = StreamState::Reconnecting { backoff_ms: next_backoff_ms, last_error: Some(last_error) };
+        (StreamState::Waiting { attempt, last_error }, StreamEvent::WaitElapsed) => {
+            *state = StreamState::Reconnecting { attempt, last_error: Some(last_error) };
             Effects::none()
         }
         (prev, _) => {
@@ -196,19 +195,13 @@ pub(super) fn read_events(server: &Server, idle: Duration, inbox_tx: &Sender<Inc
     run_stream(&stream, stream.epoch(), false);
 }
 
-/// How long a stream whose server refuses connections waits before trying on its own: the
-/// reach watcher ([`super::reach`]) wakes it the moment the server accepts again, so this is only
-/// a backstop.
-#[cfg(not(target_arch = "wasm32"))]
-const PARKED: Duration = Duration::from_secs(30);
-
 /// Reads `stream` as `epoch` for as long as that's the thread that speaks for it; `resumed` when
 /// it takes over from an earlier read (its first open is a reconnect, and resyncs).
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) fn run_stream(stream: &super::streams::Stream, epoch: u64, resumed: bool) {
     let (server, inbox_tx, wake) = (&stream.server, &stream.inbox, &stream.wake);
     let mut state = if resumed {
-        StreamState::Reconnecting { backoff_ms: BACKOFF_MIN_MS, last_error: None }
+        StreamState::Reconnecting { attempt: 1, last_error: None }
     } else {
         StreamState::Initial
     };
@@ -226,7 +219,7 @@ pub(super) fn run_stream(stream: &super::streams::Stream, epoch: u64, resumed: b
             stream_step(&mut state, StreamEvent::Closed);
             return;
         };
-        for effect in stream_step(&mut state, StreamEvent::Failed(e)) {
+        for effect in stream_step(&mut state, StreamEvent::Failed { error: e, now: rune::time::Instant::now() }) {
             match effect {
                 StreamEffect::ReportDown { error, wake: news } => {
                     // Sent either way: a closed inbox is how this thread learns its window went.
@@ -238,9 +231,8 @@ pub(super) fn run_stream(stream: &super::streams::Stream, epoch: u64, resumed: b
                         wake();
                     }
                 }
-                StreamEffect::WatchReach => server.watch_reach(None),
-                StreamEffect::Wait { backoff_ms } => {
-                    let wait = if server.refusing() { PARKED } else { Duration::from_millis(backoff_ms) };
+                StreamEffect::Wait { delay_ms } => {
+                    let wait = Duration::from_millis(delay_ms);
                     let _wait = RETRY
                         .1
                         .wait_timeout_while(RETRY.0.lock().unwrap_or_else(PoisonError::into_inner), wait, |g| *g == generation)
@@ -311,7 +303,6 @@ pub(super) fn spawn_workers(server: &Server, inbox_tx: &Sender<Incoming>, wake: 
                     let mut forked = None;
                     let prompt_id = match &w {
                         Write::Send { session, prompt }
-                        | Write::SendMovingHome { session, prompt }
                         | Write::SendFromRevert { session, prompt }
                         | Write::StartAs { session, prompt, .. }
                         | Write::StartInNewWorktree { session, prompt, .. } => {
@@ -358,7 +349,6 @@ pub(super) fn spawn_workers(server: &Server, inbox_tx: &Sender<Incoming>, wake: 
                             }
                             server.send_prepared(&session, &prompt, request).map(|_| ())
                         }
-                        Write::SendMovingHome { session, prompt } => server.send_moving_home(&session, &prompt).map(|_| ()),
                         Write::Start { directory, prompt } => server.create_session(&directory).and_then(|mut info| {
                             wait_after_create(&inbox_tx, &wake, &info);
                             server.send(&info.id, &prompt)?;
@@ -506,6 +496,10 @@ pub(super) fn spawn_workers(server: &Server, inbox_tx: &Sender<Incoming>, wake: 
                             Some(location) => send(Incoming::DefaultDirectory(location.directory)),
                             None => true,
                         },
+                        Request::Flags { directory } => {
+                            let flags = server.flags(directory.as_deref()).unwrap_or_default();
+                            send(Incoming::Flags { directory, flags })
+                        }
                         Request::Info(id) => match server.get(&format!("/api/session/{id}")) {
                             Ok(v) => send(Incoming::Info(model::parse_session(v.get("data").unwrap_or(&v)))),
                             Err(e) => send(Incoming::Failed(e)),

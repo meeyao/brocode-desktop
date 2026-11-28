@@ -81,10 +81,14 @@ pub(crate) struct UsageInputs {
 /// Each session's last step with token usage, and the inputs it was read from.
 pub(crate) type CachedUsage = (UsageInputs, Option<usize>);
 
-/// Session `id`'s step whose tokens fill the context window (`session_view::usage`).
-fn last_usage<'a>(app: &'a App, id: &str) -> Option<(&'a opencode_kit::model::Assistant, &'a opencode_kit::model::Tokens)> {
-    let info = app.session(id)?;
-    let t = rune::Tracked::untracked(&app.transcripts).get(&info.id)?;
+/// Session `info`'s step whose tokens fill the context window (`session_view::usage`).
+fn last_usage_for<'a>(
+    app: &'a App,
+    info: &'a opencode_kit::model::SessionInfo,
+    t: Option<&'a opencode_kit::model::Transcript>,
+) -> Option<(&'a opencode_kit::model::Assistant, &'a opencode_kit::model::Tokens)> {
+    let t = t?;
+    let id = info.id.as_str();
     let key = UsageInputs {
         server: crate::servers::runtime::active(app).clone(),
         transcripts: Stamp::of(&app.transcripts),
@@ -97,6 +101,13 @@ fn last_usage<'a>(app: &'a App, id: &str) -> Option<(&'a opencode_kit::model::As
     let at = session_view::usage::last_with_usage_at(t, info.revert.as_deref(), |m| app.holds(id, m));
     app.plugins.last_usage.borrow_mut().insert(id.to_owned(), (key, at));
     session_view::usage::at(t, at?)
+}
+
+/// Session `id`'s step whose tokens fill the context window (`session_view::usage`).
+fn last_usage<'a>(app: &'a App, id: &str) -> Option<(&'a opencode_kit::model::Assistant, &'a opencode_kit::model::Tokens)> {
+    let info = app.session(id)?;
+    let t = rune::Tracked::untracked(&app.transcripts).get(&info.id);
+    last_usage_for(app, info, t)
 }
 
 /// Session `info`'s project ID as Desktop's `MountedSession.project` resolves it
@@ -126,15 +137,22 @@ fn last_error_status(t: Option<&opencode_kit::model::Transcript>) -> Option<u16>
 /// `watch::SessionInputs` tracks the shared inputs. Only this session reads its transcript.
 pub fn session_version(app: &App, id: &str) -> u64 {
     let Some(info) = app.session(id) else { return 0 };
-    let t = rune::Tracked::untracked(&app.transcripts).get(&info.id);
-    let last = last_usage(app, id);
+    session_version_for(app, info, app.subtree_running(&info.id))
+}
+
+/// Fast path for bulk `Sessions.Changed` sweeps that already hold `info` and a precomputed
+/// `subtree_running` bit, avoiding repeated catalog lookups and ancestor walks per session.
+pub(super) fn session_version_for(app: &App, info: &opencode_kit::model::SessionInfo, busy: bool) -> u64 {
+    let id = info.id.as_str();
+    let t = rune::Tracked::untracked(&app.transcripts).get(id);
+    let last = last_usage_for(app, info, t);
     let cost = app.session_cost(id);
     let messages = t.map(|t| t.messages.len());
     let usage = last.map(|(_, k)| (k.input, k.output, k.reasoning, k.cache_read, k.cache_write));
     let mut h = std::hash::DefaultHasher::new();
-    (&info.title, info.updated, cost.to_bits(), messages, last_error_status(t), app.subtree_running(&info.id), usage, last.map(|(a, _)| (&a.id, a.completed)), (&info.model.provider, &info.model.id, &info.model.variant, &info.agent, session_project_id(app, info), app.held(id))).hash(&mut h);
+    (&info.title, info.updated, cost.to_bits(), messages, last_error_status(t), busy, usage, last.map(|(a, _)| (&a.id, a.completed)), (&info.model.provider, &info.model.id, &info.model.variant, &info.agent, session_project_id(app, info), app.held(id))).hash(&mut h);
     // The Context tab lists the inbox's waiting input too.
-    messages_version(app, id).hash(&mut h);
+    messages_version_for(app, Some(info.updated), t, id).hash(&mut h);
     h.finish()
 }
 
@@ -142,9 +160,20 @@ pub fn session_version(app: &App, id: &str) -> u64 {
 /// pages or the reader scrolls: its newest message and whether it finished, the inbox's waiting
 /// input, and the server's last change.
 fn messages_version(app: &App, id: &str) -> u64 {
+    let updated = app.session(id).map(|i| i.updated);
+    let t = rune::Tracked::untracked(&app.transcripts).get(id);
+    messages_version_for(app, updated, t, id)
+}
+
+fn messages_version_for(
+    app: &App,
+    updated: Option<i64>,
+    t: Option<&opencode_kit::model::Transcript>,
+    id: &str,
+) -> u64 {
     let mut h = std::hash::DefaultHasher::new();
-    app.session(id).map(|i| i.updated).hash(&mut h);
-    if let Some(m) = rune::Tracked::untracked(&app.transcripts).get(id).and_then(|t| t.messages.last()) {
+    updated.hash(&mut h);
+    if let Some(m) = t.and_then(|t| t.messages.last()) {
         m.id().hash(&mut h);
         if let opencode_kit::model::Message::Assistant(a) = m {
             a.completed.hash(&mut h);
@@ -543,6 +572,6 @@ fn theme(lua: &Lua, vmx: &Rc<Vmx>, t: &Table) -> mlua::Result<()> {
         let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
         Ok(format!("#{:02x}{:02x}{:02x}{:02x}", byte(c.r), byte(c.g), byte(c.b), byte(c.a)))
     })?;
-    method(lua, t, "Font", |_, family: String| Ok(if family == "mono" { "IBM Plex Mono" } else { "Inter" }))?;
+    method(lua, t, "Font", |_, family: String| Ok(if family == "mono" { "OpenMono" } else { "Inter" }))?;
     lazy_signals(lua, vmx, t, "Theme", &["Changed"])
 }

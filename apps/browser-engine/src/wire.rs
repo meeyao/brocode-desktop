@@ -66,6 +66,10 @@ pub struct TabSnapshot {
     /// `replaceState` and hash changes. `0` from engines before it existed.
     #[serde(default)]
     pub document: u64,
+    /// Whether this tab has active audio playback (`HTMLMediaElement` / `AudioContext` via
+    /// `TabMediaGate`) or active camera/microphone capture (`DisplayHandler::on_media_access_change`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub audible: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,6 +117,8 @@ pub enum HostMsg {
         extensions: bool,
         #[serde(default)]
         download_save: bool,
+        #[serde(default)]
+        tab_lifecycle: bool,
     },
     OpenTab {
         tab_id: u64,
@@ -155,6 +161,16 @@ pub enum HostMsg {
     SetTabPolicy { tab_id: u64, file_roots: Vec<String> },
     CloseTab { tab_id: u64 },
     FocusTab { tab_id: u64 },
+    /// Exact set of currently visible pane tabs (`vec![]` when panel closed, on Home/Settings, or hidden).
+    SetVisibleTabs { tab_ids: Vec<u64> },
+    /// Explicit agent RPC unthrottle hold, decoupled from security-sticky `agent_driven`.
+    SetTabUnthrottled { tab_id: u64, active: bool },
+    /// Freezes (`frozen: true`) or unfreezes (`frozen: false`) a hidden tab via Chromium Page
+    /// Lifecycle (`Page.setWebLifecycleState` + `Memory.simulatePressureNotification`).
+    FreezeTab { tab_id: u64, frozen: bool },
+    /// Closes the underlying CEF browser for `tab_id` to reclaim its renderer process while
+    /// preserving completed downloads, staged uploads, and `ExtensionHost` discarded tab state.
+    HibernateTab { tab_id: u64 },
     Navigate { tab_id: u64, url: String },
     Back { tab_id: u64 },
     Forward { tab_id: u64 },
@@ -166,6 +182,7 @@ pub enum HostMsg {
     Stop { tab_id: u64 },
     SetZoom { tab_id: u64, factor: f64 },
     SetColorScheme { dark: bool },
+    SetFrameRate { fps: u32 },
     Resize { tab_id: u64, width_pt: f32, height_pt: f32, scale: f32 },
     Emulate { tab_id: u64, device: Option<device::Device>, scale: f32 },
     MouseMove { tab_id: u64, x: f32, y: f32, mods: u8, leave: bool },
@@ -173,6 +190,12 @@ pub enum HostMsg {
     Wheel { tab_id: u64, x: f32, y: f32, dx: f32, dy: f32, mods: u8 },
     Key { tab_id: u64, down: bool, text: Option<String>, named: Option<String>, mods: u8 },
     EditCmd { tab_id: u64, cmd: String },
+    /// Reads the focused frame's selected text (and deletes it when `cut` and editable) without
+    /// touching CEF's OS clipboard; emits `EngineMsg::CopiedText` (#1308).
+    CopySelection { tab_id: u64, cut: bool },
+    /// Inserts plain text from the host clipboard into the focused frame without reading CEF's
+    /// OS clipboard (#1308).
+    PasteText { tab_id: u64, text: String },
     Ime { tab_id: u64, commit: Option<String>, preedit: Option<String> },
     SetInspect { tab_id: u64, enabled: bool },
     HighlightNode { tab_id: u64, backend_node_id: Option<i64> },
@@ -387,9 +410,24 @@ pub enum EngineMsg {
         /// `PageContextMenu.{spellcheck, languages, dictionaries}`.
         #[serde(default)]
         menu_extras: bool,
+        /// The engine supports `SetVisibleTabs` and `SetTabUnthrottled` tab visibility lifecycle.
+        #[serde(default)]
+        tab_lifecycle: bool,
+        /// The engine supports `FreezeTab`, `HibernateTab`, and `ExtensionWakeTab`.
+        #[serde(default)]
+        tab_hibernation: bool,
+        /// The engine supports host-bridged text copy/cut/paste (`CopySelection`, `PasteText`,
+        /// `CopiedText`, and `ContextMenuCommand::{CopyToHost, CutToHost}`).
+        #[serde(default)]
+        host_clipboard: bool,
+        /// Linux: CEF initialized with X11 Ozone (`ozone-platform=x11`), whose clipboard is X11.
+        #[serde(default)]
+        x11_clipboard: bool,
     },
     /// Copy image's result: the image under the menu, as PNG (base64), for the app's clipboard.
     CopiedImage { tab_id: u64, png_b64: String },
+    /// Selected text copied or cut by the user for the host app's clipboard (#1308).
+    CopiedText { tab_id: u64, text: String },
     /// A tab whose first navigation became the person's download, now placed (or cancelled):
     /// nothing to show (official `chromium.ts:1076-1083`).
     DownloadOnlyTab { tab_id: u64 },
@@ -498,6 +536,17 @@ pub enum EngineMsg {
     },
     ExtensionFocusTab {
         tab_id: u64,
+    },
+    /// An extension targeted a discarded (hibernated) tab (`chrome.tabs.{update,reload,highlight}`);
+    /// asks the app to wake `tab_id` and apply the requested focus/navigation/reload.
+    ExtensionWakeTab {
+        tab_id: u64,
+        #[serde(default)]
+        focus: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+        #[serde(default)]
+        reload: bool,
     },
     ExtensionFiltersReady,
     ExtensionUninstalled {
@@ -795,6 +844,10 @@ pub enum ContextMenuCommand {
     HardReload,
     Cut,
     Copy,
+    /// Cut routed through the host clipboard (`CopiedText` + `frame.del()`, never touching X11).
+    CutToHost,
+    /// Copy routed through the host clipboard (`CopiedText`, never touching X11).
+    CopyToHost,
     Paste,
     PastePlain,
     SelectAll,

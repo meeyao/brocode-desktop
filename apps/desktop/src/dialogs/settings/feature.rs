@@ -42,6 +42,7 @@ impl App {
 
     pub(crate) fn change_settings(&mut self, f: impl FnOnce(&mut Settings)) {
         change_settings(self, f);
+        crate::background_notice::sync_keep_running(self.settings.keep_service_running);
     }
 
     pub fn set_show_agent(&mut self, on: bool) {

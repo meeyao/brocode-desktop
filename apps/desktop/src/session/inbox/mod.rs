@@ -1,4 +1,5 @@
 pub mod branches;
+pub mod focus;
 pub mod model;
 pub mod moves;
 pub mod order;

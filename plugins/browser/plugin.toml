@@ -2,7 +2,7 @@
 id = "browser"
 name = "Browser"
 version = "1.1.0"
-contract = "1.11"
+contract = "1.13"
 description = "Web pages in a session's side region: a tab per page with its address bar, options menu, device toolbar, settings and new tab page, Open browser and the pane's keys, the + menu's Browser row, the element picker's notes, the history, and the agent's browser tools"
 entry = "init.luau"
 app = "app.luau"

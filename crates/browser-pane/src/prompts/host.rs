@@ -256,6 +256,11 @@ impl crate::BrowserHost {
         self.copied_images.drain(..)
     }
 
+    /// Host-bridged text copy/cut results from the engine, for the app's clipboard (#1308).
+    pub fn drain_copied_texts(&mut self) -> impl Iterator<Item = String> + '_ {
+        self.copied_texts.drain(..)
+    }
+
     /// Tabs whose first navigation became the person's download and has its place.
     pub fn drain_download_only_tabs(&mut self) -> impl Iterator<Item = u64> + '_ {
         self.download_only_tabs.drain(..)
@@ -298,7 +303,18 @@ impl crate::BrowserHost {
         for (tab_id, id) in expired {
             self.send(HostMsg::AnswerPermission { tab_id, id, allow: false, dismiss: true, persist: false });
         }
-        let next = self.tabs.iter().filter_map(|t| t.prompts.wake_at()).min();
+        for t in &mut self.tabs {
+            if let crate::scroll_cursor::ScrollCursorEffect::Apply(cursor) =
+                t.scroll_cursor.step(crate::scroll_cursor::ScrollCursorEvent::Tick { now })
+                && t.cursor != cursor
+            {
+                t.cursor = cursor;
+                changed = true;
+            }
+        }
+        let prompt_next = self.tabs.iter().filter_map(|t| t.prompts.wake_at()).min();
+        let cursor_next = self.tabs.iter().filter_map(|t| t.scroll_cursor.wake_at()).min();
+        let next = prompt_next.into_iter().chain(cursor_next).min();
         (changed, next)
     }
 
@@ -307,6 +323,7 @@ impl crate::BrowserHost {
     pub(crate) fn clear_prompts_on_disconnect(&mut self) {
         for t in &mut self.tabs {
             t.prompts.reset_for_engine();
+            t.scroll_cursor = Default::default();
         }
         self.context_menus.clear();
         self.popup_opens.clear();
@@ -497,6 +514,13 @@ impl crate::BrowserHost {
                 // Only for a tab this app opened; at most a few waiting (each is one person's click).
                 if self.tabs.iter().any(|t| t.id == tab_id) && self.copied_images.len() < 4 {
                     self.copied_images.push_back(png_b64);
+                }
+                true
+            }
+            EngineMsg::CopiedText { tab_id, text } => {
+                let known = self.tabs.iter().any(|t| t.id == tab_id) || self.popup_tab_id() == Some(tab_id);
+                if known && !text.is_empty() && self.copied_texts.len() < 8 {
+                    self.copied_texts.push_back(text);
                 }
                 true
             }

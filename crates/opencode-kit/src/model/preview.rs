@@ -23,6 +23,15 @@ pub const VERSION: u8 = 2;
 /// copy fills it in once it answers): a preview stays a few pages of the database.
 const INLINE_MAX: usize = 32 * 1024;
 
+fn varint_len(mut v: usize) -> usize {
+    let mut n = 1;
+    while v >= 0x80 {
+        v >>= 7;
+        n += 1;
+    }
+    n
+}
+
 /// Encodes `messages`, oldest first.
 pub fn encode(messages: &[Message]) -> Vec<u8> {
     let mut w = W(Vec::with_capacity(4096));
@@ -32,6 +41,86 @@ pub fn encode(messages: &[Message]) -> Vec<u8> {
         message(&mut w, m);
     }
     w.0
+}
+
+/// Encodes the longest suffix of `messages` whose serialized length fits in `max_bytes`, always
+/// keeping at least the last message when `messages` is non-empty. Walks backwards once instead of
+/// repeatedly re-encoding shrinking suffixes (O(max_bytes) instead of O(N²)).
+pub fn encode_suffix_within(messages: &[Message], max_bytes: usize) -> Vec<u8> {
+    if messages.is_empty() {
+        return encode(&[]);
+    }
+    let mut chunks: Vec<Vec<u8>> = Vec::new();
+    let mut body_len = 0usize;
+    for m in messages.iter().rev() {
+        let next_count = chunks.len() + 1;
+        if !chunks.is_empty()
+            && 1usize
+                .saturating_add(varint_len(next_count))
+                .saturating_add(body_len)
+                >= max_bytes
+        {
+            break;
+        }
+        let mut one = W(Vec::new());
+        message(&mut one, m);
+        let next_total = 1usize
+            .saturating_add(varint_len(next_count))
+            .saturating_add(body_len)
+            .saturating_add(one.0.len());
+        if !chunks.is_empty() && next_total > max_bytes {
+            break;
+        }
+        body_len += one.0.len();
+        chunks.push(one.0);
+    }
+    let mut w = W(Vec::with_capacity(1 + varint_len(chunks.len()) + body_len));
+    w.0.push(VERSION);
+    w.n(chunks.len());
+    for chunk in chunks.iter().rev() {
+        w.0.extend_from_slice(chunk);
+    }
+    w.0
+}
+
+/// Encodes at least `min_count` messages from the start of `messages`, then appends further
+/// messages while the total length stays within `grow_limit`. Returns `None` if the encoded
+/// result exceeds `hard_limit` (aborting early without encoding the full slice).
+pub fn encode_prefix_within(
+    messages: &[Message],
+    min_count: usize,
+    grow_limit: usize,
+    hard_limit: usize,
+) -> Option<Vec<u8>> {
+    let min_count = min_count.min(messages.len());
+    let mut body = W(Vec::with_capacity(4096.min(hard_limit)));
+    for m in &messages[..min_count] {
+        message(&mut body, m);
+        if 1 + varint_len(min_count) + body.0.len() > hard_limit {
+            return None;
+        }
+    }
+    let mut count = min_count;
+    for m in &messages[min_count..] {
+        if 1 + varint_len(count + 1) + body.0.len() >= grow_limit {
+            break;
+        }
+        let prev = body.0.len();
+        message(&mut body, m);
+        if 1 + varint_len(count + 1) + body.0.len() > grow_limit {
+            body.0.truncate(prev);
+            break;
+        }
+        count += 1;
+    }
+    if 1 + varint_len(count) + body.0.len() > hard_limit {
+        return None;
+    }
+    let mut w = W(Vec::with_capacity(1 + varint_len(count) + body.0.len()));
+    w.0.push(VERSION);
+    w.n(count);
+    w.0.extend_from_slice(&body.0);
+    Some(w.0)
 }
 
 /// Decodes what [`encode`] wrote, putting each user message's files, path cards, comments,

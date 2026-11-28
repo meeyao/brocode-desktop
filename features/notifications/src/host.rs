@@ -71,11 +71,6 @@ pub trait NotificationsHost: opencode_kernel::AppEnv {
     fn is_root_session(&self, session_id: &str) -> bool {
         self.root_session_id(session_id) == session_id
     }
-    /// Whether any direct child session of `session_id` is currently running.
-    fn has_running_child(&self, session_id: &str) -> bool {
-        let _ = session_id;
-        false
-    }
     /// Whether `session_id` (or its root) is muted and should not post notifications.
     fn is_session_silenced(&self, session_id: &str) -> bool {
         let _ = session_id;
@@ -113,6 +108,15 @@ pub trait NotificationsHost: opencode_kernel::AppEnv {
         let _ = session_id;
     }
 
+    /// Brings the posting window forward and focuses it after a click on the notification itself.
+    ///
+    /// `token` is the platform activation token supplied with the click (`Click::activation_token`,
+    /// such as an XDG activation token on Wayland or startup ID on X11), if any. Defaults to
+    /// `rune_notify::bring_to_front()`.
+    fn activate_window(&mut self, token: Option<&str>) {
+        let _ = token;
+        rune_notify::bring_to_front();
+    }
     /// Opens `session_id` on `server` after a notification click (closing Settings, switching
     /// servers if needed, and navigating to the session).
     fn open_session_from_notification(&mut self, server: &ServerKey, session_id: &str, tx: &mut Tx) {

@@ -1,6 +1,11 @@
 //! Execute: "Execute" and its latest (or failed) nested call; open, a row per nested call
 //! (`ExecuteCallRow`), its result (`ExecuteOutputRow`), and a runtime failure under the call that
 //! raised it. A View code button beside the trigger opens the script (`ExecuteDetails`).
+//!
+//! Under `full_codemode` (`anomalyco/opencode#66509`, `tool-renderer.tsx:2110-2460`,
+//! `message-part.css:1213-1240`), execute draws in the flat layout: a static muted title locked
+//! open over flush-left calls in the UI sans face (with failure warnings after the call name),
+//! and `Output` moving after the script's file changes when those changes draw right after it.
 
 use opencode_kit::model::ToolStatus;
 use rune::{El, Tx, col, el, icon, row, text};
@@ -8,52 +13,104 @@ use serde_json::Value;
 
 use super::console::{capped, console};
 use super::plain::{linked, one_line, strip_ansi};
-use super::{Call, Ctx, Display, Press, Trigger, body, disclosure, field, output, sub_key, trigger};
+use super::{Call, Ctx, Display, Fold, Press, Trigger, body, disclosure, field, output, sub_key, trigger};
 use crate::TimelineHost;
 use crate::focus::FocusExt;
 use crate::palette::Pal;
-use crate::style::{INSTANT, TOOL_CODE, readable};
+use crate::style::{INSTANT, TOOL_CODE, UI, readable};
 
-pub fn execute<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call) -> El {
-    let calls = calls(c.metadata);
+/// What a script returned, shown as its Output row (`scriptOutputText`, `tool-renderer.tsx:1071`).
+/// A failure shows on its failing row instead.
+pub fn script_output_text(c: &Call) -> String {
+    if error(c).is_some() {
+        return String::new();
+    }
+    strip_ansi(output(c)).replace("\r\n", "\n").replace('\r', "\n").trim().to_owned()
+}
+
+pub fn execute<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, c: &Call, after_changes: bool) -> El {
+    let raw_calls = c.metadata["toolCalls"].as_array().map(Vec::as_slice).unwrap_or(&[]);
+    let any_calls = raw_calls.iter().any(|v| v["tool"].is_string());
     let error = error(c);
-    let out = if error.is_some() { "" } else { output(c).trim() };
-    let opens = !calls.is_empty() || error.is_some() || !out.is_empty();
-    let d = Display::of(s, cx, c, opens);
-    let subtitle = (!d.open()).then(|| subtitle(&calls)).flatten();
+    let flat = s.full_codemode(cx.session);
+    // When its changes are drawn right after it under `full_codemode`, its Output row follows
+    // them: steps, changes, then Output (`tool-renderer.tsx:2126`).
+    let out = if error.is_some() || (flat && after_changes) { String::new() } else { script_output_text(c) };
+    let output_here = !out.is_empty();
+    let opens = any_calls || error.is_some() || output_here;
+    let mut d = Display::of(s, cx, c, opens);
+    if flat {
+        // Flat, the title is static and the calls always show under it: the block never collapses
+        // (`tool-renderer.tsx:2155-2167`).
+        d.fold = if opens { Fold::Expanded } else { Fold::Collapsed };
+    }
+    let subtitle = (!flat && !d.open() && any_calls).then(|| subtitle_raw(raw_calls)).flatten();
     let t = Trigger { title: opencode_i18n::t!("ui.tool.execute").into(), compact: true, subtitle, code: true, ..Default::default() };
-    let press = if opens { Press::Toggle(super::key(c.id)) } else { Press::None };
+    let press = if opens && !flat { Press::Toggle(super::key(c.id)) } else { Press::None };
     let code = field(c.input, "code").map(str::trim_end).filter(|code| !code.is_empty());
     // The script is whole once the model has written the call, so it can be read while it runs.
     let view_code = code.filter(|_| *c.status != ToolStatus::Pending).map(|_| view_code_button::<S>(p, cx.session, c.id));
-    disclosure(s, trigger(s, p, cx, c, d, t, press, view_code), d, || {
-        let owner = calls.iter().rposition(|v| v["status"] == "error");
+    let line = trigger(s, p, cx, c, d, t, press, view_code);
+    let build_body = || {
         // A script can make thousands of calls, so the list shows the latest and each press of "+N
         // more" reveals earlier ones (`executeCallsShown`, `executeCallsRevealed`, opencode#65696).
-        let presses = (1..).take_while(|k| s.expanded().contains(&sub_key(c.id, format!("more-{k}")))).count();
-        let hidden = calls.len().saturating_sub(CALLS_SHOWN + presses * CALLS_REVEALED);
+        let (presses, limit) = shown_calls(s, c.id);
+        let total = if any_calls { raw_calls.iter().filter(|v| v["tool"].is_string()).count() } else { 0 };
+        let hidden = total.saturating_sub(limit);
+        let owner = error.as_ref().and_then(|_| {
+            raw_calls
+                .iter()
+                .rev()
+                .filter(|v| v["tool"].is_string())
+                .enumerate()
+                .find(|(_, v)| v["status"] == "error")
+                .map(|(from_end, _)| total - 1 - from_end)
+        });
         let mut list = col().key(calls_key(c.id)).w_full().gap(6.0);
         if hidden > 0 {
-            list = list.child(more_button::<S>(p, c.id, presses + 1, hidden));
+            list = list.child(more_button::<S>(p, c.id, presses + 1, hidden, flat));
         }
-        for (n, call) in calls.iter().enumerate().skip(hidden) {
+        for (n, call) in raw_calls.iter().filter(|v| v["tool"].is_string()).enumerate().skip(hidden) {
             let err = if Some(n) == owner { error.as_deref() } else { None };
-            list = list.child(call_row(s, p, cx, c.id, n, Some(call), err));
+            list = list.child(call_row(s, p, cx, c.id, n, Some(call), err, flat));
         }
         // A failure with no call, or one that belongs to a call still hidden above, shows on its own.
         if let (true, Some(e)) = (owner.is_none_or(|o| o < hidden), error.as_deref()) {
-            list = list.child(call_row(s, p, cx, c.id, calls.len(), None, Some(e)));
+            list = list.child(call_row(s, p, cx, c.id, total, None, Some(e), flat));
         }
-        if !out.is_empty() {
-            list = list.child(output_row(s, p, cx.session, c.id, out));
+        if output_here {
+            list = list.child(output_row(s, p, cx.session, c.id, &out, flat));
         }
-        body(list, false, 4.0)
-    })
+        // Flat: 6 pt trigger bottom overhang + 2 pt = 8 pt `--execute-title-gap` (`timeline-next.css:503`).
+        body(list, false, if flat { 2.0 } else { 4.0 })
+    };
+    if flat {
+        let root = col().w_full().hover_group_focus().child(line);
+        if opens { root.child(build_body()) } else { root }
+    } else {
+        disclosure(s, line, d, build_body)
+    }
 }
 
 /// How many of a script's latest calls show when it opens, and how many more each "+N more" adds.
 const CALLS_SHOWN: usize = 10;
 const CALLS_REVEALED: usize = 50;
+
+/// How many "+N more" reveals are open on script `id`, and the resulting visible call count.
+pub fn shown_calls<S: TimelineHost>(s: &S, id: &str) -> (usize, usize) {
+    let presses = (1..).take_while(|k| s.expanded().contains(&sub_key(id, format!("more-{k}")))).count();
+    (presses, CALLS_SHOWN + presses * CALLS_REVEALED)
+}
+
+/// Whether Code Mode reported at least one nested call, without allocating.
+pub fn has_calls(metadata: &Value) -> bool {
+    metadata["toolCalls"].as_array().is_some_and(|a| a.iter().any(|v| v["tool"].is_string()))
+}
+
+/// Whether an `execute` call failed, without allocating or stripping ANSI.
+pub fn has_error(c: &Call) -> bool {
+    *c.status == ToolStatus::Error || c.metadata["error"] == Value::Bool(true)
+}
 
 /// The calls list of script `id`: its own key, so focus can be sent to its first call.
 fn calls_key(id: &str) -> String {
@@ -63,7 +120,7 @@ fn calls_key(id: &str) -> String {
 /// "+N more" above the shown calls, lined up with their names past the markers
 /// (`execute-tool-call-more`): faint, brighter under the pointer. Its `press`th press reveals the
 /// next calls.
-fn more_button<S: TimelineHost>(p: &Pal, id: &str, press: usize, hidden: usize) -> El {
+fn more_button<S: TimelineHost>(p: &Pal, id: &str, press: usize, hidden: usize, flat: bool) -> El {
     let label = opencode_i18n::plural!("ui.common.moreCount", hidden);
     let reveal = crate::disclosure::toggle::<S>(sub_key(id, format!("more-{press}")), format!("tool-{id}"));
     let (list, last) = (calls_key(id), hidden <= CALLS_REVEALED);
@@ -71,7 +128,7 @@ fn more_button<S: TimelineHost>(p: &Pal, id: &str, press: usize, hidden: usize) 
         .key("calls-more")
         .role("button")
         .label(label.clone())
-        .ml(20.0)
+        .ml(if flat { 0.0 } else { 20.0 })
         .radius(4.0)
         .cursor(rune::Cursor::Pointer)
         .focus_default(p)
@@ -88,11 +145,6 @@ fn more_button<S: TimelineHost>(p: &Pal, id: &str, press: usize, hidden: usize) 
         .child(text(label).font(TOOL_CODE).color(p.faint).group_color(p.text))
 }
 
-/// The nested calls Code Mode reported (`metadata.toolCalls`).
-pub fn calls(metadata: &Value) -> Vec<&Value> {
-    metadata["toolCalls"].as_array().map(|a| a.iter().filter(|v| v["tool"].is_string()).collect()).unwrap_or_default()
-}
-
 /// A runtime failure's message, without its "Error:" prefix; "Failed" when it says nothing.
 pub fn error(c: &Call) -> Option<String> {
     let failed = *c.status == ToolStatus::Error || c.metadata["error"] == Value::Bool(true);
@@ -105,8 +157,16 @@ pub fn error(c: &Call) -> Option<String> {
 }
 
 /// "read [path=ci/toolchain.env]": the failed call, else the latest.
-fn subtitle(calls: &[&Value]) -> Option<String> {
-    let call = calls.iter().find(|v| v["status"] == "error").or(calls.last())?;
+fn subtitle_raw(raw_calls: &[Value]) -> Option<String> {
+    let mut last = None;
+    let mut err = None;
+    for v in raw_calls.iter().filter(|v| v["tool"].is_string()) {
+        if err.is_none() && v["status"] == "error" {
+            err = Some(v);
+        }
+        last = Some(v);
+    }
+    let call = err.or(last)?;
     let tool = call["tool"].as_str()?;
     let args = call_args(call);
     Some(if args.is_empty() { tool.to_owned() } else { format!("{tool} [{}]", args.join(", ")) })
@@ -136,28 +196,37 @@ fn chevron(p: &Pal, open: bool) -> El {
 }
 
 /// One nested call: a marker, its tool (shimmering while it runs) and args; open, its input and
-/// its error. Its name and args brighten under the pointer when it opens.
-fn call_row<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, id: &str, n: usize, call: Option<&Value>, error: Option<&str>) -> El {
+/// its error. In the flat layout (`full_codemode`), no leading marker is drawn, names use the UI
+/// sans face, and a failed call's warning icon sits after its name (`tool-renderer.tsx:2434-2459`).
+#[allow(clippy::too_many_arguments)]
+fn call_row<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, id: &str, n: usize, call: Option<&Value>, error: Option<&str>, flat: bool) -> El {
     let failed = call.is_none_or(|c| c["status"] == "error");
     let entries = call.and_then(|c| c["input"].as_object());
     let opens = entries.is_some_and(|e| !e.is_empty()) || error.is_some();
     let k = sub_key(id, format!("call-{n}"));
     let open = opens && s.expanded().contains(&k);
-    let marker = if failed {
-        icon(&rune_theme_opencode::icons::OUTLINE_HEXAGONAL_WARNING, 14.0).color(p.danger).offset(0.0, 1.0)
-    } else {
-        text("›").font(TOOL_CODE).color(p.faint)
-    };
-    let mut line = row().key(format!("call-{n}")).w_full().gap(6.0).center_y().child(el().w(14.0).center().child(marker));
+    let warn_icon = || icon(&rune_theme_opencode::icons::OUTLINE_HEXAGONAL_WARNING, 14.0).color(p.danger).offset(0.0, 1.0);
+    let mut line = row().key(format!("call-{n}")).w_full().gap(6.0).center_y();
+    if !flat {
+        let marker = if failed { warn_icon() } else { text("›").font(TOOL_CODE).color(p.faint) };
+        line = line.child(el().w(14.0).center().child(marker));
+    }
     if let Some(c) = call {
         let name = c["tool"].as_str().unwrap_or("");
         let running = c["status"] == "running";
+        // Flat names inherit `--line-height-base` (20 px) from `execute-tool-calls` (`message-part.css:352,485-490`).
+        let name_font = if flat { UI.lh(20.0) } else { TOOL_CODE };
         let shown = if running && cx.live {
-            crate::working::shimmer(s, p, name, TOOL_CODE, 0.0)
+            crate::working::shimmer(s, p, name, name_font, 0.0)
         } else {
-            text(name.to_owned()).font(TOOL_CODE).color(p.text)
+            text(name.to_owned()).font(name_font).color(p.text)
         };
         line = line.child(shown.key("name"));
+    }
+    // Flat: after the name so every call's name lines up with the title; a failure without a call
+    // leads with it (`tool-renderer.tsx:2453-2458`).
+    if flat && failed {
+        line = line.child(el().key("warn").w(14.0).center().child(warn_icon()));
     }
     let summary = match call {
         Some(c) => Some(call_args(c).join(", ")).filter(|a| !a.is_empty()).map(|a| format!("[{a}]")),
@@ -194,27 +263,33 @@ fn call_row<S: TimelineHost>(s: &S, p: &Pal, cx: Ctx, id: &str, n: usize, call: 
                     .child(readable(p, text(value).font(TOOL_CODE).color(p.text).wrap_anywhere()).shrink().min_w(0.0)),
             );
         }
-        // A hairline down the input's left, 4 pt in from the marker (`margin: 4px 0 2px 4px`).
+        // A hairline down the input's left, 4 pt in from the marker (flush left in flat mode).
         item = item.child(crate::disclosure::reveal(
             s.knobs(),
-            row().key("input-box").w_full().mt(4.0).mb(2.0).pl(4.0)
+            row().key("input-box").w_full().mt(4.0).mb(2.0).pl(if flat { 0.0 } else { 4.0 })
                 .child(el().key("rule").w(0.5).self_stretch().fill(p.border))
                 .child(capped(list).grow(1.0).min_w(0.0)),
         ));
     }
     if let Some(e) = error {
-        item = item.child(crate::disclosure::reveal(s.knobs(), capped(col().key("error").w_full().pl(20.0).mt(4.0).child(readable(p, linked::<S>(p, e, TOOL_CODE, p.danger))))));
+        item = item.child(crate::disclosure::reveal(
+            s.knobs(),
+            capped(col().key("error").w_full().pl(if flat { 0.0 } else { 20.0 }).mt(4.0).child(readable(p, linked::<S>(p, e, TOOL_CODE, p.danger)))),
+        ));
     }
     item
 }
 
 /// "Output · 3 lines"; open, a console of the script's result.
-fn output_row<S: TimelineHost>(s: &S, p: &Pal, session: &str, id: &str, out: &str) -> El {
+/// In the flat layout (`full_codemode`), omits the leading `›` marker, draws "Output" in muted UI
+/// sans, and aligns the expanded console flush left (`tool-renderer.tsx:2383-2398`,
+/// `message-part.css:1222-1231`).
+pub(crate) fn output_row<S: TimelineHost>(s: &S, p: &Pal, session: &str, id: &str, out: &str, flat: bool) -> El {
     let k = sub_key(id, "output");
     let open = s.expanded().contains(&k);
     let lines = out.split('\n').count();
-    let line = row()
-        .key("output-row")
+    let mut line = row()
+        .key(if flat { format!("output-row-{id}") } else { "output-row".into() })
         .w_full()
         .gap(6.0)
         .center_y()
@@ -225,12 +300,24 @@ fn output_row<S: TimelineHost>(s: &S, p: &Pal, session: &str, id: &str, out: &st
         .focus_default(p)
         .hover_group_focus()
         .hover_motion(INSTANT, INSTANT)
-        .on_press_tx(crate::disclosure::toggle::<S>(k, format!("tool-{id}")))
-        .child(el().w(14.0).center().child(chevron(p, open)))
-        .child(text(opencode_i18n::t!("ui.tool.execute.output")).key("name").font(TOOL_CODE).color(p.text))
+        .on_press_tx(crate::disclosure::toggle::<S>(k, format!("tool-{id}")));
+    if !flat {
+        line = line.child(el().w(14.0).center().child(chevron(p, open)));
+    }
+    let name_font = if flat { UI.lh(20.0) } else { TOOL_CODE };
+    let name_color = if flat { p.muted } else { p.text };
+    line = line
+        .child(text(opencode_i18n::t!("ui.tool.execute.output")).key("name").font(name_font).color(name_color))
         .child(text(opencode_i18n::plural!("ui.tool.execute.lines", lines)).key("args").font(TOOL_CODE).color(p.muted).group_color(p.text));
-    let c = col().key("output-item").w_full().child(line);
-    if open { c.child(crate::disclosure::reveal(s.knobs(), col().key("output").w_full().pl(20.0).mt(4.0).child(console(s, p, session, id, None, out)))) } else { c }
+    let c = col().key(if flat { format!("script-output-{id}") } else { "output-item".into() }).w_full().child(line);
+    if open {
+        c.child(crate::disclosure::reveal(
+            s.knobs(),
+            col().key("output").w_full().pl(if flat { 0.0 } else { 20.0 }).mt(4.0).child(console(s, p, session, id, None, out)),
+        ))
+    } else {
+        c
+    }
 }
 
 /// View code: a 24 pt ghost icon button that opens the script and its result in a dialog.

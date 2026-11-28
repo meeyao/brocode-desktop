@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 profdata=${LLVM_PROFDATA:-$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin/llvm-profdata}
 [ -x "$profdata" ] || { echo "no llvm-profdata at $profdata: rustup component add llvm-tools, or set LLVM_PROFDATA" >&2; exit 1; }
-work=$(mktemp -d -t startup-order)
+work=$(mktemp -d "${TMPDIR:-/tmp}/startup-order.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 case "$1" in
@@ -30,10 +30,14 @@ esac
 # Names without what changes from build to build: the crate hashes (Cs<hash>_), the back
 # references that count bytes across them (B<n>_) and thin LTO's suffix. link-order.sh takes the
 # same three out of a build's names before it looks them up here.
-out=$ROOT/apps/desktop/pgo/startup-order.txt
+out=${OPENCODE_RUNE_ORDER_OUT:-$ROOT/apps/desktop/pgo/startup-order.txt}
+reader="apps/desktop/scripts/link-order.sh"
+case "$(basename "$out")" in
+  *linux*) reader="apps/desktop/scripts/link-order-linux.sh" ;;
+esac
 {
   echo "# The functions a launch runs, in the order it first runs them: made by apps/desktop/scripts/startup-order.sh,"
-  echo "# read by apps/desktop/scripts/link-order.sh. Names are Rust v0 symbols without crate hashes."
+  echo "# read by $reader. Names are Rust v0 symbols without crate hashes."
   echo "# trained at ${OPENCODE_RUNE_TRAINED_AT:-$(git -C "$ROOT" rev-parse HEAD)}, $(rustc -V), $(date -u +%Y-%m-%d), from $# profile file(s)"
   awk '
     /^#/ || !NF { next }

@@ -505,8 +505,8 @@ return plugin.defineWindow(function(ctx)
                         ),
                         link(
                             "debug-bar-components",
-                            I18n:T("components.label"),
-                            I18n:T("components.tip"),
+                            I18n:T("lab.label"),
+                            I18n:T("lab.tip"),
                             v:Handler(function()
                                 Diagnostics:Set("components", true)
                             end)

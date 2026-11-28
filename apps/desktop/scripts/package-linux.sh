@@ -36,11 +36,63 @@ if [[ -z $scheme ]]; then
 fi
 scheme=${scheme,,}
 install -Dm755 "$bin" "$root/usr/bin/brocode"
+# Strip brocode (and libopencode_office.so below when built with office-library), removing
+# ~45 MB of .symtab/.strtab while keeping .eh_frame for panic unwinding. RPM disables __strip
+# globally so the bundled brocode-cli stays intact.
+if [ "${OPENCODE_RUNE_KEEP_SYMBOLS:-0}" != "1" ]; then
+  if command -v strip >/dev/null 2>&1; then
+    strip --strip-unneeded "$root/usr/bin/brocode"
+    "$root/usr/bin/brocode" --unwind-check >/dev/null
+  else
+    echo "package-linux: strip not found; shipping unstripped brocode" >&2
+  fi
+fi
+# Probe the staged binary itself to determine whether it expects the external office library:
+# a non-office-library build succeeds with "in the exe" (ignoring any stale .so in target/);
+# an office-library build fails before the .so is installed and requires it beside $bin.
+office=0
+office_rpm_files=""
+office_lib="$(dirname "$bin")/libopencode_office.so"
+if office_out=$("$root/usr/bin/brocode" --office-check 2>&1); then
+  case "$office_out" in
+    *"in the exe"*)
+      if [ -f "$office_lib" ]; then
+        echo "package-linux: ignoring stale $office_lib (binary has office engines linked in)" >&2
+      fi
+      ;;
+    *)
+      echo "package-linux: unexpected --office-check output before library install: $office_out" >&2
+      exit 1
+      ;;
+  esac
+else
+  if [ ! -f "$office_lib" ]; then
+    echo "package-linux: binary requires office library (--office-check: $office_out), but $office_lib is missing" >&2
+    exit 1
+  fi
+  install -Dm755 "$office_lib" "$root/usr/lib/brocode/libopencode_office.so"
+  if [ "${OPENCODE_RUNE_KEEP_SYMBOLS:-0}" != "1" ]; then
+    if command -v strip >/dev/null 2>&1; then
+      strip --strip-unneeded "$root/usr/lib/brocode/libopencode_office.so"
+    else
+      echo "package-linux: strip not found; shipping unstripped libopencode_office.so" >&2
+    fi
+  fi
+  office_out=$("$root/usr/bin/brocode" --office-check 2>&1) || {
+    echo "package-linux: staged --office-check failed: $office_out" >&2
+    exit 1
+  }
+  [[ "$office_out" == *"in their library, loaded"* ]] || {
+    echo "package-linux: expected office library to load, got: $office_out" >&2
+    exit 1
+  }
+  office=1
+  office_rpm_files=$'%dir /usr/lib/brocode\n/usr/lib/brocode/libopencode_office.so'
+fi
 cli_rpm_files=""
 if [ "${OPENCODE_RUNE_BUNDLE_CLI:-1}" != "0" ]; then
-  bash "$repo_root/scripts/guardrails/run-js.sh" "$repo_root/scripts/fetch-cli.mjs" \
-    --target "linux-$arch" --dest "$root/usr/share/brocode" --channel "$OPENCODE_RUNE_BUILD_CHANNEL"
-  cli_rpm_files=$'/usr/share/brocode/opencode-cli\n/usr/share/brocode/opencode-cli.version'
+  bash "$repo_root/scripts/fetch-brocode-cli.sh" "brocode-linux-$arch" "$root/usr/share/brocode"
+  cli_rpm_files=$'/usr/share/brocode/brocode-cli\n/usr/share/brocode/brocode-cli.version'
 fi
 install -Dm644 "$(dirname "$0")/../assets/icon/icon-1024.png" "$root/usr/$icon"
 install -Dm644 "$repo_root/LICENSE" "$root/usr/$doc/LICENSE"
@@ -87,6 +139,16 @@ mksquashfs "$work/AppDir" "$work/app.squashfs" -root-owned -noappend -comp gzip 
 cat "$work/runtime" "$work/app.squashfs" > "$stem.AppImage"
 chmod +x "$stem.AppImage"
 [[ $(cd "$work" && "$stem.AppImage" --appimage-extract-and-run --version) == "$expected" ]]
+if [ "$office" = "1" ]; then
+  office_out=$(cd "$work" && "$stem.AppImage" --appimage-extract-and-run --office-check 2>&1) || {
+    echo "package-linux: AppImage --office-check failed: $office_out" >&2
+    exit 1
+  }
+  [[ "$office_out" == *"in their library, loaded"* ]] || {
+    echo "package-linux: AppImage expected office library to load, got: $office_out" >&2
+    exit 1
+  }
+fi
 
 # Tilde sorts prereleases before stable; the run number stays numeric for upgrades.
 # deb and rpm versions can't carry '-': 0.0.0-dev-484 is 0.0.0~dev.484, 0.0.0-pr-12-3 is 0.0.0~pr.12.3.
@@ -94,6 +156,7 @@ pkg_version=${version/-/\~}
 pkg_version=${pkg_version//-/.}
 mkdir -p "$work/rpm"
 cat > "$work/app.spec" <<EOF
+%global __provides_exclude_from ^/usr/lib/brocode/.*$
 Name: brocode
 Version: $pkg_version
 Release: 1
@@ -115,6 +178,7 @@ cp -a "$root/usr" "%{buildroot}/"
 /usr/$doc/LICENSE
 /usr/$doc/THIRD_PARTY_NOTICES.md
 /usr/$apparmor_src
+$office_rpm_files
 $cli_rpm_files
 
 %post
@@ -138,10 +202,13 @@ if [ "\$1" = "0" ] && [ -f /etc/apparmor.d/brocode-browser-engine ]; then
   rm -f /etc/apparmor.d/brocode-browser-engine
 fi
 EOF
-# Keep __strip a no-op: opencode-cli is a Bun single-file executable whose payload sits at EOF.
+# Keep __strip a no-op for the bundled brocode-cli.
 rpmbuild -bb --define "_topdir $work/rpm" --define 'debug_package %{nil}' --define '__strip /bin/true' "$work/app.spec"
 cp "$work/rpm/RPMS/$machine/"*.rpm "$stem.rpm"
 rpm -qp --list "$stem.rpm" | grep -Fx /usr/bin/brocode
+if [ "$office" = "1" ]; then
+  rpm -qp --list "$stem.rpm" | grep -Fx /usr/lib/brocode/libopencode_office.so
+fi
 
 mkdir "$root/DEBIAN"
 cat > "$root/DEBIAN/control" <<EOF
@@ -188,6 +255,16 @@ chmod 0755 "$root/DEBIAN/postinst" "$root/DEBIAN/postrm"
 dpkg-deb --root-owner-group --build "$root" "$stem.deb"
 dpkg-deb --extract "$stem.deb" "$work/installed"
 [[ $("$work/installed/usr/bin/brocode" --version) == "$expected" ]]
+if [ "$office" = "1" ]; then
+  office_out=$("$work/installed/usr/bin/brocode" --office-check 2>&1) || {
+    echo "package-linux: DEB --office-check failed: $office_out" >&2
+    exit 1
+  }
+  [[ "$office_out" == *"in their library, loaded"* ]] || {
+    echo "package-linux: DEB expected office library to load, got: $office_out" >&2
+    exit 1
+  }
+fi
 # The installed desktop file takes a link and claims the app's scheme.
 grep -Fxq "Exec=brocode %u" "$work/installed/usr/$desktop"
 grep -Fxq "MimeType=x-scheme-handler/$scheme;" "$work/installed/usr/$desktop"

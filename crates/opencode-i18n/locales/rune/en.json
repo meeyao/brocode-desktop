@@ -21,6 +21,12 @@
   "rune.attach.failed": "Couldn't attach a file",
   "rune.attach.folder": "{{name}} is a folder. Only files can be attached.",
   "rune.attach.pickerTitle": "Attach images and files",
+  "rune.automations.outcome.disabled": "Automations were off",
+  "rune.automations.outcome.late": "Ran late",
+  "rune.automations.outcome.skipped": "Skipped",
+  "rune.automations.output.prompted": "Prompted {{session}}",
+  "rune.automations.output.subagent": "Started subagent {{session}}",
+  "rune.automations.trigger.monthly": "Day {{day}} of every month at {{time}}",
   "rune.branch.choose": "Choose branch",
   "rune.branch.loadFailed": "Couldn't load branches",
   "rune.browser.comment.attach": "Add to session",
@@ -226,6 +232,8 @@
   "rune.home.noServer.checking": "Checking for server",
   "rune.home.noServer.copyCommand": "Copy command",
   "rune.home.noServer.description": "Start Brocode Desktop, or run:",
+  "rune.home.noServer.download": "Download brocode",
+  "rune.home.noServer.install": "Brocode's background service didn't start. Install the brocode CLI, then retry:",
   "rune.home.noServer.remoteDescription": "Nothing answered at {{address}}.",
   "rune.home.noServer.remoteTitle": "Can't reach Brocode",
   "rune.home.noServer.retry": "Retry connection",
@@ -298,6 +306,8 @@
   "rune.session.offlineCopy": "Can't reach this server · showing what was loaded",
   "rune.session.reconnecting": "Reconnecting…",
   "rune.session.slowCopy": "This server is slow to answer · showing what was saved",
+  "rune.session.status.waitingSubagent": "Waiting for subagent",
+  "rune.session.status.waitingSubagents": "Waiting for subagents",
   "rune.session.untitled": "Untitled session",
   "rune.settings.developer.rewind.title": "Rewind",
   "rune.settings.developer.title": "Developer",
@@ -443,5 +453,6 @@
   "rune.web.stay.title": "Stay signed in on this device?",
   "rune.web.stay.yes": "Stay signed in",
   "session.markRead": "Mark as read",
-  "session.markUnread": "Mark as unread"
+  "session.markUnread": "Mark as unread",
+  "rune.connect.brocode.getKey": "Get a key at apibrother.com/dashboard"
 }

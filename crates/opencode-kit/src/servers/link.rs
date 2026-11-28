@@ -15,8 +15,9 @@ use crate::wire_error::{WireError, WireKind};
 /// A drop shorter than this says nothing (Kit's grace before the header says Reconnecting).
 pub const QUIET: f64 = 2.0;
 /// A suspect link whose stream stays up this long is fine after all: the app reopens a stream
-/// that's silent for 25 s (`reconnect::STREAM_IDLE`), and the server writes a heartbeat every 15.
-pub const SUSPECT_FOR: f64 = 25.0 + QUIET;
+/// that's silent for 45 s (`reconnect::STREAM_IDLE`, official `defaultIdleTimeout = 45_000`),
+/// and the server writes a heartbeat every 15.
+pub const SUSPECT_FOR: f64 = 45.0 + QUIET;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Link {

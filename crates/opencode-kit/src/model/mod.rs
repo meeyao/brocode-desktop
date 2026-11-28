@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use serde_json::Value;
 
 mod attachment;
+mod automation;
 mod background_result;
 mod catalog;
 mod compaction;
@@ -24,6 +25,7 @@ mod transcript;
 pub mod turn;
 
 pub use attachment::{Attachment, base64_decode, media_hash, parse_attachment, prompt_extras_generation, set_user_files, user_files};
+pub use automation::{AutomationAction, AutomationInfo, AutomationOutcome, AutomationStatus, AutomationTarget, AutomationTime, AutomationTrigger, parse_automation, parse_automations};
 pub use background_result::{BackgroundResult, BackgroundResultKind, parse_background_result};
 pub use catalog::{AttachmentInput, Model, Speed};
 pub(crate) use attachment::extras_changed;
@@ -89,7 +91,7 @@ impl ProjectIcon {
 const OPENCODE_PROJECT_IDS: [&str; 3] =
     ["012780c4098d08caa4ea8c479ed0a4690489f38d", "476fbfe6befa9e63ddd7f9ae71655999a0104256", "4b0ea68d7af9a6031a7ffda7ad66e0cb83315750"];
 
-/// The drawing of `https://apibrother.com/favicon.svg` (`packages/ui/src/assets/favicon/favicon.svg`),
+/// The drawing of OpenCode's favicon (`packages/ui/src/assets/favicon/favicon.svg`),
 /// which Desktop loads for those ids: carried here, so it shows on the first frame and offline.
 const OPENCODE_FAVICON: &str = "data:image/svg+xml;utf8,<svg width=\"512\" height=\"512\" viewBox=\"0 0 512 512\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#131010\"/><path d=\"M320 224V352H192V224H320Z\" fill=\"#5A5858\"/><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M384 416H128V96H384V416ZM320 160H192V352H320V160Z\" fill=\"white\"/></svg>";
 
@@ -127,7 +129,7 @@ pub struct ModelRef {
 }
 
 impl ModelRef {
-    pub(super) fn parse(v: &Value) -> ModelRef {
+    pub fn parse(v: &Value) -> ModelRef {
         ModelRef {
             id: s(&v["id"]),
             provider: s(&v["providerID"]),
@@ -284,12 +286,20 @@ fn user_created_store() -> &'static Mutex<HashMap<String, i64>> {
 /// path attachments, comments), kept only for the messages `keep` names: an app that lets go of a
 /// transcript calls it, so those go too. A message parsed again fills them again.
 pub fn retain_user_messages(keep: &dyn Fn(&str) -> bool) {
-    attachment::retain_user_files(keep);
-    user_created_store().lock().unwrap_or_else(PoisonError::into_inner).retain(|id, _| keep(id));
+    let mut dropped = attachment::retain_user_files(keep);
+    {
+        let mut created = user_created_store().lock().unwrap_or_else(PoisonError::into_inner);
+        let before = created.len();
+        created.retain(|id, _| keep(id));
+        dropped |= created.len() != before;
+    }
     crate::mention::retain_user_messages(keep);
     crate::quote::retain_user_comments(keep);
-    // What was let go of a projection may have read: it projects again.
-    extras_changed();
+    dropped |= inbox::retain_inbox_payloads(keep);
+    if dropped {
+        // What was let go of a projection may have read: it projects again.
+        extras_changed();
+    }
 }
 
 /// When user message `id` was sent (ms), once known: a reply's duration runs from it.

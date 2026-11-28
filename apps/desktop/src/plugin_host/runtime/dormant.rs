@@ -89,10 +89,15 @@ fn panel_rows(record: &Record) -> impl Iterator<Item = &opencode_plugin_runtime:
 /// plugin with no entry there needn't, nor one whose entries are all in its record: of fifteen
 /// built-ins a side panel restored on New tab started before its first frame, four have such an
 /// entry (strobe `rec_7ecdd3`, `rec_5a45c9`, `rec_2fd572`: 18.5 ms of plugin starts).
+fn is_new_tab_slot(e: &opencode_plugin_runtime::dormant::Entry) -> bool {
+    matches!(e.spec.get("at").and_then(|v| v.as_str()), Some("session.panel.new" | "session.panel.new.list"))
+}
+
 pub(super) fn launcher_needs(record: &Record) -> bool {
     let asks = |e: &opencode_plugin_runtime::dormant::Entry, name: &str| e.fns.iter().any(|f| f == name);
     let panel = record.window.get("panels").is_some_and(|es| es.iter().any(|e| !asks(e, "list") && asks(e, "enabled") && e.spec.get("launcher").and_then(|v| v.as_bool()) != Some(false)));
-    panel || panel_rows(record).any(|e| asks(e, "when"))
+    let new_tab_slot = record.window.get("slots").is_some_and(|es| es.iter().any(is_new_tab_slot));
+    panel || new_tab_slot || panel_rows(record).any(|e| asks(e, "when"))
 }
 /// The records as written last: none when there are none yet, they don't read, or are of another
 /// version. Before the first frame this is the boot packet's, so it reads no file.
@@ -399,7 +404,7 @@ pub fn recorded_fn(app: &App, id: &str, kind: &str, key: &str, name: &str) -> bo
 /// The side region's New tab view or its `+` menu is opening: any queued or dormant plugins with
 /// entries there (panels, `session.panel` rows) start, so the entries are the ones they offer.
 pub fn wake_launchers(app: &mut App) -> bool {
-    let adopted = super::boot::adopt_later_kinds(app, &["Panel", "MenuItem"]);
+    let adopted = super::boot::adopt_later_kinds(app, &["Panel", "MenuItem", "Slot"]);
     // A plugin whose entries there are all in its record (`launcher_needs`) stays asleep: the
     // view lists them from it (`panels::asleep_launchers`), and opening one starts it. A launch
     // reaches this before its first frame, for a side panel saved on New tab
@@ -497,7 +502,8 @@ fn for_session(app: &App, session: &str) -> Vec<String> {
         .asleep
         .iter()
         .filter(|(id, a)| {
-            let slot = has(a, "slots") && (id.as_str() != "debug" || super::first_screen::debug_bar_shown());
+            let non_new_tab_slot = a.record.window.get("slots").is_some_and(|es| es.iter().any(|e| !is_new_tab_slot(e)));
+            let slot = non_new_tab_slot && (id.as_str() != "debug" || super::first_screen::debug_bar_shown());
             let launcher = on_new_tab && launcher_needs(&a.record);
             slot || has(a, "composer_pills") || with_tabs.contains(&id.as_str()) || (files && has(a, "file_viewers")) || launcher
         })

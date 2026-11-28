@@ -199,6 +199,11 @@ pub trait PickerHost: ComposerHost {
     /// "Default" for no choice) for any model that has variants.
     fn has_effort(&self) -> bool {
         let m = self.selection().model;
+        // brocode: API Brother has no thinking stages on its side, so its models never offer any,
+        // whatever `/api/model` sends.
+        if m.provider == "brocode" {
+            return false;
+        }
         self.pickers().models.iter().find(|x| x.id == m.id && x.provider == m.provider).is_some_and(|x| !x.variants.is_empty())
     }
 
@@ -507,7 +512,8 @@ fn model_items(pk: &Pickers) -> Vec<Item> {
 }
 
 /// Desktop's `popularProviders` (`providers/catalog/order.ts`), which lead the list in this order.
-const POPULAR: [&str; 8] = ["opencode-go", "opencode", "anthropic", "github-copilot", "openai", "google", "openrouter", "vercel"];
+// `packages/app/src/providers/catalog/order.ts` (`opencode#66736`).
+const POPULAR: [&str; 9] = ["opencode-go", "opencode", "openai", "anthropic", "claude-agent", "github-copilot", "google", "openrouter", "vercel"];
 
 /// Where a model's provider goes: a popular one by its place, the rest after them by name.
 pub(super) fn provider_rank(m: &Model) -> (usize, String) {

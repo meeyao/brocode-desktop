@@ -107,6 +107,7 @@ fn open_page_menu(app: &mut App, tab_id: u64, info: PageContextMenu, tx: &mut Tx
     let can_forward = tab.can_go_forward;
     let is_preview = tab.preview.is_some();
     let menu_extras = app.workspace_panes.browser.host.engine_menu_extras();
+    let host_clipboard = app.workspace_panes.browser.host.uses_host_clipboard();
     let (ox, oy) = tab.surface_origin;
     let z = tab.view_zoom.max(0.01);
     let anchor = (ox + (info.x as f32) / z, oy + (info.y as f32) / z);
@@ -175,12 +176,15 @@ fn open_page_menu(app: &mut App, tab_id: u64, info: PageContextMenu, tx: &mut Tx
     }
 
     // 6. Edit / selection (`page-menu.ts:107-117`)
+    // When CEF runs on X11 Ozone inside a Wayland session, its `can_paste` checks X11 rather than
+    // Rune's Wayland clipboard, so keep Paste enabled on editable fields and read the host clipboard.
+    let can_paste = info.can_paste || host_clipboard;
     if info.is_editable {
         groups.push(vec![
             Item::new("cut", t!("rune.browser.menu.cut")).enabled(info.can_cut),
             Item::new("copy", t!("rune.browser.menu.copy")).enabled(info.can_copy),
-            Item::new("paste", t!("rune.browser.menu.paste")).enabled(info.can_paste),
-            Item::new("paste-plain", t!("rune.browser.menu.pastePlain")).enabled(info.can_paste),
+            Item::new("paste", t!("rune.browser.menu.paste")).enabled(can_paste),
+            Item::new("paste-plain", t!("rune.browser.menu.pastePlain")).enabled(can_paste),
             Item::new("select-all", t!("rune.browser.menu.selectAll")).enabled(info.can_select_all),
         ]);
     } else if !info.selection_text.is_empty() {
@@ -307,10 +311,38 @@ fn open_page_menu(app: &mut App, tab_id: u64, info: PageContextMenu, tx: &mut Tx
                     tx.copy(url);
                 }
             }
-            Some("cut") => engine_cmd = Some(ContextMenuCommand::Cut),
-            Some("copy") => engine_cmd = Some(ContextMenuCommand::Copy),
-            Some("paste") => engine_cmd = Some(ContextMenuCommand::Paste),
-            Some("paste-plain") => engine_cmd = Some(ContextMenuCommand::PastePlain),
+            Some("cut") => {
+                engine_cmd = Some(if s.workspace_panes.browser.host.uses_host_clipboard() {
+                    ContextMenuCommand::CutToHost
+                } else {
+                    ContextMenuCommand::Cut
+                });
+            }
+            Some("copy") => {
+                engine_cmd = Some(if s.workspace_panes.browser.host.uses_host_clipboard() {
+                    ContextMenuCommand::CopyToHost
+                } else {
+                    ContextMenuCommand::Copy
+                });
+            }
+            Some("paste") => {
+                if s.workspace_panes.browser.host.uses_host_clipboard() {
+                    tx.read_clipboard(move |s: &mut App, content, _| {
+                        s.workspace_panes.browser.host.paste_host_clipboard(tab_id, content.text());
+                    });
+                } else {
+                    engine_cmd = Some(ContextMenuCommand::Paste);
+                }
+            }
+            Some("paste-plain") => {
+                if s.workspace_panes.browser.host.uses_host_clipboard() {
+                    tx.read_clipboard(move |s: &mut App, content, _| {
+                        s.workspace_panes.browser.host.paste_host_clipboard(tab_id, content.text());
+                    });
+                } else {
+                    engine_cmd = Some(ContextMenuCommand::PastePlain);
+                }
+            }
             Some("select-all") => engine_cmd = Some(ContextMenuCommand::SelectAll),
             Some("spellcheck") => {
                 if menu_extras {
@@ -432,9 +464,15 @@ fn log_diagnostics(app: &App, records: Vec<PageDiagnostic>) {
 }
 
 impl App {
-    /// The page menu's Copy image (`ContextMenuCommand::CopyImage`): the engine sends the image as
-    /// PNG, and it goes to the person's clipboard.
-    pub(super) fn copy_browser_images(&mut self) {
+    /// Routes host-bridged browser text copies/cuts (`EngineMsg::CopiedText`) and Copy image
+    /// results (`EngineMsg::CopiedImage`) to Rune's host clipboard.
+    pub(super) fn copy_browser_clipboard(&mut self) {
+        let texts: Vec<String> = self.workspace_panes.browser.host.drain_copied_texts().collect();
+        for text in texts {
+            self.later(Box::new(move |_s: &mut App, tx: &mut Tx| {
+                tx.copy(text);
+            }));
+        }
         let images: Vec<String> = self.workspace_panes.browser.host.drain_copied_images().collect();
         for png_b64 in images {
             let Ok(png) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, png_b64) else { continue };

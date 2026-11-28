@@ -371,14 +371,14 @@ pub fn server(host: &dyn ProjectsHost) -> ServerKey {
     selection(host).server.unwrap_or_else(ServerKey::sidecar)
 }
 
-/// Home's selected project, on the server the window works against.
+/// Home's selected project, on the server the window works against (`packages/app/src/home/model.ts:132-135`).
 pub fn selected(host: &dyn ProjectsHost) -> Option<&Project> {
     let sel = selection(host);
     if sel.server.as_ref() != Some(&host.active_server()) {
         return None;
     }
-    let dir = machine::comparable_path(sel.directory.as_deref()?);
-    used_projects(host).into_iter().find(|p| machine::comparable_path(&p.directory) == dir)
+    let dir = machine::same_directory_key(sel.directory.as_deref()?);
+    used_projects(host).into_iter().find(|p| machine::same_directory_key(&p.directory) == dir)
 }
 
 /// Its id.
@@ -420,20 +420,20 @@ fn send(host: &mut dyn ProjectsHost, event: machine::Event) {
 }
 
 fn step(host: &mut dyn ProjectsHost, event: machine::Event) -> Effects<machine::Effect> {
-    let before = selection(host).server;
     let fx = machine::step(&mut host.home_state_mut().machine, event);
-    follow(host, before);
+    follow(host);
     fx
 }
 
-/// The selection moved to another server while Home shows: the window works against it now.
-fn follow(host: &mut dyn ProjectsHost, before: Option<ServerKey>) {
-    let after = selection(host).server;
-    if after == before || !host.is_home_route() || host.settings_open() {
+/// Keep the window checkout aligned with Home's focused server (`server(host)`, matching
+/// `servers::runtime::desired`) while Home shows.
+fn follow(host: &mut dyn ProjectsHost) {
+    if !host.is_home_route() || host.settings_open() {
         return;
     }
-    if let Some(key) = after {
-        host.switch_server(&key);
+    let want = server(host);
+    if want != host.active_server() {
+        host.switch_server(&want);
     }
 }
 

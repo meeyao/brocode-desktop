@@ -112,6 +112,19 @@ pub trait PopupHost: Sized {
         let scale = crate::scroller::device_scale();
         scale.floor().max(1.0) / scale
     }
+
+    /// Whether a Rune modal surface (such as a dialog or media lightbox) is currently mounted
+    /// beneath the drawn popup layer.
+    ///
+    /// When `true`, [`view`] wraps the drawn popup's scrim, point anchor, and menu surfaces in a
+    /// raised modal scope so Rune's active-modal input filter allows hover, clicks, and outside
+    /// dismissal to reach the popup instead of being blocked by the modal underneath. When
+    /// `false`, the popup stays non-modal so context menus keep `hover_passes_below` and
+    /// `press_focuses_below` on background chrome and `MenuButton` drag-to-pick gestures stay
+    /// intact.
+    fn over_modal(&self) -> bool {
+        false
+    }
 }
 
 pub(super) type Pick<S> = Box<dyn FnOnce(&mut S, Option<&str>, &mut Tx)>;

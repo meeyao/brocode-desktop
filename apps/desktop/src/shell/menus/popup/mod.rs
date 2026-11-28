@@ -59,4 +59,25 @@ impl opencode_ui::popup::PopupHost for App {
     fn hairline(&self) -> f32 {
         crate::view::chrome().hairline
     }
+
+    fn over_modal(&self) -> bool {
+        modal_open_below_popup(self)
+    }
+}
+
+/// Whether any Rune modal (`.modal` / `.modal_tx`) is currently mounted in an overlay layer below
+/// `CHROME_POPUP` (dialogs, media lightboxes, tool details, model picker dialogs, and confirmation
+/// prompts). Excludes full-page Settings, which is tracked on `kernel.overlays` for Escape
+/// handling but does not mount a Rune modal element.
+pub(crate) fn modal_open_below_popup(s: &App) -> bool {
+    use crate::pickers::PickerHost as _;
+    s.kernel.overlays.entries().iter().any(|e| e.id != crate::settings::OVERLAY_ID)
+        || s.composer_ext.attach.store.viewing.is_some()
+        || s.timeline_fx.diagram.is_open()
+        || s.timeline_fx.expanded.iter().any(|k| k.starts_with("execute-details:"))
+        || (!s.narrow() && s.pickers().open() == Some(crate::pickers::Kind::Model))
+        || s.pickers().manage.is_some()
+        || crate::surfaces::automations::delete_modal_open(s)
+        || crate::background_notice::is_open(s)
+        || crate::deep_links::asking(s)
 }

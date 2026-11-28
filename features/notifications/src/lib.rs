@@ -7,8 +7,8 @@
 //!
 //! Only a live window with a person at it posts (`NotificationsHost::persists`), through
 //! `rune_notify`: Notification Center on macOS, toasts on Windows (`identify` gives the app its
-//! name and icon there). On `wasm32` and Linux where `rune_notify::available()` is `false`,
-//! platform calls are safe no-ops.
+//! name and icon there), and `org.freedesktop.Notifications` on Linux. Where
+//! `rune_notify::available()` is `false`, platform calls are safe no-ops.
 
 #![forbid(unsafe_code)]
 
@@ -360,7 +360,7 @@ pub fn clear_extension(host: &mut dyn NotificationsHost, os_id: &str) {
 }
 
 /// What `ty` posts, if anything: the kind, its title, the session a click opens and the body.
-fn decide(host: &dyn NotificationsHost, ty: &str, data: &Value, sid: &str) -> Option<(Kind, &'static str, String, String)> {
+fn decide(host: &dyn NotificationsHost, ty: &str, data: &Value, sid: &str, running_child: bool) -> Option<(Kind, &'static str, String, String)> {
     // A muted session, or one under a muted root, posts nothing (`notification.tsx`'s `muted`).
     if host.is_session_silenced(sid) {
         return None;
@@ -368,7 +368,7 @@ fn decide(host: &dyn NotificationsHost, ty: &str, data: &Value, sid: &str) -> Op
     let prefs = host.notification_prefs();
     match ty {
         "session.execution.succeeded" if prefs.agent => {
-            if host.has_running_child(sid) || !host.is_root_session(sid) {
+            if running_child || !host.is_root_session(sid) {
                 return None;
             }
             let title = host.tab_title(sid)?;
@@ -426,10 +426,17 @@ fn request(ty: &str, data: &Value, sid: &str) -> Option<(Kind, &'static str, Str
 ///
 /// `claim` receives whether this window decided to post and returns `true` when this window won
 /// the per-event claim across windows (e.g. `StreamEvent::take(&e.notice, want)`).
-pub fn notify_event(host: &mut dyn NotificationsHost, ty: &str, data: &Value, sid: &str, claim: &mut dyn FnMut(bool) -> bool) -> bool {
+pub fn notify_event(host: &mut dyn NotificationsHost, ty: &str, data: &Value, sid: &str, running_child: bool, claim: &mut dyn FnMut(bool) -> bool) -> bool {
     if !host.notifier().shows() {
         return false;
     }
+    let decided = decide(host, ty, data, sid, running_child);
+    if !claim(decided.is_some()) {
+        return false;
+    }
+    let Some((kind, title, session, body)) = decided else {
+        return false;
+    };
     if matches!(ty, "permission.asked" | "form.created") {
         let id = if data["form"].is_object() { &data["form"]["id"] } else { &data["id"] };
         let id = id.as_str().unwrap_or("");
@@ -438,13 +445,6 @@ pub fn notify_event(host: &mut dyn NotificationsHost, ty: &str, data: &Value, si
             return false;
         }
     }
-    let decided = decide(host, ty, data, sid);
-    if !claim(decided.is_some()) {
-        return false;
-    }
-    let Some((kind, title, session, body)) = decided else {
-        return false;
-    };
     // A request's toast says what it asks and carries its answers; a run's is per session.
     let (id, body, ask) = match actions::ask(ty, data) {
         Some(ask) => (format!("req-{}", ask.request()), actions::body(&body, &ask), Some(ask)),
@@ -493,7 +493,7 @@ pub fn poll(host: &mut dyn NotificationsHost, tx: &mut Tx) -> bool {
             let notif_id = click.get("ext_notif_id").unwrap_or("").to_owned();
             if !ext_id.is_empty() && !notif_id.is_empty() {
                 if host.is_live() {
-                    rune_notify::bring_to_front();
+                    host.activate_window(click.activation_token());
                 }
                 host.notifier_mut().take_out(&click.id);
                 host.on_extension_notification_clicked(&ext_id, &notif_id);
@@ -518,7 +518,7 @@ pub fn poll(host: &mut dyn NotificationsHost, tx: &mut Tx) -> bool {
             continue;
         }
         if host.is_live() {
-            rune_notify::bring_to_front();
+            host.activate_window(click.activation_token());
         }
         let own_base = host.own_server_base();
         let server = click_server(own_base.as_deref(), from);

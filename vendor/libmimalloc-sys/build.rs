@@ -96,6 +96,13 @@ fn main() {
         }
     }
 
+    // rune-desktop: default THP off for mimalloc's 1 GiB arena on Linux so sparse 64 KiB
+    // slices do not pin 2 MiB transparent huge pages on distros with THP=always (Fedora, Debian).
+    // Still overridable at runtime with MIMALLOC_ALLOW_THP=1.
+    if target_os == "linux" {
+        build.define("MI_DEFAULT_ALLOW_THP", "0");
+    }
+
     if (target_os == "linux" || target_os == "android")
         && env::var_os("CARGO_FEATURE_NO_THP").is_some()
     {

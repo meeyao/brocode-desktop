@@ -87,6 +87,11 @@ fn toggle_spellcheck(s: &mut dyn SettingsHost) {
     change_settings(s, |x| x.spellcheck = !x.spellcheck);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn toggle_keep_service_running(s: &mut dyn SettingsHost) {
+    change_settings(s, |x| x.keep_service_running = !x.keep_service_running);
+}
+
 fn toggle_mobile_diff_wrap(s: &mut dyn SettingsHost) {
     change_settings(s, |x| x.mobile_diff_wrap = !x.mobile_diff_wrap);
 }
@@ -239,6 +244,18 @@ pub fn view<H: SettingsHost + PopupHost + 'static>(s: &H, p: &Pal) -> El {
                 t!("settings.general.row.spellcheck.title"),
                 t!("settings.general.row.spellcheck.description"),
                 switch(p, "spellcheck-switch", st.spellcheck).on_press(|s: &mut H| toggle_spellcheck(s)),
+            ),
+        ),
+        // Official Settings > General (`settings/general/general.tsx:354-361`, opencode#66499).
+        #[cfg(not(target_arch = "wasm32"))]
+        (
+            "settings-keep-service-running",
+            setting(
+                p,
+                "settings-keep-service-running",
+                t!("settings.general.row.keepServiceRunning.title"),
+                t!("settings.general.row.keepServiceRunning.description"),
+                switch(p, "keep-service-running-switch", st.keep_service_running).on_press(|s: &mut H| toggle_keep_service_running(s)),
             ),
         ),
         (

@@ -1,31 +1,33 @@
-//! Naming a section in place: a new section opens its name field with a suggested name selected
-//! (typing replaces it) and a few other names to pick under it; a rename opens it with the name
-//! it has. ⏎ or a click elsewhere keeps what's typed, Esc keeps the name it had, an empty field
-//! keeps it too.
+//! Naming a section in place: a new section opens its name field on a name its tabs' titles
+//! share (selected, so typing replaces it), or empty under a quiet "Section name"; a rename opens
+//! it on the name it has. ⏎ or a click elsewhere keeps what's typed, Esc keeps the name it had, an
+//! empty field keeps it too.
 //!
-//! The names are guessed here, at once, from the tabs' titles and projects: no server asks.
+//! The name is guessed here, at once, from the tabs' titles alone: no server asks, and no
+//! project's slug is ever offered as a name.
 
 use rune::TextEdit;
 
-/// The name being edited: arming until its field takes focus, then editing.
+/// The name being edited: arming until its field takes focus, then editing. `before` is the
+/// name kept when the field is left empty or Esc is pressed; `created` marks a brand-new section
+/// whose gathered tabs are flying in under its header.
 #[derive(Default)]
 pub enum Naming {
     #[default]
     Idle,
-    Arming { section: String, field: TextEdit, alternates: Vec<String>, before: String },
-    Editing { section: String, field: TextEdit, alternates: Vec<String>, before: String },
+    Arming { section: String, field: TextEdit, before: String, created: bool },
+    Editing { section: String, field: TextEdit, before: String, created: bool },
 }
 
 pub enum Event<'a> {
-    Start { section: &'a str, name: &'a str, alternates: Vec<String> },
+    /// Name `section`: the field opens on `text`, and `before` stays if nothing is typed.
+    Start { section: &'a str, text: &'a str, before: &'a str, created: bool },
     /// The field's focus, read each frame while naming.
     Focused(bool),
     /// ⏎.
     Commit,
     /// Esc.
     Cancel,
-    /// One of the other names, picked.
-    Pick(&'a str),
     /// Section `id` went while it was named.
     Gone(&'a str),
 }
@@ -40,18 +42,18 @@ pub enum Effect {
 impl Naming {
     pub fn step(&mut self, event: Event<'_>) -> Effect {
         match (std::mem::take(self), event) {
-            (_, Event::Start { section, name, alternates }) => {
-                let mut field = TextEdit::new(name);
+            (_, Event::Start { section, text, before, created }) => {
+                let mut field = TextEdit::new(text);
                 field.set_selection(0, field.text.len());
-                *self = Naming::Arming { section: section.to_owned(), field, alternates, before: name.to_owned() };
+                *self = Naming::Arming { section: section.to_owned(), field, before: before.to_owned(), created };
                 Effect::Focus
             }
-            (Naming::Arming { section, field, alternates, before } | Naming::Editing { section, field, alternates, before }, Event::Focused(true)) => {
-                *self = Naming::Editing { section, field, alternates, before };
+            (Naming::Arming { section, field, before, created } | Naming::Editing { section, field, before, created }, Event::Focused(true)) => {
+                *self = Naming::Editing { section, field, before, created };
                 Effect::None
             }
-            (Naming::Arming { section, field, alternates, before }, Event::Focused(false)) => {
-                *self = Naming::Arming { section, field, alternates, before };
+            (Naming::Arming { section, field, before, created }, Event::Focused(false)) => {
+                *self = Naming::Arming { section, field, before, created };
                 Effect::Focus
             }
             (Naming::Editing { section, field, before, .. }, Event::Focused(false))
@@ -60,7 +62,6 @@ impl Naming {
                 Effect::Save { section, name: if typed.is_empty() { before } else { typed.to_owned() } }
             }
             (Naming::Arming { section, before, .. } | Naming::Editing { section, before, .. }, Event::Cancel) => Effect::Save { section, name: before },
-            (Naming::Arming { section, .. } | Naming::Editing { section, .. }, Event::Pick(name)) => Effect::Save { section, name: name.to_owned() },
             (Naming::Arming { section, .. } | Naming::Editing { section, .. }, Event::Gone(id)) if section == id => Effect::None,
             (state, _) => {
                 *self = state;
@@ -69,12 +70,17 @@ impl Naming {
         }
     }
 
-    /// The section being named, its field and the other names offered.
-    pub fn editing(&self) -> Option<(&str, &TextEdit, &[String])> {
+    /// The section being named and its field.
+    pub fn editing(&self) -> Option<(&str, &TextEdit)> {
         match self {
-            Naming::Arming { section, field, alternates, .. } | Naming::Editing { section, field, alternates, .. } => Some((section, field, alternates)),
+            Naming::Arming { section, field, .. } | Naming::Editing { section, field, .. } => Some((section, field)),
             Naming::Idle => None,
         }
+    }
+
+    /// Whether `id` is a brand-new section currently in its initial naming pass.
+    pub fn is_created(&self, id: &str) -> bool {
+        matches!(self, Naming::Arming { section, created: true, .. } | Naming::Editing { section, created: true, .. } if section == id)
     }
 
     pub fn field_mut(&mut self) -> Option<&mut TextEdit> {
@@ -86,7 +92,7 @@ impl Naming {
 
     /// Whether the field has focus, while naming.
     pub fn focused(&self) -> Option<bool> {
-        self.editing().map(|(_, field, _)| field.focused)
+        self.editing().map(|(_, field)| field.focused)
     }
 }
 
@@ -138,71 +144,23 @@ fn stop(t: &str) -> bool {
     STOP.contains(&t)
 }
 
-/// Names for a section of tabs titled `titles` in `projects`: the best first, then up to three
-/// others, or `fallback` alone. The leading words every title shares, the project they share,
-/// a word they all have, the project with that word.
-pub fn suggest(titles: &[&str], projects: &[Option<&str>], fallback: &str) -> Vec<String> {
+/// A name for a section of tabs titled `titles`, only when two or more of them plainly share
+/// one: the leading words every title starts with ("Inference" from "INFERENCE ROUTING" and
+/// "INFERENCE STATS", "Phase 2"), or else a word every title has. Anything less is no guess.
+pub fn suggest(titles: &[&str]) -> Option<String> {
+    if titles.len() < 2 {
+        return None;
+    }
     let toks: Vec<Vec<(String, String)>> = titles.iter().map(|t| tokens(t)).collect();
-    let mut names: Vec<String> = Vec::new();
-    let push = |n: String, names: &mut Vec<String>| {
-        if !n.trim().is_empty() && !names.iter().any(|x| x.eq_ignore_ascii_case(&n)) {
-            names.push(n);
-        }
-    };
-    // The leading words all titles share, up to three ("Inference", "Phase 2").
-    let first = toks.first().cloned().unwrap_or_default();
+    let first = toks.first()?;
     let shared = first.iter().take(3).enumerate().take_while(|(i, (t, _))| toks.iter().all(|w| w.get(*i).is_some_and(|(x, _)| x == t))).count();
-    let lead: Vec<&(String, String)> = first.iter().take(shared).collect();
-    let lead_name = (!lead.is_empty() && !lead.iter().all(|(t, _)| stop(t)) && toks.len() > 1).then(|| lead.iter().map(|(_, r)| show(r)).collect::<Vec<_>>().join(" "));
-    if let Some(n) = &lead_name {
-        push(n.clone(), &mut names);
-        // As one title writes it ("Phase2"), where a title runs the shared words together.
-        for t in titles {
-            if let Some(word) = t.split(|c: char| !c.is_alphanumeric()).find(|w| !w.is_empty())
-                && tokens(word).iter().map(|(c, _)| c.as_str()).eq(lead.iter().map(|(c, _)| c.as_str()))
-            {
-                push(show(word), &mut names);
-            }
-        }
-        // Its first word alone ("Inference" for "Inference stats").
-        if lead.len() > 1 {
-            push(show(&lead[0].1), &mut names);
-        }
+    // "Fix login page" and "Fix login redirect" share "Login", not "Fix Login".
+    let lead: Vec<&(String, String)> = first[..shared].iter().skip_while(|(t, _)| stop(t)).collect();
+    if lead.iter().any(|(t, _)| t.chars().any(char::is_alphabetic)) {
+        return Some(lead.iter().map(|(_, r)| show(r)).collect::<Vec<_>>().join(" "));
     }
-    // The project they share.
-    let project = projects.first().copied().flatten().filter(|p| !p.is_empty() && projects.iter().all(|x| x.is_some_and(|x| x.eq_ignore_ascii_case(p))));
-    if let Some(p) = project {
-        push(show(p), &mut names);
-    }
-    // A word every title has, and then one most of them have.
-    let word = |min: usize| {
-        first.iter().chain(toks.iter().flatten()).find(|(t, _)| {
-            !stop(t) && t.chars().any(char::is_alphabetic) && toks.iter().filter(|w| w.iter().any(|(x, _)| x == t)).count() >= min && !lead.iter().any(|(l, _)| l == t)
-        })
-    };
-    let common = if toks.len() > 1 { word(toks.len()).or_else(|| word(2.max(toks.len() / 2 + 1))) } else { None };
-    if let Some((_, raw)) = common {
-        push(show(raw), &mut names);
-    }
-    // The project with that word ("Lumen routing").
-    if let (Some(p), Some(key)) = (project, lead_name.clone().or_else(|| common.map(|(_, r)| show(r))))
-        && !key.eq_ignore_ascii_case(p)
-    {
-        push(format!("{} {}", show(p), key.to_lowercase()), &mut names);
-    }
-    // A section of one: its title's first words.
-    if toks.len() == 1 {
-        let words: Vec<String> = first.iter().filter(|(t, _)| !stop(t)).map(|(_, r)| show(r)).collect();
-        if let Some(w) = words.first() {
-            push(w.clone(), &mut names);
-        }
-        if words.len() > 1 {
-            push(words[..2].join(" "), &mut names);
-        }
-    }
-    names.truncate(4);
-    if names.is_empty() {
-        names.push(fallback.to_owned());
-    }
-    names
+    first
+        .iter()
+        .find(|(t, _)| !stop(t) && t.chars().filter(|c| c.is_alphabetic()).count() >= 3 && toks.iter().all(|w| w.iter().any(|(x, _)| x == t)))
+        .map(|(_, raw)| show(raw))
 }

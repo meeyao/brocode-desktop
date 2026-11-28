@@ -21,32 +21,20 @@ use rune::{Key, KeyEvent, TextEdit, Tx};
 use serde_json::Value;
 
 use super::{DockHost, knobs, morph};
-use crate::keymap::Bind;
 
 mod classic;
-mod face;
+mod composer;
 
-/// Whether the dock is Desktop's default Classic one (Settings › New question UI off) rather
-/// than the keyboard-first one this module's keys describe.
+/// Whether the dock is Desktop's Classic one rather than the composer-integrated New question UI
+/// (`general.questionComposer`, `opencode#66825`).
 pub fn classic<S: DockHost>(s: &S) -> bool {
-    !s.dock_new_question_ui()
+    !s.dock_question_composer()
 }
 
-/// The question's face of the composer surface, Classic or the new one.
+/// The question's face, Classic or composer-integrated (`opencode#66825`).
 pub fn face<S: DockHost>(s: &S, p: &crate::palette::Pal) -> Option<Vec<rune::El>> {
-    if classic(s) { classic::face(s, p) } else { face::face(s, p) }
+    if classic(s) { classic::face(s, p) } else { composer::face(s, p) }
 }
-
-/// The footer's height: its padding and the 32 pt buttons.
-const FOOTER_H: f32 = 47.0;
-/// How far the answers fade under the header and footer, and how clear of them a revealed one stops.
-pub const FADE: f32 = 16.0;
-/// Never shorter than this while the pane has room (Desktop's floor).
-const MIN_H: f32 = 240.0;
-/// The share of the pane the timeline keeps above a long question, however short the pane.
-const TIMELINE_KEEP: f32 = 0.2;
-/// The session header's row over the timeline, with the timeline's own padding under it.
-const HEADER_H: f32 = 48.0 + 16.0;
 
 /// Where the dock is for the form it shows: the question, the highlighted answer, and the
 /// picked and typed answers in progress by `form/key`.
@@ -55,18 +43,16 @@ pub struct Dock {
     form: String,
     pub tab: usize,
     pub focus: usize,
-    /// -1 or 1: the way the last question change went, for the arrival slide.
-    step: i32,
     pub picks: HashMap<String, Vec<String>>,
     pub typed: HashMap<String, TextEdit>,
     /// `form/key`s whose typed answer counts.
     custom: HashSet<String>,
-    /// The typed answer's laid-out width, to tell which wrapped line its caret is on.
-    input_w: f32,
     /// The Classic dock folded down to its question (the header's chevron).
     pub minimized: bool,
-    /// The Classic dock's last input was a key, so the highlighted answer shows its focus ring.
+    /// The dock's last input was a key, so the highlighted answer shows its focus ring.
     keyboard: bool,
+    /// Highlighted preset option index in composer mode (`activeOption`, `opencode#66825`).
+    active_option: Option<usize>,
 }
 
 impl Dock {
@@ -115,32 +101,6 @@ impl Dock {
     }
 }
 
-/// What a key does in the dock (`QuestionKeyIntent`).
-#[derive(Clone, Debug, PartialEq)]
-pub enum Intent {
-    Dismiss,
-    Advance,
-    Question(i32),
-    Move(i32),
-    First,
-    Last,
-    Number(usize),
-    Activate,
-    Commit,
-    Type(String),
-    None,
-}
-
-/// Where the keyboard is: on an answer, on "Type your own answer", typing in it, or on a
-/// footer/header button (`QuestionKeyZone`, `question-keys.ts:4`).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Zone {
-    Option,
-    Custom,
-    Input,
-    Other,
-}
-
 /// Whether keyboard focus sits inside the question dock (or nowhere specific, as right after the
 /// dock opens). Unlike official (where `onKeyDown` is scoped to the dock DOM node), Rune's
 /// `question_key` runs window-wide (`keys.rs:27`), so focus on widgets outside the dock (tabs,
@@ -152,12 +112,30 @@ pub(super) fn focus_in_dock(focused: Option<&str>) -> bool {
     }
 }
 
-/// Whether keyboard focus `focused` sits on a question option or nowhere specific (as opposed to a
-/// header/footer button like Dismiss, Back, Next/Submit, Minimize, or progress segments).
+/// Whether keyboard focus `focused` sits on a question option, the composer-mode options listbox,
+/// or nowhere specific (as opposed to a header/footer button like Dismiss, Back, Next/Submit,
+/// Minimize, or progress segments).
 pub(super) fn focus_in_options(focused: Option<&str>) -> bool {
     match focused {
         None | Some("q-custom" | "q-custom-mark" | "q-input") => true,
-        Some(k) => k.starts_with("q-opt-"),
+        Some(k) => k.starts_with("q-opt-") || k.starts_with("q-options-"),
+    }
+}
+
+/// The element key that takes keyboard focus when the question dock opens (`land()` in
+/// `session-question-dock-classic.tsx:299-305`): the custom answer field when there are no preset
+/// options (or a typed answer is active in composer mode), the options listbox in composer mode,
+/// or the first option in Classic mode.
+pub fn initial_focus<S: DockHost>(s: &S) -> String {
+    let Some(f) = asking(s) else { return "q-opt-0".to_owned() };
+    let (tab, _) = place(s, &f);
+    let n = rows(&f.fields[tab]).len();
+    if classic(s) {
+        if n > 0 { "q-opt-0".to_owned() } else { "q-input".to_owned() }
+    } else {
+        let k = f.key(tab);
+        let has_typed = s.dock().custom_on(&k) && s.dock().typed.get(&k).is_some_and(|t| !t.text.is_empty());
+        if n == 0 || has_typed { "q-input".to_owned() } else { format!("q-options-{tab}") }
     }
 }
 
@@ -217,67 +195,6 @@ pub(super) fn submit_hint(submit: SubmitKey) -> String {
         SubmitKey::Enter => "⏎".to_owned(),
         SubmitKey::ModEnter if cfg!(target_os = "macos") => "⌘⏎".to_owned(),
         SubmitKey::ModEnter => format!("{}+⏎", opencode_i18n::t!("common.key.ctrl")),
-    }
-}
-
-/// Desktop's `questionKey`: `count` answers including the typed one.
-pub fn intent(ev: &KeyEvent, zone: Zone, count: usize, submit: SubmitKey) -> Intent {
-    let m = ev.mods;
-    match &ev.key {
-        Key::Escape => return Intent::Dismiss,
-        _ if Bind::QuestionBack.matches(ev) => return Intent::Question(-1),
-        _ if Bind::QuestionAdvance.matches(ev) => return Intent::Advance,
-        _ => {}
-    }
-    if zone == Zone::Input || m.cmd || m.ctrl || matches!(ev.key, Key::Command(_)) {
-        return Intent::None;
-    }
-    let ch = match &ev.key {
-        Key::Text(s) if s.chars().count() == 1 => s.chars().next(),
-        _ => None,
-    };
-    let digit = ch.and_then(|c| c.to_digit(10)).filter(|d| *d >= 1);
-    if let (Zone::Custom, None, Some(c)) = (zone, digit, ch)
-        && c != ' '
-    {
-        return Intent::Type(c.to_string());
-    }
-    if m.alt {
-        return Intent::None;
-    }
-    if let Some(d) = digit {
-        let index = d as usize - 1;
-        return if index < count { Intent::Number(index) } else { Intent::None };
-    }
-    let arrow = matches!(ev.key, Key::Left | Key::Right | Key::Up | Key::Down);
-    if m.shift && arrow {
-        return Intent::None;
-    }
-    // The questions run toward the end of the line: leftward in a right-to-left window.
-    let ahead = if opencode_i18n::direction() == opencode_i18n::Direction::Rtl { -1 } else { 1 };
-    match &ev.key {
-        Key::Left => return Intent::Question(-ahead),
-        Key::Right => return Intent::Question(ahead),
-        _ => {}
-    }
-    // Footer and progress buttons keep their own Enter/Space/arrows (`question-keys.ts:66`).
-    if zone == Zone::Other {
-        return Intent::None;
-    }
-    match &ev.key {
-        Key::Down => Intent::Move(1),
-        Key::Up => Intent::Move(-1),
-        Key::Home => Intent::First,
-        Key::End => Intent::Last,
-        Key::Text(s) if s == " " => Intent::Activate,
-        // The submit key commits the highlighted answer and moves on; the other Enter marks it
-        // (`question-keys.ts:95-101`).
-        Key::Enter => match enter(ev, submit) {
-            Some(Enter::Submit) => Intent::Commit,
-            Some(Enter::Select) => Intent::Activate,
-            None => Intent::None,
-        },
-        _ => Intent::None,
     }
 }
 
@@ -342,8 +259,8 @@ fn dock<'a, S: DockHost>(s: &'a mut S, f: &Form) -> &'a mut Dock {
     if s.dock().form != f.id {
         let focus = pick_focus(s, f, 0);
         let d = s.dock_mut();
-        (d.form, d.tab, d.focus, d.step) = (f.id.clone(), 0, focus, 0);
-        (d.minimized, d.keyboard) = (false, false);
+        (d.form, d.tab, d.focus) = (f.id.clone(), 0, focus);
+        (d.minimized, d.keyboard, d.active_option) = (false, false, Some(focus));
     }
     s.dock_mut()
 }
@@ -368,12 +285,11 @@ fn editing<S: DockHost>(s: &S, f: &Form, tab: usize) -> bool {
     s.dock().typed.get(&f.key(tab)).is_some_and(|t| t.focused)
 }
 
-/// Whether the dock takes letters now: its typed answer is open or highlighted.
+/// Whether the dock takes letters now: its typed answer field has focus.
 pub fn takes_text<S: DockHost>(s: &S) -> bool {
     let Some(f) = asking(s) else { return false };
-    let (tab, focus) = place(s, &f);
-    // Classic's "Type your own answer" is a field only once it's open.
-    editing(s, &f, tab) || (!classic(s) && focus >= rows(&f.fields[tab]).len() && has_custom(&f.fields[tab]))
+    let (tab, _) = place(s, &f);
+    editing(s, &f, tab)
 }
 
 /// Opens the current question's typed answer with `text` in it (the storybook's typing stories).
@@ -423,6 +339,7 @@ fn select<S: DockHost>(s: &mut S, f: &Form, tab: usize, i: usize) {
     }
     let Some((value, ..)) = rows(&f.fields[tab]).into_iter().nth(i) else { return };
     let k = f.key(tab);
+    let clear_typed = !classic(s) && !f.multi(tab);
     let d = s.dock_mut();
     let picks = d.picks.entry(k.clone()).or_default();
     if f.multi(tab) {
@@ -435,6 +352,9 @@ fn select<S: DockHost>(s: &mut S, f: &Form, tab: usize, i: usize) {
     } else {
         *picks = vec![value];
         d.custom.remove(&k);
+        if clear_typed {
+            d.typed.remove(&k);
+        }
     }
     stop_typing(s, f, tab);
 }
@@ -475,10 +395,13 @@ fn jump<S: DockHost>(s: &mut S, f: &Form, tab: usize, tx: &mut Tx) {
     stop_typing(s, f, from);
     let focus = pick_focus(s, f, tab);
     let d = dock(s, f);
-    d.step = if tab > from { 1 } else { -1 };
     d.tab = tab;
     d.focus = focus;
+    d.active_option = Some(focus);
     tx.motion_curve(knobs::morph(s.knobs()));
+    if !classic(s) {
+        composer::land(s, f, tab, tx);
+    }
 }
 
 /// Next question, or the reply on the last one.
@@ -512,109 +435,13 @@ fn closed_if_gone<S: DockHost>(s: &mut S, f: &Form, tx: &mut Tx) {
     }
 }
 
-/// Enter on a single choice picks the highlighted answer and moves on; an empty typed answer
-/// opens its field instead.
-fn commit<S: DockHost>(s: &mut S, f: &Form, tx: &mut Tx) {
-    let (tab, focus) = place(s, f);
-    if f.multi(tab) {
-        return next(s, f, tx);
-    }
-    if focus < rows(&f.fields[tab]).len() {
-        select(s, f, tab, focus);
-        return next(s, f, tx);
-    }
-    if s.dock().typed.get(&f.key(tab)).is_none_or(|t| t.text.trim().is_empty()) {
-        tx.instant();
-        return start_typing(s, f, tab);
-    }
-    s.dock_mut().custom.insert(f.key(tab));
-    next(s, f, tx);
-}
-
 /// A key while the dock shows; false when it isn't the dock's.
 pub fn key<S: DockHost>(s: &mut S, ev: &KeyEvent, tx: &mut Tx) -> bool {
     if classic(s) {
-        return classic::key(s, ev, tx);
-    }
-    let Some(f) = asking(s) else { return false };
-    let (tab, focus) = place(s, &f);
-    let editing_here = editing(s, &f, tab);
-    if !editing_here && !focus_in_dock(tx.focused()) {
-        return false;
-    }
-    let field = &f.fields[tab];
-    let n = rows(field).len();
-    let focus = focused_option(tx.focused(), n, has_custom(field)).unwrap_or(focus);
-    let zone = if editing_here {
-        Zone::Input
-    } else if !focus_in_options(tx.focused()) {
-        Zone::Other
-    } else if focus >= n && has_custom(field) {
-        Zone::Custom
+        classic::key(s, ev, tx)
     } else {
-        Zone::Option
-    };
-    let intent = intent(ev, zone, count(field), s.dock_question_submit());
-    // A reply on its way: the dock's keys do nothing (Desktop's `nav` while `sending`).
-    if busy(s, &f) {
-        return intent != Intent::None;
+        composer::key(s, ev, tx)
     }
-    match intent {
-        Intent::None => return false,
-        Intent::Dismiss => dismiss(s, &f, tx),
-        // Next and Submit are lit only on an answered question; → skips one.
-        Intent::Advance => {
-            if answered(s, &f, tab) {
-                next(s, &f, tx)
-            }
-        }
-        // ⌘[ on the first question isn't the dock's: it goes back through the history.
-        Intent::Question(-1) if tab == 0 && matches!(ev.key, Key::Command(_)) => return false,
-        Intent::Question(step) => {
-            if step > 0 && !f.last(tab) {
-                jump(s, &f, tab + 1, tx);
-            } else if step < 0 && tab > 0 {
-                jump(s, &f, tab - 1, tx);
-            }
-        }
-        Intent::Commit => {
-            if !tx.key_repeat() {
-                dock(s, &f).focus = focus;
-                commit(s, &f, tx);
-            }
-        }
-        Intent::Type(c) => {
-            tx.instant();
-            let t = s.dock_mut().typed_mut(&f.id, &field.key);
-            *t = TextEdit::new(format!("{}{c}", t.text));
-            start_typing(s, &f, tab);
-        }
-        Intent::Number(i) => {
-            tx.instant();
-            if i >= n {
-                toggle_custom(s, &f, tab);
-            } else {
-                select(s, &f, tab, i);
-                dock(s, &f).focus = i;
-            }
-        }
-        Intent::Activate => {
-            if !tx.key_repeat() {
-                tx.instant();
-                if focus >= n { toggle_custom(s, &f, tab) } else { select(s, &f, tab, focus) }
-            }
-        }
-        Intent::Move(step) => {
-            tx.instant();
-            dock(s, &f).focus = (focus as i32 + step).clamp(0, count(field) as i32 - 1) as usize;
-        }
-        Intent::First | Intent::Last => {
-            tx.instant();
-            dock(s, &f).focus = if ev.key == Key::Home { 0 } else { count(field) - 1 };
-        }
-    }
-    reveal_focus(s, tx);
-    true
 }
 
 /// Inserts a newline into the typed answer's field when plain Enter is the non-submitting Enter
@@ -628,67 +455,6 @@ pub(super) fn insert_typed_newline<S: DockHost>(s: &mut S, f: &Form, tab: usize)
     if !f.multi(tab) {
         d.picks.remove(&k);
     }
-}
-
-/// Keys in "Type your own answer": Esc leaves the field, ↑ on its first line goes to the answer
-/// above, the submit key moves on, ⌘↵ and ⌘[ as anywhere. Everything else types: the other
-/// Enter starts a new line (`session-question-dock-experimental.tsx:1363-1369`).
-fn typed_key<S: DockHost>(s: &mut S, ev: &KeyEvent, tx: &mut Tx) -> bool {
-    let Some(f) = asking(s) else { return false };
-    let (tab, _) = place(s, &f);
-    let n = rows(&f.fields[tab]).len();
-    let m = ev.mods;
-    match ev.key {
-        Key::Escape => {
-            tx.instant();
-            stop_typing(s, &f, tab);
-            dock(s, &f).focus = n;
-            reveal_focus(s, tx);
-            true
-        }
-        Key::Up if n > 0 && !m.shift && !m.alt && !m.cmd && !m.ctrl && s.dock().typed.get(&f.key(tab)).is_none_or(|t| face::on_first_line(t, s.dock().input_w)) => {
-            tx.instant();
-            stop_typing(s, &f, tab);
-            dock(s, &f).focus = n - 1;
-            reveal_focus(s, tx);
-            true
-        }
-        Key::Enter if !m.cmd && !m.ctrl => match enter(ev, s.dock_question_submit()) {
-            Some(Enter::Submit) => {
-                if !tx.key_repeat() && answered(s, &f, tab) {
-                    next(s, &f, tx);
-                }
-                true
-            }
-            Some(Enter::Select) if !m.shift => {
-                insert_typed_newline(s, &f, tab);
-                true
-            }
-            _ => false,
-        },
-        _ => key(s, ev, tx) || s.dock_shortcut(ev, tx),
-    }
-}
-
-fn hover_answer<S: DockHost>(s: &mut S, i: usize, tx: &mut Tx) {
-    let Some(f) = asking(s) else { return };
-    let (tab, _) = place(s, &f);
-    if !editing(s, &f, tab) {
-        tx.instant();
-        dock(s, &f).focus = i;
-    }
-}
-
-/// The tallest the header and answers get, the footer under them taking the rest of the cap;
-/// None on a stage with no pane to share (the composer stories).
-fn body_max<S: DockHost>(s: &S) -> Option<f32> {
-    let pane = s.dock_pane_h()?;
-    // Never so tall the timeline goes: in a short pane (1280×640 at 1.6×) the 240 pt floor gives
-    // way, so a fifth of the pane under the header still shows the conversation; the answers
-    // scroll inside whatever the dock gets.
-    let keep = pane * TIMELINE_KEEP + HEADER_H;
-    let cap = (pane * s.knobs().get(&knobs::QUESTION_MAX)).max(MIN_H).min(pane - keep).max(FOOTER_H);
-    Some((cap - FOOTER_H).max(0.0))
 }
 
 /// Brings the highlighted answer, or "Type your own answer", into sight; on the first answer as

@@ -121,6 +121,16 @@ pub fn on_plugin_updated(s: &mut dyn SettingsHost) {
     s.spawn_job(SettingsJob::ActiveServer(SettingsRequest::ReloadPlugins { server }));
 }
 
+/// Called on `skill.updated` SSE: refreshes the skill list when Settings › Extensions is open
+/// (`packages/client/src/solid/data.ts:1522-1540`, `opencode#66813`).
+pub fn on_skill_updated(s: &mut dyn SettingsHost) {
+    if !s.settings_open() || s.settings_pages().page != Page::Extensions {
+        return;
+    }
+    let server = s.settings_pages().extensions.server.clone();
+    s.spawn_job(SettingsJob::ActiveServer(SettingsRequest::ReloadSkills { server }));
+}
+
 /// Called on `config.updated` SSE: refreshes Console extension sources when Extensions is open.
 pub fn on_config_updated(s: &mut dyn SettingsHost) {
     if !s.settings_open() || s.settings_pages().page != Page::Extensions {

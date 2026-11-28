@@ -355,6 +355,7 @@ pub fn poll(tx: &mut Tx) {
         // `--launch-trace-relaunch`: the quit is a Restart (an update's relaunch), once: the copy it
         // starts (`RUNE_RELAUNCH_AFTER`) quits as a traced run does, appending its own line.
         if crate::flag("--launch-trace-relaunch") && std::env::var_os("RUNE_RELAUNCH_AFTER").is_none() {
+            crate::background_notice::mark_relaunch();
             tx.relaunch();
         } else {
             tx.quit();

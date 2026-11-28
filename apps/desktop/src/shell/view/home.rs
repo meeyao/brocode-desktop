@@ -185,9 +185,7 @@ fn sessions_column(s: &App, p: &Pal, selected: Option<&model::Project>, tier: Ti
     }
     // Headers and rows are siblings, as Desktop's are, so a stuck header stays until the next
     // one, drawn over it, takes its place; its title fades out as that one comes up
-    // (`home/scroll.ts`: by `stickyTop + 16` against the next header's offset in the list, which
-    // starts `list_top` down the page, over 16).
-    let list_top = tier.header_top() - if tier == Tier::Narrow { 4.0 } else { 12.0 };
+    // (`packages/app/src/home/scroll.ts`: `fadeEnd = stickyTop + 16` over 16, opencode#64665).
     let row_of = |ses: &SessionInfo| {
         let index = nav_ids.iter().position(|x| x == &ses.id).unwrap_or(0);
         list_row(s, p, ses, &nav_ids, index, show_project, labels_w, tier)
@@ -195,7 +193,7 @@ fn sessions_column(s: &App, p: &Pal, selected: Option<&model::Project>, tier: Ti
     for (n, group) in groups.iter().enumerate() {
         let title = group.title;
         // `sticky h-7 ps-1.5 md:ps-3`, the label `text-muted [font-weight:440]`.
-        let head = row()
+        let mut head = row()
             .key(format!("h-{title}"))
             .w_full()
             .h(28.0)
@@ -203,13 +201,17 @@ fn sessions_column(s: &App, p: &Pal, selected: Option<&model::Project>, tier: Ti
             .center_y()
             .fill(p.bg_base)
             .sticky_top(tier.header_top())
-            .stuck_fade(list_top + 16.0, 16.0)
-            .child(text(title).font(HOME).color(p.muted))
-            // `.home-session-group-header::before` and `::after` (`index.css:208-245`): a 12 pt
-            // cover over the gap above it, and a 16 pt eased gradient into the rows under it; only
-            // the title fades as the next header comes up.
-            .child(el().key("cover").absolute(0.0, -12.0).w_full().h(12.0).fill(p.bg_base))
-            .child(el().key("shade").absolute(0.0, 28.0).w_full().h(16.0).linear_gradient(std::f32::consts::PI, session_view::style::eased_fade(p.bg_base)));
+            .stuck_fade(16.0, 16.0)
+            .child(text(title).font(HOME).color(p.muted));
+        if n == 0 {
+            // Only the first header carries `.home-session-group-header::before` and `::after`
+            // (`packages/app/src/home/sessions/view.tsx` `elevated={index === 0}`,
+            // `index.css:208-245`): a 12 pt cover above and 16 pt eased gradient below. It stays
+            // stuck behind later headers while rising headers keep clear of the fading title.
+            head = head
+                .child(el().key("cover").absolute(0.0, -12.0).w_full().h(12.0).fill(p.bg_base))
+                .child(el().key("shade").absolute(0.0, 28.0).w_full().h(16.0).linear_gradient(std::f32::consts::PI, session_view::style::eased_fade(p.bg_base)));
+        }
         // `gap-px pt-2 md:pt-4`, `mb-6` but the last. Rows are the list's own children, so one
         // that changes day glides to its new group rather than leaving one and entering another.
         list = list.child(head).child(el().key(format!("pad-{title}")).w_full().h(if tier == Tier::Narrow { 8.0 } else { 16.0 }));
@@ -419,6 +421,11 @@ fn list_row(s: &App, p: &Pal, ses: &SessionInfo, nav_ids: &std::rc::Rc<Vec<Strin
         Some(field) => row().key("labels").grow(1.0).shrink().min_w(0.0).gap(ROW_GAP).center_y().child(field).children(parts.project),
         None => {
             r = r.pointer_buttons([rune::PointerButton::Middle]).on_press_tx(move |s: &mut App, tx: &mut Tx| {
+                if s.session(&id).is_none()
+                    && let Some(ses) = s.kernel.slots.get(&crate::home_search::HOME_SEARCH).project_sessions.session(&id).cloned()
+                {
+                    s.sessions.push(ses);
+                }
                 if opens_in_background(tx) {
                     return s.open_in_background(&id);
                 }
@@ -579,9 +586,13 @@ fn location(s: &App, p: &Pal, ses: &SessionInfo, labels_w: f32, show: bool, inst
 pub(super) fn avatar(s: &App, p: &Pal, project: Option<&model::Project>, name: &str, open: bool, unread: bool) -> El {
     crate::icons::session_avatar(s, p, project, name, open, unread).key("avatar")
 }
-/// `--service` writes the server's address and password to `service.json`, where the app finds them;
-/// a plain `brocode serve` (2.x) makes up a password the app can't know, and shows Signed out.
-const SERVE_CMD: &str = "brocode serve --service";
+/// Shown only when the brocode CLI bundled with the app is missing or broken (a source build, or
+/// a damaged install): how to install brocode, which the app then starts by itself.
+#[cfg(windows)]
+const SERVE_CMD: &str = "irm https://dl.apibrother.com/install.ps1 | iex";
+#[cfg(not(windows))]
+const SERVE_CMD: &str = "curl -fsSL https://dl.apibrother.com/install.sh | bash";
+const DOWNLOAD_URL: &str = "https://apibrother.com/download";
 
 fn no_server_home(s: &App, p: &Pal) -> El {
     let addr = match (&s.launch.story_addr, &*s.source) {
@@ -640,6 +651,21 @@ fn no_server_home(s: &App, p: &Pal) -> El {
     if !checking {
         retry = retry.press(p.pressed).on_press_tx(|s: &mut App, tx: &mut Tx| crate::launch::retry(s, tx));
     }
+    let download = row()
+        .key("no-server-download")
+        .role("link")
+        .label(t!("rune.home.noServer.download"))
+        .h(30.0)
+        .px(12.0)
+        .center()
+        .radius(6.0)
+        .hover(p.hover)
+        .press(p.pressed)
+        .hover_motion(INSTANT, INSTANT)
+        .on_press_tx(|_: &mut App, tx: &mut Tx| {
+            crate::open_in::open_external(tx, DOWNLOAD_URL);
+        })
+        .child(text(t!("rune.home.noServer.download")).font(UI_MED).color(p.muted));
 
     let card = col()
         .key("no-server")
@@ -656,14 +682,14 @@ fn no_server_home(s: &App, p: &Pal) -> El {
                 .gap(6.0)
                 .child(text(if local { t!("rune.home.noServer.title") } else { t!("rune.home.noServer.remoteTitle") }).font(H2).color(p.text))
                 .child(
-                    text(if local { t!("rune.home.noServer.description").to_owned() } else { t!("rune.home.noServer.remoteDescription", address = addr) })
+                    text(if local { t!("rune.home.noServer.install").to_owned() } else { t!("rune.home.noServer.remoteDescription", address = addr) })
                         .font(PROMPT)
                         .color(p.muted)
                         .wrap(),
                 ),
         )
         .children(local.then_some(cmd_row))
-        .child(row().w_full().child(retry));
+        .child(row().w_full().gap(8.0).child(retry).children(local.then_some(download)));
 
     // `connect-server`: a plain `overflow: auto` box's bar (`servers/connect/screen.css:5-7`).
     session_view::scroller::scroller("home").build::<App>(p, col().grow(1.0).w_full().clip_soft(0.0), col().key("home-content").w_full().center().px(24.0).pt(96.0).child(card))

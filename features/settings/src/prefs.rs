@@ -174,6 +174,27 @@ choice! {
     TabGrouping { None => "none", "settings.general.row.tabGrouping.none", Project => "project", "settings.general.row.tabGrouping.project", Server => "server", "settings.general.row.tabGrouping.server" } default None
 }
 
+/// Only local and dev builds (and internal `pr-*` builds) offer the composer-integrated New
+/// question UI (`settings/model.tsx:357`, `opencode#66825`).
+pub fn question_composer_available() -> bool {
+    let channel = crate::build_channel();
+    matches!(channel, "local" | "dev") || channel.starts_with("pr-")
+}
+
+impl crate::Settings {
+    /// Experimental › New question UI (`general.questionComposer`, `opencode#66825`): offered only
+    /// on local and dev builds, defaulting to `default` when unset (true live, false in fixtures).
+    pub fn question_composer_with_default(&self, default: bool) -> bool {
+        question_composer_available() && self.question_composer.unwrap_or(default)
+    }
+
+    /// Experimental › New question UI (`general.questionComposer`, `opencode#66825`): on by default
+    /// on local and dev builds.
+    pub fn question_composer(&self) -> bool {
+        self.question_composer_with_default(true)
+    }
+}
+
 /// Desktop's sound effects (`shell/notifications/sound.ts`), by id and label key.
 pub const SOUNDS: &[(&str, opencode_i18n::Key)] = &[
     ("alert-01", opencode_i18n::key!("sound.option.alert01")), ("alert-02", opencode_i18n::key!("sound.option.alert02")), ("alert-03", opencode_i18n::key!("sound.option.alert03")), ("alert-04", opencode_i18n::key!("sound.option.alert04")), ("alert-05", opencode_i18n::key!("sound.option.alert05")),

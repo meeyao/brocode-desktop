@@ -27,6 +27,14 @@ pub(super) fn devtools(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Resul
             if let Err(err) = scope.check_tab(s, id, true) {
                 return done.complete(failed(err));
             }
+            if let Some(res) = s.workspace_panes.browser.host.tab(id).map(|t| t.residency())
+                && matches!(res, browser_pane::TabResidency::Hibernated { .. } | browser_pane::TabResidency::Waking)
+            {
+                if res.is_hibernated() && !s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id)) {
+                    return done.complete(failed("Browser tab could not be woken.".to_owned()));
+                }
+                return done.complete(failed("Tab is waking; retry once loaded.".to_owned()));
+            }
             if !s.workspace_panes.browser.host.has_live_sidecar() {
                 return done.complete(failed(not_running(&s.workspace_panes.browser.host.status())));
             }
@@ -42,6 +50,7 @@ pub(super) fn devtools(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Resul
             if !is_dialog && s.workspace_panes.browser.host.tab(id).is_some_and(|t| t.prompts.dialog.open().is_some()) {
                 return done.complete(failed(format!("[browser.dialog_open] A JavaScript dialog is open in tab {id}. Answer or dismiss the dialog before continuing.")));
             }
+            s.workspace_panes.browser.host.freeze_tab(id, false);
             match s.workspace_panes.browser.host.send_cdp(id, cdp, params, target) {
                 Ok(request) => {
                     s.workspace_panes.browser.devtools.insert(request, crate::surfaces::browser::PendingDevtools { done, deadline: Instant::now() + DEVTOOLS_TIMEOUT, tab_id: id, is_dialog });
@@ -66,9 +75,18 @@ pub(super) fn site_cookies(lua: &Lua, a: MultiValue, done: Completer) -> mlua::R
             if let Err(err) = scope.check_tab(s, id, true) {
                 return done.complete(failed(err));
             }
+            if let Some(res) = s.workspace_panes.browser.host.tab(id).map(|t| t.residency())
+                && matches!(res, browser_pane::TabResidency::Hibernated { .. } | browser_pane::TabResidency::Waking)
+            {
+                if res.is_hibernated() && !s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id)) {
+                    return done.complete(failed("Browser tab could not be woken.".to_owned()));
+                }
+                return done.complete(failed("Tab is waking; retry once loaded.".to_owned()));
+            }
             if !s.workspace_panes.browser.host.has_live_sidecar() {
                 return done.complete(failed(not_running(&s.workspace_panes.browser.host.status())));
             }
+            s.workspace_panes.browser.host.freeze_tab(id, false);
             match s.workspace_panes.browser.host.site_cookies(id) {
                 Ok(request) => {
                     s.workspace_panes.browser.devtools.insert(request, crate::surfaces::browser::PendingDevtools { done, deadline: Instant::now() + DEVTOOLS_TIMEOUT, tab_id: id, is_dialog: false });
@@ -93,10 +111,19 @@ pub(super) fn clear_site(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Res
             if let Err(err) = scope.check_tab(s, id, true) {
                 return done.complete(failed(err));
             }
+            if let Some(res) = s.workspace_panes.browser.host.tab(id).map(|t| t.residency())
+                && matches!(res, browser_pane::TabResidency::Hibernated { .. } | browser_pane::TabResidency::Waking)
+            {
+                if res.is_hibernated() && !s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id)) {
+                    return done.complete(failed("Browser tab could not be woken.".to_owned()));
+                }
+                return done.complete(failed("Tab is waking; retry once loaded.".to_owned()));
+            }
             if !s.workspace_panes.browser.host.has_live_sidecar() {
                 return done.complete(failed(not_running(&s.workspace_panes.browser.host.status())));
             }
             scope.mark_tab_driven(s, id);
+            s.workspace_panes.browser.host.freeze_tab(id, false);
             match s.workspace_panes.browser.host.clear_site(id) {
                 Ok(request) => {
                     s.workspace_panes.browser.devtools.insert(request, crate::surfaces::browser::PendingDevtools { done, deadline: Instant::now() + DEVTOOLS_TIMEOUT, tab_id: id, is_dialog: false });

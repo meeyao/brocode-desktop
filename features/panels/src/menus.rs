@@ -7,14 +7,21 @@ use opencode_ui::popover::{self, MENU, Opt};
 use opencode_ui::style::{UI, UI_SMALL};
 
 use crate::host::PanelsHost;
-use crate::state::{ResolvedRegion, SideMenu, close_side_tab, reopen_closed_side_tab, resolve_side_region};
+use crate::state::{NewTabFocus, ResolvedRegion, SideMenu, close_side_tab, release_strip_width_holds, reopen_closed_side_tab, resolve_side_region};
 use crate::tabs::{ClosedSideTab, split_panel_key};
 use crate::{Launch, PanelLauncherDesc, SessionPane};
 
 const INSTANT: Anim = Anim::INSTANT;
 
-pub fn new_tab_view<H: PanelsHost + 'static>(host: &H, p: &Pal, reg: &ResolvedRegion, pane: SessionPane) -> El {
-    // `Launchers`: rows 12 apart in a 560 column, 48 from the strip.
+pub fn new_tab_view<H: PanelsHost + 'static>(host: &H, p: &Pal, reg: &ResolvedRegion, pane: SessionPane, pane_w: f32) -> El {
+    let focus_token = match host.side().new_tab_focus {
+        NewTabFocus::Requested { pane: fp, token } if fp == pane && !host.side().edge_flight.is_flying() => Some(token),
+        _ => None,
+    };
+    let top = host.panel_new_tab_slots(p, "session.panel.new", &reg.session_id, pane, pane_w, focus_token);
+    let extra_list = host.panel_new_tab_slots(p, "session.panel.new.list", &reg.session_id, pane, pane_w, None);
+
+    // `Launchers`: rows 12 apart in a 560 column, 48 from the strip (or browser bar).
     let mut list = col().key("side-launchers").w_full().max_w(560.0).pt(48.0).pb(40.0).gap(12.0);
 
     for &(plugin, ref desc, launch) in &reg.launchers {
@@ -26,6 +33,10 @@ pub fn new_tab_view<H: PanelsHost + 'static>(host: &H, p: &Pal, reg: &ResolvedRe
             .on_press_tx(move |s: &mut H, tx: &mut Tx| on_launch_card_press(s, launch, id, pane, tx))
             .on_hover_change(move |s: &mut H, inside, tx: &mut Tx| on_launch_hover(s, launch, id, inside, tx));
         list = list.child(card);
+    }
+
+    for extra in extra_list {
+        list = list.child(extra);
     }
 
     let closed_items = visible_closed_items(host, reg);
@@ -44,14 +55,34 @@ pub fn new_tab_view<H: PanelsHost + 'static>(host: &H, p: &Pal, reg: &ResolvedRe
         list = list.child(recent);
     }
 
-    col()
-        .key("side-new-tab-view")
+    let has_top = !top.is_empty();
+    let scroller = col()
+        .key("side-new-tab-scroll")
         .w_full()
         .grow(1.0)
         .min_h(0.0)
         .px(24.0)
+        .pt(if has_top { 44.0 } else { 0.0 })
         .scroll(ScrollSpec { stick_bottom: false })
-        .child(row().w_full().center().child(list))
+        .child(row().w_full().center().child(list));
+
+    let mut view = col()
+        .key("side-new-tab-view")
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
+        .child(scroller);
+    if has_top {
+        // Pinned as the last child so the top browser bar stays fixed above scrolled rows and its
+        // omnibox suggestions dropdown paints and hit-tests above the launchers (`side-region.tsx:636`).
+        view = view.child(
+            col()
+                .key("side-new-tab-top")
+                .pin(Some(0.0), Some(0.0), Some(0.0), None)
+                .children(top),
+        );
+    }
+    view
 }
 
 fn launcher_card_shell(host: &dyn PanelsHost, p: &Pal, plugin: &'static str, desc: &PanelLauncherDesc) -> El {
@@ -365,12 +396,14 @@ fn on_tab_menu_copy_url(host: &mut dyn PanelsHost, url: Option<&str>, tx: &mut T
 }
 
 fn on_tab_menu_close(host: &mut dyn PanelsHost, key: &str, tx: &mut Tx) {
+    release_strip_width_holds(host);
     host.side_mut().menu = SideMenu::Closed;
     close_side_tab(host, key, tx);
 }
 
 fn on_tab_menu_close_list(host: &mut dyn PanelsHost, keys: &[String], tx: &mut Tx) {
     tx.instant();
+    release_strip_width_holds(host);
     host.side_mut().menu = SideMenu::Closed;
     for k in keys {
         close_side_tab(host, k, tx);

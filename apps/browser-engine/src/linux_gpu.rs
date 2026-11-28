@@ -1,11 +1,13 @@
 //! Windowless CEF renders on the session's GPU, through the display backend's buffer allocator.
 //!
-//! Only X11 Ozone hands `OnAcceleratedPaint` dmabufs: under Wayland Ozone (and headless) CEF
-//! 156's frame capture can't allocate GPU buffers, and Wayland Ozone also turns Vulkan off. So
-//! when the app imports dmabufs and an X server answers (XWayland on a Wayland session), the
-//! engine uses X11 with ANGLE on Vulkan, and copies each frame into its own dmabufs
-//! (`dmabuf_frames`). Otherwise frames come as BGRA paints, still rendered on the GPU, on the
-//! session's own backend.
+//! X11 Ozone is preferred whenever an X server answers (including XWayland on a Wayland session):
+//! it is the only Ozone backend whose `OnAcceleratedPaint` hands dmabufs, it keeps ANGLE on
+//! Vulkan enabled, and its BGRA `OnPaint` fallback honours `ScreenInfo::device_scale_factor`
+//! (Wayland Ozone in CEF 156 disables Vulkan and paints BGRA at DIP dimensions instead of device
+//! pixels, breaking fractional/HiDPI scaling under Rune's `surface_unscaled(true)`). When the
+//! app imports dmabufs (`--dmabuf-device`) and the render node's GBM/EGL stack can allocate and
+//! render into linear `ARGB8888` buffers, each frame is copied into dmabufs (`dmabuf_frames`);
+//! otherwise frames come as BGRA paints.
 use std::sync::{Arc, OnceLock};
 
 use cef::{CommandLine, ImplCommandLine};
@@ -15,8 +17,6 @@ use crate::dmabuf_frames::{Gpu, Transport};
 /// The Ozone platform, chosen once before CEF starts.
 #[derive(Clone, Copy, Debug)]
 enum Ozone {
-    /// X11 with dmabufs, on the app's render node.
-    X11Dmabuf,
     X11,
     Wayland,
     /// No display answers: only the repo's headless tooling runs the engine like this (the app
@@ -67,21 +67,29 @@ fn x_answers() -> bool {
 /// dmabufs (`--dmabuf-device`) and an X server answers.
 pub fn plan(node: Option<String>) -> Option<String> {
     let x = x_answers();
-    let ozone = match (&node, x, set("WAYLAND_DISPLAY")) {
-        (Some(_), true, _) => Ozone::X11Dmabuf,
-        (_, _, true) => Ozone::Wayland,
-        (_, true, false) => Ozone::X11,
-        (_, false, false) => {
-            eprintln!("browser engine: no display answers (WAYLAND_DISPLAY unset, DISPLAY {}); headless ozone", if set("DISPLAY") { "doesn't answer" } else { "unset" });
+    let wayland = set("WAYLAND_DISPLAY") || set("WAYLAND_SOCKET");
+    let ozone = match (x, wayland) {
+        (true, _) => Ozone::X11,
+        (false, true) => Ozone::Wayland,
+        (false, false) => {
+            eprintln!(
+                "browser engine: no display answers (WAYLAND_DISPLAY unset, DISPLAY {}); headless ozone",
+                if set("DISPLAY") { "doesn't answer" } else { "unset" }
+            );
             Ozone::Headless
         }
     };
     let _ = OZONE.set(ozone);
-    node.filter(|_| matches!(ozone, Ozone::X11Dmabuf))
+    node.filter(|_| matches!(ozone, Ozone::X11))
 }
 
 fn ozone() -> Ozone {
     OZONE.get().copied().unwrap_or(Ozone::Headless)
+}
+
+/// Whether CEF was configured with X11 Ozone (`ozone-platform=x11`).
+pub fn is_x11() -> bool {
+    matches!(ozone(), Ozone::X11)
 }
 
 /// The transport the engine starts with, from its EGL context's start.
@@ -106,7 +114,7 @@ pub fn transport(gpu: Option<Result<Arc<Gpu>, String>>) -> Transport {
 pub fn configure(cmd: &mut CommandLine) {
     let value = |key: &str, val: &str| cmd.append_switch_with_value(Some(&key.into()), Some(&val.into()));
     let platform = match ozone() {
-        Ozone::X11Dmabuf | Ozone::X11 => "x11",
+        Ozone::X11 => "x11",
         Ozone::Wayland => "wayland",
         Ozone::Headless => "headless",
     };

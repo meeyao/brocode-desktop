@@ -1,7 +1,8 @@
 //! Sidecar connection and multi-tab state, including the Rune frame handle for each tab.
 
 mod poll;
-use std::collections::{HashMap, VecDeque};
+mod residency;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -30,10 +31,13 @@ pub struct BrowserTab {
     pub url: String,
     pub title: String,
     pub loading: bool,
+    pub audible: bool,
     pub can_go_back: bool,
     pub can_go_forward: bool,
     pub zoom: f64,
     pub cursor: CursorKind,
+    /// Wheel-scroll cursor deferral state machine (avoids full-window UI rebuilds on scroll).
+    pub(crate) scroll_cursor: crate::scroll_cursor::ScrollCursor,
     /// Why the page shows no document (`TabSnapshot::load_error`).
     pub load_error: Option<String>,
     /// Site favicon as a bounded `data:image/png;base64,...` data URL (`UP-109` `#65094`).
@@ -70,9 +74,26 @@ pub struct BrowserTab {
     pub(crate) has_engine_tab: bool,
     /// True once the engine has emitted at least one `TabUpdate`/`TabList` snapshot for this tab.
     pub(crate) engine_confirmed: bool,
+    /// Explicit residency phase (`Active`, `Hidden`, `Frozen`, `Hibernated`, `Waking`).
+    pub(crate) residency: crate::residency::TabResidency,
 }
 
 impl BrowserTab {
+    /// Whether this tab currently has a live (or queued) backing tab in the engine.
+    pub fn has_engine_tab(&self) -> bool {
+        self.has_engine_tab
+    }
+
+    /// Whether the engine has emitted at least one `TabUpdate`/`TabList` snapshot for this tab.
+    pub fn engine_confirmed(&self) -> bool {
+        self.engine_confirmed
+    }
+
+    /// Current explicit residency phase (mutated exclusively via `residency::step`).
+    pub fn residency(&self) -> crate::residency::TabResidency {
+        self.residency
+    }
+
     /// The pixel size the engine renders this tab's frames at: its viewport in whole points (the
     /// engine's view rect) times its scale.
     pub fn frame_px(&self) -> (u32, u32) {
@@ -103,10 +124,36 @@ pub struct CdpEvent {
 /// Bounded queue capacity for unconsumed CDP events so diagnostics never grow unboundedly.
 const MAX_QUEUED_CDP_EVENTS: usize = 2_048;
 
+#[cfg(target_os = "linux")]
+fn host_is_wayland() -> bool {
+    if std::env::var_os("WINIT_UNIX_BACKEND").is_some_and(|v| v.eq_ignore_ascii_case("x11")) {
+        return false;
+    }
+    std::env::var_os("WAYLAND_DISPLAY").is_some_and(|v| !v.is_empty())
+        || std::env::var_os("WAYLAND_SOCKET").is_some_and(|v| !v.is_empty())
+}
+
+/// Result of forwarding a keyboard event to a browser tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum KeyForward {
+    /// Not handled by the browser surface (e.g. a shell shortcut or blocked by a modal).
+    Ignored,
+    /// Sent directly to the browser engine; no Rune view state changed (`tx.live_only()`).
+    Forwarded,
+    /// Mutated browser-pane UI state (zoom, inspect, reload); requires a Rune view commit.
+    StateChanged,
+    /// Paste should read Rune's host clipboard and send `HostMsg::PasteText` (#1308).
+    PasteHost,
+}
+
 pub struct BrowserHost {
     pub(crate) tabs: Vec<BrowserTab>,
     pub(crate) focused_tab: Option<u64>,
+    pub(crate) visible_tabs: Vec<u64>,
+    pub(crate) unthrottled_tabs: HashSet<u64>,
     pub(crate) surfaces: Arc<Mutex<HashMap<u64, TabSurface>>>,
+    #[cfg(all(feature = "engine", target_os = "linux"))]
+    pub(crate) dmabuf_pools: Arc<Mutex<Option<Arc<Mutex<crate::dmabuf::Pools>>>>>,
     /// Shared sidecar connection state (`generation`, `status`, `outbox`, child PID, and early opens).
     pub(crate) shared: Arc<Mutex<SharedEngine>>,
     /// Status last observed by `poll()`, for change detection in `quiet()` and `poll()`.
@@ -145,6 +192,8 @@ pub struct BrowserHost {
     pub(crate) popup_opens: VecDeque<crate::prompts::PopupRequest>,
     /// The person's Copy image results (PNG, base64), drained by the app for its clipboard.
     pub(crate) copied_images: VecDeque<String>,
+    /// Host-bridged text copy/cut results, drained by the app for its clipboard (#1308).
+    pub(crate) copied_texts: VecDeque<String>,
     /// Tabs whose first navigation became the person's download, now placed: drained by the app.
     pub(crate) download_only_tabs: VecDeque<u64>,
     pub(crate) app_links: VecDeque<(u64, String)>,
@@ -163,6 +212,8 @@ pub struct BrowserHost {
     pub(crate) keep_engine: bool,
     /// The scheme pages draw in: 0 not given yet, 1 light, 2 dark.
     color_scheme: std::sync::atomic::AtomicU8,
+    /// Target OSR frame rate matching the window's display refresh rate in Hz (0 = not given yet).
+    display_fps: std::sync::atomic::AtomicU32,
     /// The last laid-out page size, so a new tab opens at it instead of 800 × 600 and a resize.
     pub(crate) last_viewport: ((f32, f32), f32),
     #[cfg(all(feature = "engine", target_os = "macos"))]
@@ -183,6 +234,8 @@ pub struct BrowserHost {
     /// Per-tab `(last_engine_favicon, url -> favicon)` cache (bounded to 32 URLs/tab) so same-origin
     /// bfcache Back/Forward restores each page's icon when CEF omits `on_favicon_urlchange`.
     pub(crate) tab_favicons: HashMap<u64, (Option<String>, HashMap<String, String>)>,
+    /// Extension wake requests (`EngineMsg::ExtensionWakeTab`) drained by desktop's `poll_browser`.
+    pub(crate) pending_ext_wakes: VecDeque<crate::residency::ExtensionWakeRequest>,
 }
 
 impl Default for BrowserHost {
@@ -198,7 +251,11 @@ impl BrowserHost {
         Self {
             tabs: Vec::new(),
             focused_tab: None,
+            visible_tabs: Vec::new(),
+            unthrottled_tabs: HashSet::new(),
             surfaces: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(all(feature = "engine", target_os = "linux"))]
+            dmabuf_pools: Arc::new(Mutex::new(None)),
             last_polled_status: initial_status.clone(),
             shared: Arc::new(Mutex::new(SharedEngine::new(initial_status))),
             inbox_tx,
@@ -224,6 +281,7 @@ impl BrowserHost {
             picked: VecDeque::new(),
             popup_opens: VecDeque::new(),
             copied_images: VecDeque::new(),
+            copied_texts: VecDeque::new(),
             download_only_tabs: VecDeque::new(),
             app_links: VecDeque::new(),
             context_menus: VecDeque::new(),
@@ -237,6 +295,7 @@ impl BrowserHost {
             site_zoom: SiteZoom::default(),
             keep_engine: false,
             color_scheme: std::sync::atomic::AtomicU8::new(0),
+            display_fps: std::sync::atomic::AtomicU32::new(0),
             last_viewport: ((800.0, 600.0), 2.0),
             #[cfg(all(feature = "engine", target_os = "macos"))]
             mach: None,
@@ -249,6 +308,7 @@ impl BrowserHost {
             prepared: Arc::default(),
             extensions: Default::default(),
             tab_favicons: HashMap::new(),
+            pending_ext_wakes: VecDeque::new(),
         }
     }
 
@@ -264,6 +324,31 @@ impl BrowserHost {
         if self.color_scheme.swap(want, std::sync::atomic::Ordering::Relaxed) != want {
             self.send(HostMsg::SetColorScheme { dark });
         }
+    }
+
+    /// Matches off-screen browser rendering to the window's display refresh rate (60..=240 Hz).
+    pub fn set_display_hz(&self, hz: f64) {
+        if !hz.is_finite() || hz < 30.0 {
+            return;
+        }
+        let fps = (hz.round() as u32).clamp(60, 240);
+        if self.display_fps.swap(fps, std::sync::atomic::Ordering::Relaxed) != fps {
+            self.send(HostMsg::SetFrameRate { fps });
+        }
+    }
+
+    /// Notes active wheel scrolling on `tab_id` so cursor-only `TabUpdate`s defer until settle.
+    pub(crate) fn note_wheel_scroll(&mut self, tab_id: u64) {
+        let now = rune::time::Instant::now();
+        if let Some(t) = self.tabs.iter_mut().find(|t| t.id == tab_id) {
+            t.scroll_cursor.step(crate::scroll_cursor::ScrollCursorEvent::Wheel { now });
+        }
+    }
+
+    /// Earliest deadline at which a deferred scroll-time cursor must settle (used by `browser_waker`
+    /// to arm `tx.wake_after` when `poll()` returns `false`).
+    pub fn scroll_cursor_wake_at(&self) -> Option<rune::time::Instant> {
+        self.tabs.iter().filter_map(|t| t.scroll_cursor.wake_at()).min()
     }
 
     /// Leaves the engine running when the last tab closes, so the next page skips its start and
@@ -307,6 +392,30 @@ impl BrowserHost {
 
     pub fn set_shell_shortcut(&mut self, check: fn(&KeyEvent) -> bool) {
         self.shell_shortcut = Some(check);
+    }
+
+    /// Whether browser text Copy/Cut/Paste should route through Rune's host clipboard instead of
+    /// CEF's native clipboard. Active on Linux when Rune runs on Wayland while CEF runs under X11
+    /// Ozone (XWayland), where CEF touching the X11 clipboard breaks the Wayland host clipboard
+    /// until a window focus cycle (#1308).
+    pub fn uses_host_clipboard(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            host_is_wayland() && self.caps.host_clipboard() && self.caps.x11_clipboard()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
+    }
+
+    /// Sends plain text read from Rune's host clipboard to `tab_id` without reading CEF's clipboard.
+    pub fn paste_host_clipboard(&mut self, tab_id: u64, text: &str) {
+        let known = self.tabs.iter().any(|t| t.id == tab_id) || self.popup_tab_id() == Some(tab_id);
+        if text.is_empty() || !known {
+            return;
+        }
+        self.send(HostMsg::PasteText { tab_id, text: text.to_owned() });
     }
 
     /// Whether this build has any way to run an engine: a download source, a trust rule for an
@@ -440,6 +549,9 @@ impl BrowserHost {
     pub fn close_tab(&mut self, id: u64) {
         self.preview_chunk_budget.cancel_tab(id);
         self.tab_favicons.remove(&id);
+        self.visible_tabs.retain(|&x| x != id);
+        self.unthrottled_tabs.remove(&id);
+        self.close_dmabuf_pool(id);
         if let Some(pos) = self.tabs.iter().position(|t| t.id == id) {
             let removed = self.tabs.remove(pos);
             removed.surface.clear();
@@ -454,7 +566,9 @@ impl BrowserHost {
                 } else {
                     Some(self.tabs[pos.min(self.tabs.len() - 1)].id)
                 };
-                if let Some(next_id) = self.focused_tab {
+                if let Some(next_id) = self.focused_tab
+                    && self.tabs.iter().any(|t| t.id == next_id && t.has_engine_tab)
+                {
                     self.send(HostMsg::FocusTab { tab_id: next_id });
                 }
             }
@@ -480,10 +594,29 @@ impl BrowserHost {
     pub(crate) fn clear_stale_fault_if_empty(&self) {
         #[cfg(feature = "engine")]
         if !self.has_engine_tabs() {
-            self.shared
+            self.clear_stale_fault();
+        }
+    }
+
+    pub(crate) fn clear_stale_fault(&self) {
+        #[cfg(feature = "engine")]
+        {
+            let effect = self
+                .shared
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .step(EngineEvent::ClearStaleFault);
+            if let EngineEffect::EndHung { kill_pid, sock, outbox } = effect {
+                if let Some(pid) = kill_pid {
+                    crate::transport::kill_pid(pid);
+                }
+                if let Some(tx) = outbox {
+                    tx.send(HostMsg::Shutdown).ok();
+                }
+                if let Some(sock) = sock.or_else(|| self.engine_socket().ok()) {
+                    std::fs::remove_file(sock).ok();
+                }
+            }
         }
     }
 
@@ -555,6 +688,7 @@ impl BrowserHost {
                 return;
             }
             t.has_engine_tab = true;
+            crate::residency::step(&mut t.residency, crate::residency::ResidencyEvent::BeginWake);
             promote_open = Some((
                 t.viewport_pt,
                 t.scale,
@@ -577,12 +711,10 @@ impl BrowserHost {
         t.loading = true;
         if let Some(((width_pt, height_pt), scale, _file_roots, context, agent_driven, allow_ext_pages)) = promote_open {
             if !had_engine_tabs {
-                #[cfg(feature = "engine")]
-                self.shared
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .step(EngineEvent::ClearStaleFault);
+                self.clear_stale_fault();
             }
+            let connected = self.is_connected();
+            let ready = self.status() == EngineStatus::Ready;
             self.sync_has_tabs();
             if connected && (context.is_default() || ready) {
                 self.send_open_tab_with_ext(
@@ -780,7 +912,7 @@ impl BrowserHost {
         // one given another address or laid out at another size meanwhile gets them.
         for (&tab_id, (sent_url, sent_size)) in &early {
             let pending_url = self.pending_opens.iter().find(|(id, _)| *id == tab_id).map(|(_, u)| u.clone());
-            let (size, nav_url, agent_driven, isolated) = {
+            let (size, zoom, nav_url, agent_driven, isolated) = {
                 let Some(t) = self.tabs.iter_mut().find(|t| t.id == tab_id) else {
                     self.send(HostMsg::CloseTab { tab_id });
                     continue;
@@ -801,13 +933,16 @@ impl BrowserHost {
                     }
                     _ => None,
                 };
-                (size, nav, t.prompts.agent_driven, t.context.is_isolated() || t.preview.is_some())
+                (size, t.zoom, nav, t.prompts.agent_driven, t.context.is_isolated() || t.preview.is_some())
             };
             if agent_driven {
                 self.send(HostMsg::SetAgentDriven { tab_id, agent_driven: true });
             }
             if size != *sent_size {
                 self.send(HostMsg::Resize { tab_id, width_pt: size.0, height_pt: size.1, scale: size.2 });
+            }
+            if (zoom - 1.0).abs() > 0.001 {
+                self.send(HostMsg::SetZoom { tab_id, factor: zoom });
             }
             if let Some(url) = nav_url {
                 if !isolated && self.extensions.filter_gate.maybe_hold(tab_id, &url) {
@@ -831,7 +966,7 @@ impl BrowserHost {
                 continue;
             }
             let mut skip_open = false;
-            let (open_url, ((width_pt, height_pt), scale), context, preview, emulate, agent_driven, allow_ext_pages) =
+            let (open_url, ((width_pt, height_pt), scale), context, preview, zoom, emulate, agent_driven, allow_ext_pages) =
                 if let Some(t) = self.tabs.iter_mut().find(|t| t.id == tab_id) {
                     t.sent_resize = Some((t.viewport_pt.0, t.viewport_pt.1, t.scale));
                     let (open_url, preview) = if let Some(spec) = t.preview_spec.clone() {
@@ -903,12 +1038,20 @@ impl BrowserHost {
                     let emulate = t.device.as_ref().map(|d| (d.clone(), d.fit([t.viewport_pt.0, t.viewport_pt.1])));
                     if !skip_open {
                         t.has_engine_tab = true;
+                    } else if t.residency.is_waking() {
+                        crate::residency::step(
+                            &mut t.residency,
+                            crate::residency::ResidencyEvent::WakeFailed {
+                                now: rune::time::Instant::now(),
+                            },
+                        );
                     }
                     (
                         open_url,
                         (t.viewport_pt, t.scale),
                         t.context.clone(),
                         preview,
+                        t.zoom,
                         emulate,
                         t.prompts.agent_driven,
                         t.allow_extension_pages,
@@ -934,9 +1077,13 @@ impl BrowserHost {
                 allow_ext_pages,
                 None,
             );
+            if (zoom - 1.0).abs() > 0.001 {
+                self.send(HostMsg::SetZoom { tab_id, factor: zoom });
+            }
             if let Some((device, emu_scale)) = emulate {
                 self.send(HostMsg::Emulate { tab_id, device: Some(device), scale: emu_scale });
             }
+            self.replay_tab_lifecycle(tab_id);
         }
         self.pending_opens = deferred;
         self.sync_has_tabs();
@@ -968,17 +1115,23 @@ impl BrowserHost {
         self.close_extension_popup();
         let effect = self.shared.lock().unwrap_or_else(PoisonError::into_inner).step(EngineEvent::Shutdown);
         #[cfg(feature = "engine")]
-        if let Ok(sock) = self.engine_socket() {
-            std::fs::remove_file(sock).ok();
+        {
+            let active_sock = match &effect {
+                EngineEffect::Shutdown { sock, .. } => sock.clone(),
+                _ => None,
+            };
+            if let Some(sock) = active_sock.or_else(|| self.engine_socket().ok()) {
+                std::fs::remove_file(sock).ok();
+            }
         }
-        if let EngineEffect::Shutdown { outbox: Some(tx) } = effect {
+        if let EngineEffect::Shutdown { outbox: Some(tx), .. } = effect {
             tx.send(HostMsg::Shutdown).ok();
         }
     }
 
-    pub(crate) fn forward_key(&mut self, tab_id: u64, ev: &KeyEvent, down: bool) -> bool {
+    pub(crate) fn forward_key(&mut self, tab_id: u64, ev: &KeyEvent, down: bool) -> KeyForward {
         if self.tab(tab_id).is_some_and(|t| t.prompts.has_blocking_modal()) {
-            return false;
+            return KeyForward::Ignored;
         }
         if ev.key == Key::Escape
             && !(ev.mods.ctrl || ev.mods.cmd || ev.mods.alt || ev.mods.shift)
@@ -986,44 +1139,69 @@ impl BrowserHost {
         {
             if down {
                 self.toggle_inspect(tab_id);
+                return KeyForward::StateChanged;
             }
-            return true;
+            return KeyForward::Forwarded;
         }
         if self.shell_shortcut.map_or_else(|| is_shell_shortcut(ev), |f| f(ev)) {
-            return false;
+            return KeyForward::Ignored;
         }
         if let Some(dir) = page_zoom_dir(ev) {
             if down {
                 self.step_zoom(tab_id, dir);
+                return KeyForward::StateChanged;
             }
-            return true;
+            return KeyForward::Forwarded;
+        }
+        if self.uses_host_clipboard() {
+            if ev.key == Key::Delete && ev.mods.shift && !ev.mods.ctrl && !ev.mods.cmd && !ev.mods.alt {
+                if down {
+                    self.send(HostMsg::CopySelection { tab_id, cut: true });
+                }
+                return KeyForward::Forwarded;
+            }
+            if down && let Key::Command(c) = ev.key && !ev.mods.alt {
+                match c {
+                    'c' if !ev.mods.shift => {
+                        self.send(HostMsg::CopySelection { tab_id, cut: false });
+                        return KeyForward::Forwarded;
+                    }
+                    'x' if !ev.mods.shift => {
+                        self.send(HostMsg::CopySelection { tab_id, cut: true });
+                        return KeyForward::Forwarded;
+                    }
+                    'v' => return KeyForward::PasteHost,
+                    _ => {}
+                }
+            }
         }
         if down && let Key::Command(c) = ev.key {
             let cmd = match c {
                 'a' => Some("select_all"),
                 'c' => Some("copy"),
+                'v' if ev.mods.shift && self.caps.host_clipboard() => Some("paste_plain"),
                 'v' => Some("paste"),
                 'x' => Some("cut"),
                 'z' if ev.mods.shift => Some("redo"),
                 'z' => Some("undo"),
                 'r' if ev.mods.shift => {
                     self.reload_ignore_cache(tab_id);
-                    return true;
+                    return KeyForward::StateChanged;
                 }
                 'r' => {
                     self.reload(tab_id);
-                    return true;
+                    return KeyForward::StateChanged;
                 }
                 _ => None,
             };
             if let Some(cmd) = cmd {
                 self.send(HostMsg::EditCmd { tab_id, cmd: cmd.into() });
-                return true;
+                return KeyForward::Forwarded;
             }
         }
         if down && !cfg!(target_os = "macos") && ev.mods.ctrl && !ev.mods.alt && !ev.mods.cmd && ev.key == Key::Function(5) {
             self.reload_ignore_cache(tab_id);
-            return true;
+            return KeyForward::StateChanged;
         }
         // Every other chord and the function keys go to the page, as official leaves them there
         // (`keys.ts` `pageShortcut` forwards only the shell's own): Ctrl+P / S / U, Ctrl+Shift+I,
@@ -1036,7 +1214,7 @@ impl BrowserHost {
             other => (None, named_key_str(other).map(str::to_owned)),
         };
         if text.is_none() && named.is_none() {
-            return false;
+            return KeyForward::Ignored;
         }
         self.send(HostMsg::Key {
             tab_id,
@@ -1045,7 +1223,7 @@ impl BrowserHost {
             named,
             mods: pack_mods(ev.mods),
         });
-        true
+        KeyForward::Forwarded
     }
 
     pub(crate) fn alloc_tab_id(&mut self) -> u64 {
@@ -1071,6 +1249,11 @@ impl BrowserHost {
         self.next_tab_id = self.next_tab_id.max(snap.tab_id + 1);
         let want_zoom = self.site_zoom.get(&snap.url);
         if let Some(t) = self.tabs.iter_mut().find(|t| t.id == snap.tab_id) {
+            // Ignore late in-flight engine snapshots after a tab has been hibernated so it never
+            // resurrects into a zombie with `has_engine_tab == true`.
+            if t.residency.is_hibernated() && !t.has_engine_tab {
+                return false;
+            }
             // While an `http(s)` navigation is held behind startup DNR filter readiness, the
             // engine paints an initial `about:blank` shell; keep the tab showing its target URL
             // and spinner so the address bar never flickers.
@@ -1120,18 +1303,42 @@ impl BrowserHost {
                 }
                 url_favs.insert(snap.url.clone(), fav.clone());
             }
-            let changed = url_changed
+            let non_cursor_changed = url_changed
                 || t.title != snap.title
                 || t.loading != snap.loading
+                || t.audible != snap.audible
                 || t.can_go_back != snap.can_go_back
                 || t.can_go_forward != snap.can_go_forward
                 || (t.zoom - snap.zoom).abs() > 0.001
-                || t.cursor != snap.cursor
                 || t.load_error != snap.load_error
                 || t.favicon != resolved_favicon
                 || clear_refusal
                 || !cancel_perms.is_empty()
                 || !cancel_auth.is_empty();
+            let cursor_changed = if non_cursor_changed {
+                t.scroll_cursor.step(crate::scroll_cursor::ScrollCursorEvent::CoalescedCommit);
+                let diff = t.cursor != snap.cursor;
+                t.cursor = snap.cursor;
+                diff
+            } else if t.scroll_cursor == crate::scroll_cursor::ScrollCursor::Idle {
+                let diff = t.cursor != snap.cursor;
+                t.cursor = snap.cursor;
+                diff
+            } else {
+                let now = rune::time::Instant::now();
+                match t.scroll_cursor.step(crate::scroll_cursor::ScrollCursorEvent::CursorChanged {
+                    cursor: snap.cursor,
+                    now,
+                }) {
+                    crate::scroll_cursor::ScrollCursorEffect::Apply(c) => {
+                        let diff = t.cursor != c;
+                        t.cursor = c;
+                        diff
+                    }
+                    crate::scroll_cursor::ScrollCursorEffect::None => false,
+                }
+            };
+            let changed = non_cursor_changed || cursor_changed;
             if clear_refusal {
                 t.refusal = None;
             }
@@ -1141,10 +1348,10 @@ impl BrowserHost {
             t.url = snap.url;
             t.title = snap.title;
             t.loading = snap.loading;
+            t.audible = snap.audible;
             t.can_go_back = snap.can_go_back;
             t.can_go_forward = snap.can_go_forward;
             t.zoom = snap.zoom;
-            t.cursor = snap.cursor;
             let keep_artifact_missing = t.load_error.as_deref() == Some("browser.artifact.missing")
                 && (t.preview == Some(crate::protocol::PreviewKindTag::Artifact)
                     || snap.preview == Some(crate::protocol::PreviewKindTag::Artifact));
@@ -1163,6 +1370,14 @@ impl BrowserHost {
             }
             t.has_engine_tab = true;
             t.engine_confirmed = true;
+            let awake = self.visible_tabs.contains(&snap.tab_id) || self.unthrottled_tabs.contains(&snap.tab_id);
+            crate::residency::step(
+                &mut t.residency,
+                crate::residency::ResidencyEvent::EngineConfirmed {
+                    awake,
+                    now: rune::time::Instant::now(),
+                },
+            );
             let mut changed = changed;
             if new_site && !t.context.is_isolated() {
                 changed |= (t.zoom - want_zoom).abs() > 0.001;
@@ -1207,15 +1422,18 @@ impl BrowserHost {
             *last = Some(fav.clone());
             map.insert(snap.url.clone(), fav.clone());
         }
+        let residency = self.initial_residency(snap.tab_id);
         self.tabs.push(BrowserTab {
             id: snap.tab_id,
             url: snap.url,
             title: snap.title,
             loading: snap.loading,
+            audible: snap.audible,
             can_go_back: snap.can_go_back,
             can_go_forward: snap.can_go_forward,
             zoom: if is_site { want_zoom } else { snap.zoom },
             cursor: snap.cursor,
+            scroll_cursor: Default::default(),
             load_error: snap.load_error,
             favicon: snap.favicon,
             preview: snap.preview,
@@ -1238,6 +1456,7 @@ impl BrowserHost {
             sent_resize: None,
             has_engine_tab: true,
             engine_confirmed: true,
+            residency,
         });
         self.sync_has_tabs();
         self.note_tab_confirmed();

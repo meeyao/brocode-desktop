@@ -191,6 +191,29 @@ fn supervisor() -> &'static Mutex<Sender<Job>> {
     })
 }
 
+/// Host-resolved command and base environment for a plugin's [`Spec`].
+///
+/// Returned by the resolver registered via [`set_resolver`]: `program` and `prefix_args` replace
+/// `spec.program` (prefixing `spec.args`, e.g. for multi-token dev CLI commands or `.cmd` shims),
+/// and `base_env`, when `Some`, replaces the inherited process environment before `spec.env`
+/// overrides are applied.
+pub struct Resolved {
+    pub program: String,
+    pub prefix_args: Vec<String>,
+    pub base_env: Option<Vec<(String, String)>>,
+}
+
+type Resolver = Box<dyn Fn(&str) -> Option<Resolved> + Send + Sync>;
+
+static RESOLVER: OnceLock<Resolver> = OnceLock::new();
+
+/// Registers the host's process command and environment resolver, called on the supervisor thread
+/// before each plugin process starts (e.g. mapping bare `"opencode"` to the app's bundled/staged
+/// CLI and supplying the user's login-shell environment on Unix GUI launches).
+pub fn set_resolver(resolver: impl Fn(&str) -> Option<Resolved> + Send + Sync + 'static) {
+    let _ = RESOLVER.set(Box::new(resolver));
+}
+
 /// Starts the supervisor with the plugins, so the first spawn finds it running.
 pub fn warm() {
     supervisor();
@@ -203,11 +226,27 @@ fn start(job: Job) {
         job.ctl.step(LifeEvent::Exited);
         return job.send(Event::Exit { code: None, error: String::new() });
     }
-    let mut cmd = Command::new(&spec.program);
-    cmd.args(&spec.args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    let resolved = RESOLVER.get().and_then(|resolve| resolve(&spec.program));
+    // Re-check cancellation in case the resolver waited (e.g. login-shell probe or CLI staging).
+    if job.ctl.life.lock().is_ok_and(|l| matches!(*l, Life::Cancelled(_))) {
+        job.ctl.step(LifeEvent::Exited);
+        return job.send(Event::Exit { code: None, error: String::new() });
+    }
+    let (program, prefix_args, base_env) = match resolved {
+        Some(r) => (r.program, r.prefix_args, r.base_env),
+        None => (spec.program.clone(), Vec::new(), None),
+    };
+    let mut cmd = Command::new(&program);
+    cmd.args(&prefix_args).args(&spec.args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let log = spec.stderr_file.then(StderrFile::create).flatten();
     if let Some(file) = log.as_ref().and_then(|l| l.handle()) {
         cmd.stderr(file);
+    }
+    if let Some(base_env) = base_env {
+        cmd.env_clear();
+        for (k, v) in base_env {
+            cmd.env(k, v);
+        }
     }
     for (k, v) in &spec.env {
         cmd.env(k, v);
@@ -220,7 +259,7 @@ fn start(job: Job) {
         Ok(c) => c,
         Err(e) => {
             job.ctl.step(LifeEvent::Exited);
-            return job.send(Event::Exit { code: None, error: format!("{}: {e}", spec.program) });
+            return job.send(Event::Exit { code: None, error: format!("{program}: {e}") });
         }
     };
     platform::adopt(&child);

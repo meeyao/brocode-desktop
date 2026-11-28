@@ -184,6 +184,10 @@ pub(crate) fn accept(s: &mut App, attempt: u64, tx: &mut Tx) {
         .deep_links
         .step(DeepLinkEvent::Accepted { attempt }, |server| ready.iter().any(|r| r == server));
     let _ = run(s, effects, tx);
+    // Reset focus to Cancel whenever advancing directly to a queued confirmation (`deep-links.tsx:129`, opencode#65803).
+    if asking(s) {
+        tx.focus("deep-link-cancel", false);
+    }
 }
 
 /// Declines the active deep-link confirmation attempt.
@@ -191,6 +195,9 @@ pub(crate) fn decline(s: &mut App, attempt: u64, tx: &mut Tx) {
     tx.instant();
     let effects = s.services.deep_links.step(DeepLinkEvent::Declined { attempt }, |_| false);
     let _ = run(s, effects, tx);
+    if asking(s) {
+        tx.focus("deep-link-cancel", false);
+    }
 }
 
 /// Declines whichever deep-link confirmation dialog is open, if any.

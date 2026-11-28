@@ -41,32 +41,115 @@ pub fn play(id: &str) {
     }
 }
 
+/// Bounded claim set for sounds already played this run (`MAX_CLAIMED` in
+/// `packages/app/src/shell/notifications/coordinator.ts:9`).
+const MAX_CLAIMED: usize = 500;
+
+thread_local! {
+    static CLAIMED: std::cell::RefCell<std::collections::VecDeque<String>> =
+        const { std::cell::RefCell::new(std::collections::VecDeque::new()) };
+}
+
+fn claim_key(key: &str) -> bool {
+    CLAIMED.with_borrow_mut(|claimed| {
+        if claimed.iter().any(|k| k == key) {
+            return false;
+        }
+        if claimed.len() >= MAX_CLAIMED {
+            claimed.pop_front();
+        }
+        claimed.push_back(key.to_owned());
+        true
+    })
+}
+
 /// The sound event `e` calls for, when its event's sound is on (from `App::react`): each
 /// window with the session's tab decides, and the sound plays once for the event.
+/// Matches `packages/app/src/shell/notifications/notification.tsx` (`handleSessionIdle`,
+/// `handleSessionError`, `handleRequest`) and `coordinator.ts` (`coordinator.sound`).
 pub fn event(app: &App, e: &crate::events::StreamEvent, sid: &str) {
-    let (ty, data) = (e.ty.as_str(), &e.data);
     if !app.persists() {
         return;
     }
+    let Some((id, dedup_key)) = decide(app, e.ty.as_str(), &e.data, sid, e.done.running_child) else {
+        return;
+    };
+    if !crate::events::StreamEvent::take(&e.sound, true) {
+        return;
+    }
+    if let Some(key) = dedup_key
+        && !claim_key(&key)
+    {
+        return;
+    }
+    play(id);
+}
+
+fn decide<'a>(app: &'a App, ty: &str, data: &serde_json::Value, sid: &str, running_child: bool) -> Option<(&'a str, Option<String>)> {
     let sounds = &app.settings.sounds;
     // A tab on the event's server: the window is checked out on it while it reacts.
     let server = crate::servers::runtime::active(app);
-    let has_tab = |id: &str| app.tabs.iter().any(|t| t.id == id && t.server == *server);
-    let root = |id: &str| app.session(id).is_none_or(|s| s.parent.is_none());
-    // A muted session plays nothing, as it posts nothing (`notification.tsx`'s `muted`).
-    let asker = data["sessionID"].as_str().unwrap_or(sid);
-    if crate::session_menu::preferences::silenced(app, server, sid) || crate::session_menu::preferences::silenced(app, server, asker) {
-        return;
-    }
-    let id = match ty {
-        "session.execution.succeeded" if root(sid) && has_tab(sid) => sounds.agent.as_deref(),
-        "session.execution.failed" if root(sid) && has_tab(sid) => sounds.errors.as_deref(),
-        "permission.asked" if has_tab(app.root_of(data["sessionID"].as_str().unwrap_or(sid))) => sounds.permissions.as_deref(),
-        "form.created" if has_tab(app.root_of(data["sessionID"].as_str().unwrap_or(sid))) => sounds.questions.as_deref(),
-        _ => None,
+    let has_tab = |id: &str| app.tabs.iter().any(|t| !t.is_draft() && t.id == id && t.server == *server);
+    let silenced = |id: &str| crate::session_menu::preferences::silenced(app, server, id);
+    let exec_key = || {
+        data["executionEventID"]
+            .as_str()
+            .or_else(|| data["eventID"].as_str())
+            .filter(|id| !id.is_empty())
+            .map(|id| format!("{}\0{id}", server.as_str()))
     };
-    if let Some(id) = id.filter(|_| crate::events::StreamEvent::take(&e.sound, true)) {
-        play(id);
+    match ty {
+        // `handleSessionIdle` (`packages/app/src/shell/notifications/notification.tsx:275-289`):
+        // skip while any direct child subagent was running at event time, for unknown or child
+        // sessions (`if (!session || session.parentID) return`), when muted, or without a tab.
+        "session.execution.succeeded" => {
+            let known_root = app.session(sid).is_some_and(|s| s.parent.is_none());
+            if running_child || silenced(sid) || !known_root || !has_tab(sid) {
+                return None;
+            }
+            Some((sounds.agent.as_deref()?, exec_key()))
+        }
+        // `handleSessionError` (`packages/app/src/shell/notifications/notification.tsx:304-315`):
+        // skip for subagents (`if (session?.parentID) return`), when muted, or without a tab.
+        "session.execution.failed" => {
+            let not_child = app.session(sid).is_none_or(|s| s.parent.is_none());
+            if silenced(sid) || !not_child || !has_tab(sid) {
+                return None;
+            }
+            Some((sounds.errors.as_deref()?, exec_key()))
+        }
+        // `handleRequest` (`packages/app/src/shell/notifications/notification.tsx:330-358, 382-396`):
+        // permissions and forms (`question`, `mcp-elicitation`, `websearch.provider` only),
+        // skipping muted, auto-approved permissions, resolved requests, and sessions without an
+        // open tab on themselves or their root.
+        "permission.asked" | "form.created" => {
+            let (kind, asker, request_id, sound) = if ty == "permission.asked" {
+                let asker = data["sessionID"].as_str().unwrap_or(sid);
+                if app.auto_accepts(asker) {
+                    return None;
+                }
+                ("permission", asker, data["id"].as_str().unwrap_or(""), sounds.permissions.as_deref())
+            } else {
+                let form = if data["form"].is_object() { &data["form"] } else { data };
+                let kind = form["metadata"]["kind"].as_str()?;
+                let sound = match kind {
+                    "question" | "mcp-elicitation" => sounds.questions.as_deref(),
+                    "websearch.provider" => sounds.permissions.as_deref(),
+                    _ => return None,
+                };
+                let asker = form["sessionID"].as_str().or(data["sessionID"].as_str()).unwrap_or(sid);
+                (kind, asker, form["id"].as_str().unwrap_or(""), sound)
+            };
+            if request_id.is_empty()
+                || silenced(asker)
+                || !(has_tab(asker) || has_tab(app.root_of(asker)))
+                || !app.pending.iter().any(|p| p.id() == request_id)
+            {
+                return None;
+            }
+            Some((sound?, Some(format!("{}\0{kind}:{request_id}", server.as_str()))))
+        }
+        _ => None,
     }
 }
 

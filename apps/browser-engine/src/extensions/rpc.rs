@@ -1003,6 +1003,8 @@ impl ExtensionHost {
         let index_q = query.and_then(|q| q.get("index")).and_then(Value::as_u64);
         let title_q = query.and_then(|q| q.get("title")).and_then(Value::as_str);
         let status_q = query.and_then(|q| q.get("status")).and_then(Value::as_str);
+        let discarded_q = query.and_then(|q| q.get("discarded")).and_then(Value::as_bool);
+        let frozen_q = query.and_then(|q| q.get("frozen")).and_then(Value::as_bool);
         let url_patterns: Vec<String> = match query.and_then(|q| q.get("url")) {
             Some(Value::String(s)) => vec![s.clone()],
             Some(Value::Array(arr)) => arr.iter().filter_map(Value::as_str).map(str::to_owned).collect(),
@@ -1042,6 +1044,11 @@ impl ExtensionHost {
             if status_q.is_some_and(|s| s != status) {
                 continue;
             }
+            if discarded_q.is_some_and(|d| d != tab.lifecycle.is_discarded())
+                || frozen_q.is_some_and(|f| f != tab.lifecycle.is_frozen())
+            {
+                continue;
+            }
             out.push(self.tab_json(ext_id, tab, manifest, false));
         }
         out
@@ -1071,9 +1078,9 @@ impl ExtensionHost {
             "selected": tab.active,
             "pinned": false,
             "incognito": false,
-            "discarded": false,
+            "discarded": tab.lifecycle.is_discarded(),
             "autoDiscardable": true,
-            "frozen": false,
+            "frozen": tab.lifecycle.is_frozen(),
             "groupId": -1,
             "status": status,
             "audible": tab.audible,

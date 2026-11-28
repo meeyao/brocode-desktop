@@ -48,6 +48,7 @@ pub fn unwatch(host: &mut dyn FilesHost, sid: &str, path: &str) {
 
 /// `sid`'s open files were dropped (its session closed): their watches stop.
 pub fn forget_session(host: &mut dyn FilesHost, sid: &str) {
+    host.files_mut().forget_video_auth_session(sid);
     let held: Vec<(String, String)> = host
         .files()
         .watches
@@ -122,11 +123,14 @@ pub fn reload(host: &mut dyn FilesHost, sid: &str, path: &str) {
         return;
     }
     super::trace::changed(sid, path);
-    if super::video::is_video(path)
-        && let Some(ws) = host.files_mut().sessions.get_mut(sid)
-        && ws.videos.remove(path).is_some()
-    {
-        ws.docs.remove(path);
+    if super::video::is_video(path) {
+        let pane = host.files_mut();
+        pane.reads.clear(sid, path);
+        pane.forget_video_auth(sid, path);
+        if let Some(ws) = pane.sessions.get_mut(sid) {
+            ws.videos.remove(path);
+            ws.docs.remove(path);
+        }
         crate::ops::ensure_file_loaded(host, sid, path);
         return;
     }

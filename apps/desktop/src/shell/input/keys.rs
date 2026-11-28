@@ -4,6 +4,7 @@ use crate::pickers::PickerHost as _;
 use crate::{App, Route, knobs};
 
 pub(crate) fn on_key(s: &mut App, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    s.sidebar_inbox.focus.note_key(ev);
     // A key chord in progress, or one this key starts, takes the key before anything else
     // (`createAppKeymap` reads keys on the document, in the capture phase).
     if crate::key_sequence::window_key(s, ev, tx) {

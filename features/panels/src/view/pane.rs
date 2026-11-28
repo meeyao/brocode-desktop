@@ -73,7 +73,7 @@ pub(crate) fn pane_box<H: PanelsHost + 'static>(
     });
 
     let content = if shown_new.is_some() {
-        new_tab_view(host, p, reg, pane)
+        new_tab_view(host, p, reg, pane, pane_size.0)
     } else if let Some(selected) = held.or_else(|| pane_active.as_deref().and_then(|k| reg.entry(k))) {
         render_selected_panel(host, p, reg, pane, pane_size, env_scale, selected)
     } else if !stored.all.is_empty() && routed_unlisted(host) {
@@ -130,6 +130,9 @@ fn compute_bar_hash(
             host.side().pane_drag.dragging(),
             entries.len(),
             live_new.len(),
+            host.side().width_holds[pane as usize]
+                .active(session_id, pane_w, entries.len() + live_new.len())
+                .to_bits(),
         ),
     )
         .hash(&mut h);

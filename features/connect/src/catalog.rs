@@ -29,18 +29,18 @@ pub struct Catalogs {
 }
 
 impl Catalogs {
-    /// The integrations at `dir` (the server's default when none), once read.
+    /// The integrations at `dir` (falling back to the server's default slot when `dir` is not yet cached).
     pub fn integrations(&self, dir: Option<&str>) -> Option<&[Integration]> {
-        self.integrations.get(&slot(dir)).map(Vec::as_slice)
+        self.integrations.get(&slot(dir)).or_else(|| self.integrations.get("")).map(Vec::as_slice)
     }
 
     pub fn integration_of(&self, dir: Option<&str>, id: &str) -> Option<&Integration> {
         self.integrations(dir)?.iter().find(|i| i.id == id)
     }
 
-    /// The providers the server runs at `dir`, once read.
+    /// The providers the server runs at `dir` (falling back to the default slot when `dir` is not yet cached).
     pub fn provider_infos(&self, dir: Option<&str>) -> Option<&[ProviderInfo]> {
-        self.providers.get(&slot(dir)).map(Vec::as_slice)
+        self.providers.get(&slot(dir)).or_else(|| self.providers.get("")).map(Vec::as_slice)
     }
 
     /// Puts a scene's integrations and providers in the server's default slot, as a sync would.
@@ -64,6 +64,8 @@ pub struct CatalogRead {
     pub integrations: Option<Vec<Integration>>,
     pub providers: Option<Value>,
     pub models: Option<(Value, Value)>,
+    /// `/api/config`: the model new sessions run with.
+    pub config: Option<Value>,
 }
 
 /// Continuation run on the UI thread after a catalog sync completes.
@@ -158,6 +160,7 @@ pub(crate) fn fetch_read(server: &Server, dir: Option<&str>) -> CatalogRead {
         integrations: server.integrations(dir).ok(),
         providers: server.get(&format!("/api/provider{q}")).ok(),
         models: server.get("/api/model").ok().map(|m| (m, server.get("/api/agent").unwrap_or_default())),
+        config: server.get("/api/config").ok(),
     }
 }
 
@@ -174,6 +177,9 @@ pub(crate) fn apply_read(host: &mut dyn ConnectHost, dir: Option<&str>, read: Ca
         let p = without_opencode(p, "id");
         host.catalogs_mut().insert_providers(dir, parse_providers(&p));
         host.load_providers(p.get("data").unwrap_or(&p));
+    }
+    if let Some(config) = &read.config {
+        host.load_config(config);
     }
     if let Some((m, agents)) = &read.models {
         let m = without_opencode(m, "providerID");

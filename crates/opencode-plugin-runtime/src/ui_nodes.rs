@@ -51,6 +51,8 @@ pub fn base_nodes<S: 'static>(
 ) -> Vec<HostNode> {
     vec![
         node("frame", frame::<S>),
+        node("listbox", listbox::<S>),
+        node("option", option::<S>),
         node("divider", divider),
         node("icon", icon),
         node("metric", metric),
@@ -148,6 +150,22 @@ fn frame<S: 'static>(a: &mut NodeArgs) -> Result<El, String> {
     }
     out = key_handler::<S>(a, out);
     Ok(focus(a, out))
+}
+
+/// `ui.listbox` (contract 1.12): a [`frame`] with `role("listbox")` set directly in Rust so
+/// `rune-luau`'s prop parser never rejects the role (`site-chooser.tsx:570`).
+fn listbox<S: 'static>(a: &mut NodeArgs) -> Result<El, String> {
+    Ok(frame::<S>(a)?.role("listbox"))
+}
+
+/// `ui.option` (contract 1.12): a [`frame`] with `role("option")` and optional `selected`
+/// (`aria-selected`, `site-chooser.tsx:582-591`).
+fn option<S: 'static>(a: &mut NodeArgs) -> Result<El, String> {
+    let mut out = frame::<S>(a)?.role("option");
+    if a.get("selected").is_some() {
+        out = out.checked(a.flag("selected"));
+    }
+    Ok(out)
 }
 
 /// `autofocus` (`El::autofocus`: the control a dialog focuses as it opens) and `focusReturn`
@@ -293,10 +311,13 @@ fn button(a: &mut NodeArgs) -> Result<El, String> {
         b = b.icon(named_icon(lead));
     }
     if loading {
-        let spinner = Loader::new().size(14.0).build(k);
-        b = b.label_with(move |style, ink| row().gap(6.0).center_y().child(spinner).child(text(words).font(style).color(ink)));
+        let k_spin = k.clone();
+        b = b.label_with(move |style, ink| {
+            let spinner = Loader::new().size(14.0).color(ink).build(&k_spin);
+            row().gap(6.0).center_y().child(spinner).child(text(words).font(style).color(ink))
+        });
     }
-    let el = focus(a, b.build(k));
+    let el = focus(a, widgets::not_allowed(b.build(k), disabled));
     Ok(if disabled || loading { el } else { a.on_press(el, "onPress") })
 }
 
@@ -350,6 +371,11 @@ fn checkbox(a: &mut NodeArgs) -> Result<El, String> {
         (false, true) => Mark::Check,
         (false, false) => Mark::None,
     };
+    if a.flag("presentation") {
+        // `Checkbox presentation` (`site-chooser.tsx:599-604`): draws only the 16x20 box visually
+        // inside an `option` row, with no role, focus or click handler.
+        return Ok(checkbox_box(kit(&pal), mark, disabled, layer).a11y_hidden());
+    }
     let c = checkbox_widget(kit(&pal), a.string("text").unwrap_or_default(), a.string("description").unwrap_or_default(), mark, disabled, layer);
     Ok(if disabled { c } else { a.on_press_with(c, "onChange", vec![("checked", Data::Bool(!checked))]) })
 }
@@ -396,7 +422,7 @@ fn badge_widget(k: &rune_kit::Kit, label: &str) -> El {
 /// 0.5 hairline, ticked the accent with its 20% white sheen and the 1 pt check; the 13/440 label on
 /// a 20 line, 8 after it, and the 11/440 description 6 under it. Disabled, the row is half opacity.
 /// With a dash it is filled as a ticked one is (`:where([data-checked], [data-indeterminate])`).
-fn checkbox_widget(k: &rune_kit::Kit, label: &str, description: &str, mark: Mark, disabled: bool, layer: bool) -> El {
+fn checkbox_box(k: &rune_kit::Kit, mark: Mark, disabled: bool, layer: bool) -> El {
     let checked = mark != Mark::None;
     let c = &k.c;
     let base = if layer { c.layer_01 } else { c.bg_base };
@@ -414,6 +440,12 @@ fn checkbox_widget(k: &rune_kit::Kit, label: &str, description: &str, mark: Mark
     if mark == Mark::Dash {
         control = control.child(rune_icon(&CHECKBOX_DASH, 16.0).key("dash").absolute(0.0, 0.0).color(c.icon_contrast));
     }
+    let box_el = el().key("stack").size(16.0, 20.0).child(control);
+    if disabled { box_el.layer_opacity(0.5) } else { box_el }
+}
+
+fn checkbox_widget(k: &rune_kit::Kit, label: &str, description: &str, mark: Mark, disabled: bool, layer: bool) -> El {
+    let c = &k.c;
     let mut words = col().key("text").gap(6.0).grow(1.0).shrink().min_w(0.0).child(text(label.to_owned()).key("label").font(TextStyle::new(13.0, 440.0).lh(20.0).tracking(-0.04)).color(c.text_base));
     if !description.is_empty() {
         words = words.child(text(description.to_owned()).key("description").font(TextStyle::new(11.0, 440.0).lh(16.0).tracking(0.05)).color(c.text_muted));
@@ -425,7 +457,7 @@ fn checkbox_widget(k: &rune_kit::Kit, label: &str, description: &str, mark: Mark
         .gap(8.0)
         .items_start()
         .disabled(disabled)
-        .child(el().key("stack").size(16.0, 20.0).child(control).a11y_hidden())
+        .child(checkbox_box(k, mark, false, layer).a11y_hidden())
         .child(words.a11y_hidden());
     if disabled { r.layer_opacity(0.5) } else { r }
 }

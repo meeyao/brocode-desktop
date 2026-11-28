@@ -8,9 +8,8 @@ name: Brocode Web Build
 # Three times a day, and only when dev moved since the last green run; or by hand. Not on every
 # push: dev moves dozens of times a day, and every push's own wasm32 check runs before it.
 
+# brocode: upstream runs this on Blacksmith runners this fork lacks; run by hand only.
 on:
-  schedule:
-    - cron: "17 3,11,19 * * *"
   workflow_dispatch:
 
 permissions:

@@ -12,8 +12,14 @@
 //! copying it; a buffer is written again only after. With every buffer unread the frame is
 //! dropped, and the read that frees one repaints the tab.
 //!
-//! When the app can't use the buffers, frames are read back from CEF's buffer to BGRA paints
-//! (`State::Readback`), with the same browsers.
+//! At startup `Gpu::new` probes allocating and attaching a single linear `ARGB8888` GBM buffer
+//! so drivers that cannot produce linear renderable dmabufs (such as NVIDIA's proprietary GBM
+//! driver) start directly in `Transport::Bgra` without opening shared-texture tabs.
+//!
+//! When the app rejects imported dmabufs (`HostMsg::DmabufFailed`), frames are read back from
+//! CEF's buffer to BGRA paints (`State::Readback`), keeping live tabs open. If a producer
+//! allocation, copy, or readback fails (or readback produces an all-zero transparent buffer),
+//! tabs reopen without shared textures (`Transport::Bgra`) so CEF paints BGRA directly.
 
 mod egl;
 
@@ -28,6 +34,8 @@ use crate::output::{Output, Paint};
 use crate::wire::EngineMsg;
 
 const SLOTS: usize = 3;
+/// Small linear render-target size probed in `Gpu::new` before committing to dmabuf transport.
+const PROBE_SIZE: u32 = 16;
 const ARGB8888: u32 = u32::from_le_bytes(*b"AR24");
 const ABGR8888: u32 = u32::from_le_bytes(*b"AB24");
 const MOD_INVALID: u64 = 0x00ff_ffff_ffff_ffff;
@@ -44,15 +52,26 @@ pub struct Gpu {
 }
 
 impl Gpu {
-    /// A context on render node `node` (`/dev/dri/renderD128`), released from this thread.
+    /// A context on render node `node` (`/dev/dri/renderD128`), verified to allocate and render
+    /// into a linear single-plane `ARGB8888` dmabuf, then released from this thread.
     pub fn new(node: &str) -> Result<Arc<Self>, String> {
         let egl = egl::Egl::open(node)?;
         if !egl.make_current() {
             return Err(format!("couldn't use the EGL context on {node}"));
         }
         let reads_bgra = egl.reads_bgra();
-        egl.release();
-        Ok(Arc::new(Self { egl, reads_bgra, node: node.to_owned() }))
+        let probe = Slot::new(&egl, PROBE_SIZE, PROBE_SIZE);
+        match probe {
+            Ok((slot, _)) => {
+                slot.destroy(&egl, true);
+                egl.release();
+                Ok(Arc::new(Self { egl, reads_bgra, node: node.to_owned() }))
+            }
+            Err(reason) => {
+                egl.release();
+                Err(reason)
+            }
+        }
     }
 }
 
@@ -94,16 +113,20 @@ impl<'a> Source<'a> {
         let (mut texture, mut framebuffer) = (0, 0);
         // SAFETY: GL calls on the current context; the texture and framebuffer live for this call.
         unsafe {
+            while (api.get_error)() != egl::NO_ERROR {}
             (api.gen_textures)(1, &mut texture);
             (api.bind_texture)(egl::TEXTURE_2D, texture);
             (api.image_target_texture)(egl::TEXTURE_2D, self.image);
             (api.gen_framebuffers)(1, &mut framebuffer);
             (api.bind_framebuffer)(egl::READ_FRAMEBUFFER, framebuffer);
             (api.framebuffer_texture_2d)(egl::READ_FRAMEBUFFER, egl::COLOR_ATTACHMENT0, egl::TEXTURE_2D, texture, 0);
-            let complete = (api.check_framebuffer_status)(egl::READ_FRAMEBUFFER) == egl::FRAMEBUFFER_COMPLETE;
+            let complete = (api.get_error)() == egl::NO_ERROR
+                && (api.check_framebuffer_status)(egl::READ_FRAMEBUFFER) == egl::FRAMEBUFFER_COMPLETE;
             if complete {
                 f(api);
             }
+            (api.bind_framebuffer)(egl::READ_FRAMEBUFFER, 0);
+            (api.bind_texture)(egl::TEXTURE_2D, 0);
             (api.delete_framebuffers)(1, &framebuffer);
             (api.delete_textures)(1, &texture);
             complete
@@ -114,14 +137,38 @@ impl<'a> Source<'a> {
     fn read_back(&self, frame_id: u64) -> Result<Paint, String> {
         let (w, h) = self.size;
         let mut bgra = vec![0u8; w as usize * h as usize * 4];
-        let bgr = self.gpu.reads_bgra;
+        let mut bgr = self.gpu.reads_bgra;
+        let mut gl_err = egl::NO_ERROR;
         let read = self.bound(|api| {
-            let format = if bgr { egl::BGRA_EXT } else { egl::RGBA };
             // SAFETY: `bgra` holds w × h tightly packed 4-byte pixels (GL's default pack alignment is 4).
-            unsafe { (api.read_pixels)(0, 0, w as i32, h as i32, format, egl::UNSIGNED_BYTE, bgra.as_mut_ptr().cast()) };
+            unsafe {
+                while (api.get_error)() != egl::NO_ERROR {}
+                let format = if bgr { egl::BGRA_EXT } else { egl::RGBA };
+                (api.read_pixels)(0, 0, w as i32, h as i32, format, egl::UNSIGNED_BYTE, bgra.as_mut_ptr().cast());
+                gl_err = (api.get_error)();
+                // GLES 3 always accepts `RGBA/UNSIGNED_BYTE`, whereas `BGRA_EXT` can still fail
+                // with `GL_INVALID_OPERATION` on an EGLImage attachment even when the extension is
+                // advertised. Retry with `RGBA` before giving up on readback.
+                if bgr && gl_err != egl::NO_ERROR {
+                    bgr = false;
+                    while (api.get_error)() != egl::NO_ERROR {}
+                    (api.read_pixels)(0, 0, w as i32, h as i32, egl::RGBA, egl::UNSIGNED_BYTE, bgra.as_mut_ptr().cast());
+                    gl_err = (api.get_error)();
+                }
+            }
         });
-        if !read {
-            return Err("GL couldn't read Chromium's frame".into());
+        if !read || gl_err != egl::NO_ERROR {
+            return Err(if !read {
+                "GL couldn't read Chromium's frame".into()
+            } else {
+                format!("GL readPixels failed ({gl_err:#x})")
+            });
+        }
+        // Every engine browser paints over an opaque `BASE_COLOR`, so an all-zero buffer (every
+        // pixel transparent) means readback did not receive Chromium's pixels (e.g. NVIDIA EGL
+        // external-image readback). Reject it so the engine reopens tabs in direct BGRA mode.
+        if bgra.iter().all(|&b| b == 0) {
+            return Err("GL readback returned an empty frame".into());
         }
         if !bgr {
             for pixel in bgra.as_chunks_mut::<4>().0 {
@@ -200,49 +247,105 @@ struct Slot {
     holds: Holds,
 }
 
-// SAFETY: only CEF's UI thread touches these, behind the tab's mutex.
-unsafe impl Send for Buffers {}
-
-impl Buffers {
-    fn new(gpu: &Arc<Gpu>, (width, height): (u32, u32)) -> Result<Self, String> {
-        let egl = &gpu.egl;
+impl Slot {
+    /// Allocates one linear `ARGB8888` GBM buffer, exports its dmabuf fd, imports it as an EGL
+    /// image, and attaches it to a GLES draw framebuffer (context must be current).
+    fn new(egl: &egl::Egl, width: u32, height: u32) -> Result<(Self, (u32, u32, u64)), String> {
         let api = &egl.api;
-        let mut buffers = Buffers { gpu: gpu.clone(), pool: POOLS.fetch_add(1, Ordering::Relaxed), size: (width, height), layout: (0, 0, 0), slots: Vec::new() };
-        for i in 0..SLOTS {
-            let bo = egl.linear_bo(width, height, ARGB8888);
-            if bo.is_null() {
-                return Err("GBM couldn't make a linear buffer".into());
-            }
-            // SAFETY: queries and fd export on the live buffer; the fd is owned from here.
-            let (fd, stride, offset, modifier, planes) = unsafe {
-                ((api.gbm_bo_get_fd)(bo), (api.gbm_bo_get_stride)(bo), (api.gbm_bo_get_offset)(bo, 0), (api.gbm_bo_get_modifier)(bo), (api.gbm_bo_get_plane_count)(bo))
-            };
-            if fd < 0 || planes != 1 {
-                // SAFETY: the buffer was made above and nothing else holds it.
-                unsafe { (api.gbm_bo_destroy)(bo) };
-                return Err("GBM's linear buffer isn't one exportable plane".into());
-            }
-            // SAFETY: gbm_bo_get_fd returns a new fd the caller owns.
-            let fd = unsafe { OwnedFd::from_raw_fd(fd) };
-            let image = egl.import(egl::Plane { fd: fd.as_raw_fd(), stride, offset, modifier: Some(modifier) }, width, height, ARGB8888);
-            let (mut texture, mut framebuffer) = (0, 0);
-            // SAFETY: GL calls on the current context over the image made above.
-            let complete = !image.is_null() && unsafe {
+        let bo = egl.linear_bo(width, height, ARGB8888);
+        if bo.is_null() {
+            return Err("GBM couldn't make a linear buffer".into());
+        }
+        // SAFETY: queries and fd export on the live buffer; wrap valid fd immediately so early
+        // returns never leak it.
+        let (raw_fd, stride, offset, modifier, planes) = unsafe {
+            (
+                (api.gbm_bo_get_fd)(bo),
+                (api.gbm_bo_get_stride)(bo),
+                (api.gbm_bo_get_offset)(bo, 0),
+                (api.gbm_bo_get_modifier)(bo),
+                (api.gbm_bo_get_plane_count)(bo),
+            )
+        };
+        let fd = (raw_fd >= 0).then(|| {
+            // SAFETY: `gbm_bo_get_fd` returns a new fd the caller owns.
+            unsafe { OwnedFd::from_raw_fd(raw_fd) }
+        });
+        let Some(fd) = fd.filter(|_| planes == 1) else {
+            // SAFETY: the buffer was made above and nothing else holds it.
+            unsafe { (api.gbm_bo_destroy)(bo) };
+            return Err("GBM's linear buffer isn't one exportable plane".into());
+        };
+        let image = egl.import(
+            egl::Plane { fd: fd.as_raw_fd(), stride, offset, modifier: Some(modifier) },
+            width,
+            height,
+            ARGB8888,
+        );
+        let (mut texture, mut framebuffer) = (0, 0);
+        // SAFETY: GL calls on the current context over the image made above.
+        let complete = !image.is_null()
+            && unsafe {
+                while (api.get_error)() != egl::NO_ERROR {}
                 (api.gen_textures)(1, &mut texture);
                 (api.bind_texture)(egl::TEXTURE_2D, texture);
                 (api.image_target_texture)(egl::TEXTURE_2D, image);
                 (api.gen_framebuffers)(1, &mut framebuffer);
                 (api.bind_framebuffer)(egl::DRAW_FRAMEBUFFER, framebuffer);
                 (api.framebuffer_texture_2d)(egl::DRAW_FRAMEBUFFER, egl::COLOR_ATTACHMENT0, egl::TEXTURE_2D, texture, 0);
-                (api.check_framebuffer_status)(egl::DRAW_FRAMEBUFFER) == egl::FRAMEBUFFER_COMPLETE
+                let ok = (api.get_error)() == egl::NO_ERROR
+                    && (api.check_framebuffer_status)(egl::DRAW_FRAMEBUFFER) == egl::FRAMEBUFFER_COMPLETE;
+                (api.bind_framebuffer)(egl::DRAW_FRAMEBUFFER, 0);
+                (api.bind_texture)(egl::TEXTURE_2D, 0);
+                ok
             };
-            buffers.slots.push(Slot { bo, fd, image, texture, framebuffer, holds: Holds::Free });
-            if !complete {
-                return Err("EGL can't render to a linear buffer".into());
+        let slot = Slot { bo, fd, image, texture, framebuffer, holds: Holds::Free };
+        if !complete {
+            slot.destroy(egl, true);
+            return Err("EGL can't render to a linear buffer".into());
+        }
+        Ok((slot, (stride, offset, modifier)))
+    }
+
+    fn destroy(self, egl: &egl::Egl, current: bool) {
+        // SAFETY: the slot's GL objects, image and buffer were made in `new` on this context,
+        // and are freed once here. `self.fd` closes on drop.
+        unsafe {
+            if current {
+                if self.framebuffer != 0 {
+                    (egl.api.delete_framebuffers)(1, &self.framebuffer);
+                }
+                if self.texture != 0 {
+                    (egl.api.delete_textures)(1, &self.texture);
+                }
             }
+            if !self.image.is_null() {
+                (egl.api.destroy_image)(egl.display, self.image);
+            }
+            (egl.api.gbm_bo_destroy)(self.bo);
+        }
+    }
+}
+
+// SAFETY: only CEF's UI thread touches these, behind the tab's mutex.
+unsafe impl Send for Buffers {}
+
+impl Buffers {
+    fn new(gpu: &Arc<Gpu>, (width, height): (u32, u32)) -> Result<Self, String> {
+        let egl = &gpu.egl;
+        let mut buffers = Buffers {
+            gpu: gpu.clone(),
+            pool: POOLS.fetch_add(1, Ordering::Relaxed),
+            size: (width, height),
+            layout: (0, 0, 0),
+            slots: Vec::with_capacity(SLOTS),
+        };
+        for i in 0..SLOTS {
+            let (slot, layout) = Slot::new(egl, width, height)?;
             if i == 0 {
-                buffers.layout = (stride, offset, modifier);
+                buffers.layout = layout;
             }
+            buffers.slots.push(slot);
         }
         Ok(buffers)
     }
@@ -258,14 +361,17 @@ impl Buffers {
     fn copy(&self, source: &Source, slot: usize) -> Result<(), String> {
         let (w, h) = (self.size.0 as i32, self.size.1 as i32);
         let target = self.slots[slot].framebuffer;
+        let mut gl_err = egl::NO_ERROR;
         let bound = source.bound(|api| {
             // SAFETY: GL calls on the current context; the slot's framebuffer lives as long as it.
             unsafe {
                 (api.bind_framebuffer)(egl::DRAW_FRAMEBUFFER, target);
                 (api.blit_framebuffer)(0, 0, w, h, 0, 0, w, h, egl::COLOR_BUFFER_BIT, egl::NEAREST);
+                gl_err = (api.get_error)();
+                (api.bind_framebuffer)(egl::DRAW_FRAMEBUFFER, 0);
             }
         });
-        if !bound {
+        if !bound || gl_err != egl::NO_ERROR {
             return Err("GL couldn't read Chromium's frame".into());
         }
         if !self.gpu.egl.finish() {
@@ -284,18 +390,7 @@ impl Drop for Buffers {
         let egl = &self.gpu.egl;
         let current = egl.make_current();
         for slot in self.slots.drain(..) {
-            // SAFETY: the slot's GL objects, image and buffer were made in `new` on this context,
-            // and are freed once.
-            unsafe {
-                if current {
-                    (egl.api.delete_framebuffers)(1, &slot.framebuffer);
-                    (egl.api.delete_textures)(1, &slot.texture);
-                }
-                if !slot.image.is_null() {
-                    (egl.api.destroy_image)(egl.display, slot.image);
-                }
-                (egl.api.gbm_bo_destroy)(slot.bo);
-            }
+            slot.destroy(egl, current);
         }
     }
 }
@@ -309,6 +404,9 @@ pub enum State {
     Shared { buffers: Buffers, owed: Owed },
     /// The app can't use the buffers: frames are read back to BGRA paints.
     Readback,
+    /// Producer allocation, copy, or readback failed; waiting for tabs to reopen without shared
+    /// textures.
+    Failed,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -327,10 +425,10 @@ pub enum Event {
     Read { pool: u64, frame_id: u64 },
     /// The tab was hidden, or a new app connected: the buffers go.
     Released,
-    /// Frames are read back from now on.
+    /// The app rejected imported dmabufs: read frames back from now on.
     ReadBack,
-    /// The engine's buffers can't be made or written.
-    ShareFailed(String),
+    /// The engine couldn't allocate, copy, or read frames: reopen tabs without shared textures.
+    ProducerFailed(String),
 }
 
 pub enum Effect {
@@ -344,9 +442,9 @@ pub enum Effect {
 /// Why frames can't come as dmabufs.
 #[derive(Debug)]
 pub enum Failure {
-    /// The engine's buffers, or the app's import of them: read frames back.
+    /// The app couldn't import the engine's dmabufs: try reading frames back first.
     Share(String),
-    /// Chromium's own frame can't be read here: open the tabs again without shared textures.
+    /// The engine couldn't allocate, copy, or read frames: reopen tabs without shared textures.
     Read(String),
 }
 
@@ -361,7 +459,7 @@ pub fn step(state: &mut State, event: Event) -> Vec<Effect> {
                 buffers.slots[slot].holds = Holds::Unread(frame_id);
                 vec![Effect::SendFrame { pool: buffers.pool, slot, frame_id }]
             }
-            State::Empty | State::Readback => Vec::new(),
+            State::Empty | State::Readback | State::Failed => Vec::new(),
         },
         Event::Full => {
             if let State::Shared { owed, .. } = state {
@@ -392,14 +490,20 @@ pub fn step(state: &mut State, event: Event) -> Vec<Effect> {
             }
             Vec::new()
         }
-        Event::ReadBack => {
-            *state = State::Readback;
-            vec![Effect::Repaint]
-        }
-        Event::ShareFailed(reason) => {
-            *state = State::Readback;
-            vec![Effect::Failed(Failure::Share(reason)), Effect::Repaint]
-        }
+        Event::ReadBack => match state {
+            State::Empty | State::Shared { .. } => {
+                *state = State::Readback;
+                vec![Effect::Repaint]
+            }
+            State::Readback | State::Failed => Vec::new(),
+        },
+        Event::ProducerFailed(reason) => match state {
+            State::Failed => Vec::new(),
+            State::Empty | State::Shared { .. } | State::Readback => {
+                *state = State::Failed;
+                vec![Effect::Failed(Failure::Read(reason))]
+            }
+        },
     }
 }
 
@@ -420,26 +524,30 @@ impl TabFrames {
 
     /// CEF painted frame `frame_id` (its buffer valid during this call only).
     pub fn paint(&mut self, info: &AcceleratedPaintInfo, frame_id: u64) -> Vec<Effect> {
+        if matches!(self.state, State::Failed) {
+            return Vec::new();
+        }
         let gpu = self.gpu.clone();
         let source = match Source::import(&gpu, info) {
             Ok(source) => source,
-            Err(e) => return vec![Effect::Failed(Failure::Read(e))],
+            Err(e) => return self.step(Event::ProducerFailed(e)),
         };
         let mut effects = Vec::new();
         match &self.state {
             State::Readback => {
                 return match source.read_back(frame_id) {
                     Ok(paint) => vec![Effect::SendBgra(paint)],
-                    Err(e) => vec![Effect::Failed(Failure::Read(e))],
+                    Err(e) => self.step(Event::ProducerFailed(e)),
                 };
             }
+            State::Failed => return Vec::new(),
             State::Shared { buffers, .. } if buffers.size == source.size => {}
             State::Shared { .. } | State::Empty => {
                 // The old buffers go first, so a resize never holds two sets.
                 self.state = State::Empty;
                 match Buffers::new(&gpu, source.size).and_then(|b| b.pool().map(|p| (b, p))) {
                     Ok((buffers, pool)) => effects.extend(self.step(Event::Made(buffers, pool))),
-                    Err(e) => return self.step(Event::ShareFailed(e)),
+                    Err(e) => return self.step(Event::ProducerFailed(e)),
                 }
             }
         }
@@ -450,7 +558,7 @@ impl TabFrames {
         };
         match buffers.copy(&source, slot) {
             Ok(()) => effects.extend(self.step(Event::Copied { slot, frame_id })),
-            Err(e) => effects.extend(self.step(Event::ShareFailed(e))),
+            Err(e) => return self.step(Event::ProducerFailed(e)),
         }
         effects
     }
