@@ -1,5 +1,29 @@
 # Releasing Brocode
 
+## Downloading the desktop app (this fork's own builds)
+
+[dl.apibrother.com](https://dl.apibrother.com) is served by `.github/workflows/brocode-build.yml`,
+which builds and publishes with nobody at the keyboard:
+
+```
+merge to dev  ->  the push builds Windows, Linux, macOS  ->  publish to dl.apibrother.com
+```
+
+- A push to `dev` runs the build. Every artifact bundles the brocode CLI from
+  `https://dl.apibrother.com/latest.json`, checked against the manifest's SHA-256
+  (`scripts/fetch-brocode-cli.sh`): Windows ships the per-user setup
+  (`brocode-desktop-win-x64.exe`) with `brocode-cli.exe` inside, Linux a tarball of the app and
+  the CLI, macOS a `Brocode.app` zip with the CLI in `Contents/Resources`.
+- `publish` runs only after Windows and Linux built, and only from `dev`, and runs
+  `scripts/publish-desktop.sh --version 0.0.0-dev-<run> --require windows-x64 pub`. The script
+  writes `brocode-desktop-latest.json` (version, sizes, SHA-256) and uploads the files whose
+  bytes changed; a platform it did not get is named in a warning and in the job summary, and
+  the previous download for it stays in the bucket. That is how macOS ships: until the CLI
+  release publishes `brocode-darwin-arm64`, the macOS job skips itself (with a warning) and
+  Windows publishes alone.
+- `gh workflow run brocode-build.yml --ref <branch>` builds any branch by hand; only `dev`
+  publishes, and a branch's artifacts stay in the run.
+
 `.github/workflows/release.yml` builds, signs and publishes the desktop app to `https://anoma.ly/release` (app `opencode`, artifact `desktop-rune`: `opencode/desktop-rune/<channel>`).
 
 ## Channels

@@ -2,10 +2,16 @@ name: Brocode desktop builds
 
 # Unsigned, ad-hoc builds of the branded desktop app for Windows x64, Linux x64, macOS arm64 and
 # macOS x64, each with the brocode CLI from dl.apibrother.com/latest.json inside as the app's
-# sidecar (scripts/fetch-brocode-cli.sh, sha256-checked). workflow_dispatch only; uploads workflow
-# artifacts, and publishes to dl.apibrother.com only from dev.
+# sidecar (scripts/fetch-brocode-cli.sh, sha256-checked).
+#
+# A push to dev builds and publishes to dl.apibrother.com (scripts/publish-desktop.sh) with no one
+# at the keyboard: merge to dev is shipping (docs/releasing.md, "Downloading the desktop app").
+# workflow_dispatch builds any ref and publishes only from dev; another ref keeps its artifacts.
 #
 #   gh workflow run brocode-build.yml -R meeyao/brocode-desktop --ref <branch>
+#
+# A platform whose CLI the manifest lacks (no brocode-darwin-arm64 yet, say) fails alone, and the
+# publish step says so and publishes the platforms that built.
 #
 # Windows: brocode-desktop-windows-x64-setup.exe, the per-user setup (apps/installer) with the
 # install folder (app + brocode-cli.exe) inside; the same folder is the zip beside it.
@@ -18,6 +24,8 @@ name: Brocode desktop builds
 # or `xattr -dr com.apple.quarantine Brocode.app`.
 
 on:
+  push:
+    branches: [dev]
   workflow_dispatch:
     inputs:
       ref:
@@ -27,6 +35,11 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  # Newest dev push wins; a publish in flight finishes (`cancel-in-progress: false`).
+  group: brocode-build-${{ github.ref }}
+  cancel-in-progress: false
 
 defaults:
   run:
@@ -113,16 +126,23 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: nasm
         run: brew install nasm
-      - name: The brocode CLI for macOS must be published
+      - name: The brocode CLI for macOS
+        id: cli
         run: |
           manifest=$(curl -fsSL --retry 3 https://dl.apibrother.com/latest.json)
+          missing=""
           for name in brocode-darwin-arm64 brocode-darwin-x64; do
-            jq -e --arg n "$name" '.files[] | select(.name == $n)' <<<"$manifest" >/dev/null || {
-              echo "::error::dl.apibrother.com/latest.json has no $name, so a macOS build would ship without the brocode CLI (it has: $(jq -r '[.files[].name] | join(", ")' <<<"$manifest")). Publish one, then re-run."
-              exit 1
-            }
+            jq -e --arg n "$name" '.files[] | select(.name == $n)' <<<"$manifest" >/dev/null || missing="$missing $name"
           done
+          if [ -n "$missing" ]; then
+            echo "::warning::dl.apibrother.com/latest.json has no$missing yet, so no macOS app can carry the brocode CLI (it has: $(jq -r '[.files[].name] | join(", ")' <<<"$manifest")). Skipping the macOS build; Windows and Linux publish without it."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "- warning: no macOS build: the manifest has no$missing" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Brocode icns
+        if: steps.cli.outputs.build == 'true'
         run: |
           mkdir -p /tmp/icon.iconset
           for s in 16 32 128 256 512; do
@@ -131,6 +151,7 @@ jobs:
           done
           iconutil -c icns /tmp/icon.iconset -o apps/desktop/assets/icon.icns
       - name: Build arm64
+        if: steps.cli.outputs.build == 'true'
         env:
           OPENCODE_RUNE_VERSION: 0.0.0-dev-${{ github.run_number }}
           OPENCODE_RUNE_BUILD_CHANNEL: local
@@ -144,11 +165,13 @@ jobs:
           apps/desktop/scripts/build-app.sh "$PWD/out-arm64"
           ditto -c -k --sequesterRsrc --keepParent "$PWD/out-arm64/Brocode.app" brocode-desktop-macos-arm64.zip
       - uses: actions/upload-artifact@v4
+        if: steps.cli.outputs.build == 'true'
         with:
           name: brocode-desktop-macos-arm64
           path: brocode-desktop-macos-arm64.zip
           retention-days: 14
       - name: Build x64
+        if: steps.cli.outputs.build == 'true'
         env:
           OPENCODE_RUNE_VERSION: 0.0.0-dev-${{ github.run_number }}
           OPENCODE_RUNE_BUILD_CHANNEL: local
@@ -162,14 +185,18 @@ jobs:
           apps/desktop/scripts/build-app.sh "$PWD/out-x64"
           ditto -c -k --sequesterRsrc --keepParent "$PWD/out-x64/Brocode.app" brocode-desktop-macos-x64.zip
       - uses: actions/upload-artifact@v4
+        if: steps.cli.outputs.build == 'true'
         with:
           name: brocode-desktop-macos-x64
           path: brocode-desktop-macos-x64.zip
           retention-days: 14
 
   publish:
-    # Only dev reaches customers; a branch build stays in this run's artifacts.
-    if: github.ref == 'refs/heads/dev' && inputs.ref == ''
+    # Only dev reaches customers, and only when Windows and Linux built: a platform the manifest
+    # lacks (macOS, while the CLI has no darwin binary) skipped its job, which is not a failure.
+    if: >-
+      (github.event_name == 'push' || (github.ref == 'refs/heads/dev' && inputs.ref == ''))
+      && needs.windows.result == 'success' && needs.linux.result == 'success'
     needs: [windows, linux, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -184,11 +211,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p pub
-          cp dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64-setup.exe pub/brocode-desktop-win-x64.exe
-          cp dist/brocode-desktop-macos-arm64/brocode-desktop-macos-arm64.zip pub/brocode-desktop-darwin-arm64.zip
-          cp dist/brocode-desktop-macos-x64/brocode-desktop-macos-x64.zip pub/brocode-desktop-darwin-x64.zip
+          cp dist/brocode-desktop-windows-x64/brocode-desktop-win-x64.exe pub/
+          cp dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64.zip pub/
+          for arch in arm64 x64; do
+            if [ -f "dist/brocode-desktop-macos-$arch/brocode-desktop-macos-$arch.zip" ]; then
+              cp "dist/brocode-desktop-macos-$arch/brocode-desktop-macos-$arch.zip" pub/brocode-desktop-darwin-$arch.zip
+            fi
+          done
+          ls -l pub
       - name: Publish to dl.apibrother.com
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 20b0a3b3121624c5e42cbab0910872ba
-        run: bash scripts/publish-desktop.sh pub
+          OPENCODE_RUNE_VERSION: 0.0.0-dev-${{ github.run_number }}
+        run: bash scripts/publish-desktop.sh --version "$OPENCODE_RUNE_VERSION" --require windows-x64 pub
