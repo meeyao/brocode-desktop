@@ -1,0 +1,1 @@
+{ "task": "sync-upstream-one-download", "owner": "session-sync", "files": ["router-free: apps/desktop/src/workspace/servers/sidecar/*", "crates/opencode-kit/src/local_service.rs", ".github/workflows/brocode-build.yml", "scripts/fetch-brocode-cli.sh"], "started": "2026-11-28T18:20:00Z" }
