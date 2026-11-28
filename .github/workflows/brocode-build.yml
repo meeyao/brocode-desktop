@@ -1,9 +1,18 @@
 name: Brocode desktop builds
 
-# Unsigned, ad-hoc builds of the branded desktop app for Windows x64, macOS arm64 and
-# macOS x64. workflow_dispatch only; uploads zips as workflow artifacts, publishes nothing.
+# Unsigned, ad-hoc builds of the branded desktop app for Windows x64, Linux x64, macOS arm64 and
+# macOS x64, each with the brocode CLI from dl.apibrother.com/latest.json inside as the app's
+# sidecar (scripts/fetch-brocode-cli.sh, sha256-checked). workflow_dispatch only; uploads workflow
+# artifacts, and publishes to dl.apibrother.com only from dev.
 #
-#   gh workflow run brocode-build.yml -R meeyao/brocode-desktop --ref dev
+#   gh workflow run brocode-build.yml -R meeyao/brocode-desktop --ref <branch>
+#
+# Windows: brocode-desktop-windows-x64-setup.exe, the per-user setup (apps/installer) with the
+# install folder (app + brocode-cli.exe) inside; the same folder is the zip beside it.
+# Linux: brocode-desktop-linux-x64.tar.gz holding brocode-desktop + brocode-cli (the AppImage
+# needs a release version and mksquashfs, which the packaging script requires).
+# macOS: Brocode.app with Contents/Resources/brocode-cli when latest.json lists
+# brocode-darwin-arm64 (the job fails, and only it, while it does not).
 #
 # macOS artifacts are ad-hoc signed, not notarized: after downloading, right-click > Open,
 # or `xattr -dr com.apple.quarantine Brocode.app`.
@@ -12,9 +21,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Branch, tag or commit to build
+        description: Branch, tag or commit to build (default the dispatched ref)
         required: false
-        default: dev
+        default: ""
 
 permissions:
   contents: read
@@ -36,19 +45,60 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
       - uses: dtolnay/rust-toolchain@1.99.1
       - uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: cargo build --profile release-thin --locked -p brocode-desktop --no-default-features --features knobs
+      - name: Install folder
+        env:
+          OPENCODE_RUNE_VERSION: 0.0.0-dev-${{ github.run_number }}
+          OPENCODE_RUNE_BUILD_CHANNEL: local
+        run: |
+          bash scripts/fetch-brocode-cli.sh brocode-windows-x64.exe out
+          cargo build --profile release-thin --locked -p brocode-desktop --no-default-features --features knobs
+          cp target/release-thin/brocode-desktop.exe out/
+          cp apps/desktop/assets/icon/art-512.png out/notification-icon.png
+          cp LICENSE THIRD_PARTY_NOTICES.md out/
       - name: Zip
         shell: pwsh
+        run: Compress-Archive -Path out/* -DestinationPath brocode-desktop-windows-x64.zip
+      - name: Setup
+        env:
+          OPENCODE_RUNE_VERSION: 0.0.0-dev-${{ github.run_number }}
+          OPENCODE_RUNE_BUILD_CHANNEL: local
         run: |
-          New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item target/release-thin/brocode-desktop.exe out/
-          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md out/ -ErrorAction SilentlyContinue
-          Compress-Archive -Path out/* -DestinationPath brocode-desktop-windows-x64.zip
+          OPENCODE_RUNE_SETUP_PAYLOAD="$(cygpath -w "$PWD/brocode-desktop-windows-x64.zip")" \
+            cargo build --profile release-thin --locked -p brocode-setup
+          cp target/release-thin/brocode-setup.exe brocode-desktop-windows-x64-setup.exe
       - uses: actions/upload-artifact@v4
         with:
           name: brocode-desktop-windows-x64
-          path: brocode-desktop-windows-x64.zip
+          path: |
+            brocode-desktop-windows-x64-setup.exe
+            brocode-desktop-windows-x64.zip
+          retention-days: 14
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang cmake pkg-config nasm libfontconfig1-dev libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libdbus-1-dev libudev-dev libssl-dev libasound2-dev
+      - name: Build
+        run: cargo build --profile release-thin --locked -p brocode-desktop --no-default-features --features knobs
+      - name: Tarball
+        run: |
+          mkdir -p out/brocode-desktop
+          cp target/release-thin/brocode-desktop LICENSE THIRD_PARTY_NOTICES.md out/brocode-desktop/
+          bash scripts/fetch-brocode-cli.sh brocode-linux-x64 out/brocode-desktop
+          tar -C out -czf brocode-desktop-linux-x64.tar.gz brocode-desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brocode-desktop-linux-x64
+          path: brocode-desktop-linux-x64.tar.gz
           retention-days: 14
 
   macos:
@@ -63,6 +113,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: nasm
         run: brew install nasm
+      - name: The brocode CLI for macOS must be published
+        run: |
+          manifest=$(curl -fsSL --retry 3 https://dl.apibrother.com/latest.json)
+          for name in brocode-darwin-arm64 brocode-darwin-x64; do
+            jq -e --arg n "$name" '.files[] | select(.name == $n)' <<<"$manifest" >/dev/null || {
+              echo "::error::dl.apibrother.com/latest.json has no $name, so a macOS build would ship without the brocode CLI (it has: $(jq -r '[.files[].name] | join(", ")' <<<"$manifest")). Publish one, then re-run."
+              exit 1
+            }
+          done
       - name: Brocode icns
         run: |
           mkdir -p /tmp/icon.iconset
@@ -79,6 +138,7 @@ jobs:
           OPENCODE_RUNE_PGO_USE: "0"
           OPENCODE_RUNE_TARGET: aarch64-apple-darwin
           OPENCODE_RUNE_ICON: ${{ github.workspace }}/apps/desktop/assets/icon.icns
+          OPENCODE_RUNE_BUNDLE_CLI: "1"
           OPENCODE_RUNE_SYMBOLS: ${{ runner.temp }}/symbols-arm64
         run: |
           apps/desktop/scripts/build-app.sh "$PWD/out-arm64"
@@ -96,6 +156,7 @@ jobs:
           OPENCODE_RUNE_PGO_USE: "0"
           OPENCODE_RUNE_TARGET: x86_64-apple-darwin
           OPENCODE_RUNE_ICON: ${{ github.workspace }}/apps/desktop/assets/icon.icns
+          OPENCODE_RUNE_BUNDLE_CLI: "1"
           OPENCODE_RUNE_SYMBOLS: ${{ runner.temp }}/symbols-x64
         run: |
           apps/desktop/scripts/build-app.sh "$PWD/out-x64"
@@ -107,7 +168,9 @@ jobs:
           retention-days: 14
 
   publish:
-    needs: [windows, macos]
+    # Only dev reaches customers; a branch build stays in this run's artifacts.
+    if: github.ref == 'refs/heads/dev' && inputs.ref == ''
+    needs: [windows, linux, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -121,8 +184,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p pub
-          unzip -oq dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64.zip -d pub/windows
-          cp pub/windows/brocode-desktop.exe pub/brocode-desktop-win-x64.exe
+          cp dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64-setup.exe pub/brocode-desktop-win-x64.exe
           cp dist/brocode-desktop-macos-arm64/brocode-desktop-macos-arm64.zip pub/brocode-desktop-darwin-arm64.zip
           cp dist/brocode-desktop-macos-x64/brocode-desktop-macos-x64.zip pub/brocode-desktop-darwin-x64.zip
       - name: Publish to dl.apibrother.com
