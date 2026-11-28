@@ -109,6 +109,13 @@ rune_register::register!(crate::scenes::SCENE_LIST: crate::scenes::Scene = [
         let q = s.fixture_run.fixture["question"].clone();
         s.apply_event("form.created", &q);
     }),
+    ("question-composer", |s| {
+        crate::open_scene(s);
+        s.finish_stream();
+        s.settings.question_composer = Some(true);
+        let q = s.fixture_run.fixture["question"].clone();
+        s.apply_event("form.created", &q);
+    }),
     // Answered elsewhere at 1.5 s, asked again at 2.5 s: the morph both ways.
     ("question-morph", |s| {
         crate::open_scene(s);

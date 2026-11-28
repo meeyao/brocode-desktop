@@ -22,7 +22,8 @@ use crate::jobs::{SettingsJob, SettingsRequest};
 const DIALOG_TITLE: TextStyle = TextStyle::new(15.0, 530.0).lh(20.0).tracking(-0.13);
 
 /// Desktop's popular providers, in its order (`catalog/order.ts`).
-const POPULAR: [&str; 8] = ["opencode-go", "opencode", "anthropic", "github-copilot", "openai", "google", "openrouter", "vercel"];
+// `packages/app/src/providers/catalog/order.ts` (`opencode#66736`).
+const POPULAR: [&str; 9] = ["opencode-go", "opencode", "openai", "anthropic", "claude-agent", "github-copilot", "google", "openrouter", "vercel"];
 
 /// The Connected rows' account rename/removal state. At most one row's rename field or removal
 /// confirmation is open.

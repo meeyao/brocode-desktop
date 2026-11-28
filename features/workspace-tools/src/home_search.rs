@@ -74,7 +74,19 @@ pub trait HomeSearchHost: opencode_kernel::AppEnv {
     fn push_session(&mut self, session: SessionInfo);
     fn search_session(&self, id: &str) -> Option<&SessionInfo>;
     fn project_for_session(&self, session: &SessionInfo) -> Option<&Project>;
+    /// Whether `session` belongs to `project` (`packages/app/src/home/sessions/records.ts:24-58`).
+    fn session_in_project(&self, session: &SessionInfo, project: &Project) -> bool {
+        self.project_for_session(session).is_some_and(|p| p.id == project.id)
+    }
+    /// Checkout and known worktree/sandbox directories for `project` (`projectSessionDirectories`).
+    fn project_directories(&self, project: &Project) -> Vec<String> {
+        vec![project.directory.clone()]
+    }
     fn merged_roots(&self) -> Vec<&SessionInfo>;
+    fn merged_roots_with<'a>(&'a self, extra: &'a [SessionInfo]) -> Vec<&'a SessionInfo> {
+        let _ = extra;
+        self.merged_roots()
+    }
 
     fn find_home_sessions(&self, project_id: Option<&str>, query: &str, limit: usize) -> Vec<(i32, i64, Box<str>)>;
     fn session_search_building(&self) -> bool {
@@ -274,6 +286,8 @@ pub struct HomeSearch {
     pub loaded: Vec<SessionInfo>,
     /// The id lookup on its worker: its attempt and what it found.
     lookup: Latest<(Attempt, Option<SessionInfo>)>,
+    /// Scoped session fetch for the selected Home project (`projectSessionsQuery`).
+    pub project_sessions: crate::home_project_sessions::ProjectSessions,
 }
 
 impl Default for HomeSearch {
@@ -286,13 +300,15 @@ impl Default for HomeSearch {
             hold: HomeHold::Free,
             loaded: Vec::new(),
             lookup: Latest::default(),
+            project_sessions: crate::home_project_sessions::ProjectSessions::default(),
         }
     }
 }
 
 impl HomeSearch {
     pub fn set_waker(&mut self, waker: Waker) {
-        self.lookup = Latest::new(waker);
+        self.lookup = Latest::new(waker.clone());
+        self.project_sessions.set_waker(waker);
     }
 
     pub fn activate(&mut self, id: String) {
@@ -377,32 +393,61 @@ pub fn home_search_results<'a>(host: &'a dyn HomeSearchHost, selected: Option<&P
         return vec![];
     }
     let project_id = selected.map(|p| p.id.as_str());
+    // Multiple non-git folders share `id == "global"`: fetch a wider slice before directory filtering.
+    let limit = if project_id == Some("global") { 200 } else { 50 };
     let mut records: Vec<&'a SessionInfo> = host
-        .find_home_sessions(project_id, q, 50)
+        .find_home_sessions(project_id, q, limit)
         .into_iter()
         .filter(|(score, _, _)| *score >= opencode_search::SUBSTRING)
         .filter_map(|(_, _, id)| host.search_session(&id))
-        .filter(|s| s.archived.is_none())
+        .filter(|s| s.archived.is_none() && selected.is_none_or(|proj| host.session_in_project(s, proj)))
+        .take(50)
         .collect();
+    // Also match quiet-project sessions loaded by `project_sessions` outside the global index.
+    if let Some(proj) = selected {
+        let (scope, _) = host.home_search_scope();
+        let fold = opencode_search::SearchFold::for_query(q);
+        let needle = fold.fold(q);
+        for s in host.home_search().project_sessions.sessions_for(&scope) {
+            if records.len() >= 50 {
+                break;
+            }
+            if s.archived.is_none()
+                && !records.iter().any(|r| r.id == s.id)
+                && host.session_in_project(s, proj)
+                && fold.fold(&s.title).contains(&needle)
+            {
+                records.push(s);
+            }
+        }
+    }
     // Then the sessions only their messages match (full text), each with its line of context.
     for r in host.fulltext_home_rows() {
         if !records.iter().any(|s| s.id == r.session)
             && let Some(s) = host.search_session(&r.session).or(r.fallback.as_ref())
+            && selected.is_none_or(|proj| host.session_in_project(s, proj))
         {
             records.push(s);
         }
     }
-    match host.home_search().search.exact().filter(|exact| !records.iter().any(|r| r.id == exact.id)) {
+    match host
+        .home_search()
+        .search
+        .exact()
+        .filter(|exact| !records.iter().any(|r| r.id == exact.id) && selected.is_none_or(|proj| host.session_in_project(exact, proj)))
+    {
         Some(exact) => std::iter::once(exact).chain(records).collect(),
         None => records,
     }
 }
 
 pub fn home_roots<'a>(host: &'a dyn HomeSearchHost, selected: Option<&Project>) -> impl Iterator<Item = &'a SessionInfo> + use<'a> {
-    let selected = selected.map(|p| p.id.clone());
-    host.merged_roots()
+    let (scope, _) = host.home_search_scope();
+    let extra = if selected.is_some() { host.home_search().project_sessions.sessions_for(&scope) } else { &[] };
+    let selected = selected.cloned();
+    host.merged_roots_with(extra)
         .into_iter()
-        .filter(move |ses| selected.as_ref().is_none_or(|id| host.project_for_session(ses).is_some_and(|p| &p.id == id)))
+        .filter(move |ses| selected.as_ref().is_none_or(|proj| host.session_in_project(ses, proj)))
 }
 
 /// Opens result `id`, closing the search; a session only its messages matched opens with Find
@@ -517,6 +562,7 @@ pub fn poll_home_search(host: &mut dyn HomeSearchHost, tx: &mut Tx) -> bool {
     }
     // The search goes with Home (`disposed`): back on Home, it starts empty.
     if !host.is_home() {
+        host.home_search_mut().project_sessions.leave_home();
         if host.home_search().search.focused || !host.home_search().search.query.is_empty() || !host.search_input().text.is_empty() {
             home_search_step(host, Event::Closed, tx);
             host.home_search_mut().search = Search::default();
@@ -536,6 +582,15 @@ pub fn poll_home_search(host: &mut dyn HomeSearchHost, tx: &mut Tx) -> bool {
         changed = true;
     }
     let (scope, connected) = host.home_search_scope();
+    let project_target = host.home_selected().map(|proj| crate::home_project_sessions::Target {
+        scope: scope.clone(),
+        directories: host.project_directories(proj),
+    });
+    let live_server = host.live_server();
+    if host.home_search_mut().project_sessions.poll(project_target, connected, live_server) {
+        tx.instant();
+        changed = true;
+    }
     let query = host.search_input().text.trim().to_owned();
     let now = host.clock();
     let before = host.home_search().search.mark();

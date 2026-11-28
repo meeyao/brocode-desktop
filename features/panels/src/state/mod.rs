@@ -3,6 +3,9 @@
 mod actions;
 pub mod flight;
 mod resolve;
+pub mod width_hold;
+
+pub use width_hold::{MouseClose, StripScroll, StripWidthHold, WidthHoldEvent, release_pane_width_hold, release_strip_width_holds};
 
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -88,6 +91,14 @@ impl Visibility {
             (_, false) => Self::Shut,
         };
     }
+}
+
+/// Explicit autofocus request for a side-panel New tab view (`new-tab-machine.ts`, opencode#66818).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NewTabFocus {
+    #[default]
+    Idle,
+    Requested { pane: SessionPane, token: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -532,6 +543,8 @@ pub struct SideState {
     /// Each pane's tab strip scroll (by `SessionPane as usize`): what its handlers read, which a
     /// build never does.
     pub strips: Rc<[StripScroll; 3]>,
+    /// Chrome-style mouse-close tab width holds per pane (`tab-strip-widths.ts`, `opencode#66887`).
+    pub width_holds: [StripWidthHold; 3],
     /// One side panel open state shared across sessions while `sharedSidePanel` is on (#64950).
     pub shared_open: Option<bool>,
     /// Sessions that mounted the side region while `shared_open` was true (transient, for smooth close).
@@ -539,6 +552,7 @@ pub struct SideState {
     pub sessions: HashMap<String, SessionSideState>,
     pub adding: Vec<NewTabEntry>,
     pub chosen_new_tab: HashMap<SessionPane, String>,
+    pub new_tab_focus: NewTabFocus,
     pub(crate) next_new_serial: u64,
     /// The last [`resolve_side_region`]: the plugins' surface versions and the `Tracked`
     /// state it read, and what it resolved.
@@ -568,6 +582,7 @@ impl Default for SideState {
             closing: Default::default(),
             menu: SideMenu::Closed,
             strips: Rc::default(),
+            width_holds: Default::default(),
             resolved: Default::default(),
             resolved_gen: Cell::new(0),
             tabs_stamp: Cell::new(None),
@@ -576,19 +591,12 @@ impl Default for SideState {
             sessions: HashMap::new(),
             adding: Vec::new(),
             chosen_new_tab: HashMap::new(),
+            new_tab_focus: NewTabFocus::Idle,
             next_new_serial: 1,
         }
     }
 }
 
-/// A tab strip's scroll, as `tab-strip-scroll.ts` keeps it: the offset a wheel notch moves on
-/// from, and the session, width and lead tab it last laid out with, so a strip that grows glides
-/// to its new tab.
-#[derive(Default)]
-pub struct StripScroll {
-    pub x: Cell<f32>,
-    pub laid: RefCell<Option<(String, f32, bool)>>,
-}
 
 #[derive(Clone)]
 pub struct ResolvedEntry {

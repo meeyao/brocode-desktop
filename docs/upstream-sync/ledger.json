@@ -1,30 +1,30 @@
 {
-  "generated_at": "2026-11-27",
+  "generated_at": "2026-11-28",
   "upstream_repo": "anomalyco/opencode",
   "upstream_reference_base": "f6e0c2d0833ffe772035f221fed923e1cd5fb408",
-  "upstream_head": "6c26549955966e333ae15764477c2e549776d85e",
+  "upstream_head": "2204311ec6e966db8d67988ab3638ad95a811a46",
   "upstream_pre_window_base": "3751be8138ebcf33343eb3f3d011b32fc814103c",
   "rune_desktop_repo": "anomalyco/opencode-rune",
-  "rune_desktop_head": "15988933e",
-  "post_1114_commit_count": 743,
-  "post_1114_in_ledger": 255,
-  "post_1114_skipped": 488,
+  "rune_desktop_head": "cbf38a09bb",
+  "post_1114_commit_count": 858,
+  "post_1114_in_ledger": 329,
+  "post_1114_skipped": 529,
   "post_1114_skipped_breakdown": {
-    "test-only": 33,
-    "ci-bench-deps": 26,
-    "docs-site-data": 76,
-    "tui-only": 32,
-    "cli-acp-only": 13,
-    "server-core-ai-codemode-internal": 308
+    "test-only": 37,
+    "ci-bench-deps": 32,
+    "docs-site-data": 94,
+    "tui-only": 36,
+    "cli-acp-only": 19,
+    "server-core-ai-codemode-internal": 311
   },
   "pre_1114_carryover_rows": 15,
-  "total_ledger_rows": 276,
+  "total_ledger_rows": 350,
   "status_counts": {
-    "have it": 227,
-    "not applicable": 39,
+    "have it": 264,
+    "not applicable": 84,
     "differs on purpose": 1,
-    "partly": 4,
-    "missing": 5
+    "partly": 1,
+    "missing": 0
   },
   "rows": [
     {
@@ -43,7 +43,7 @@
       "summary": "Show an error toast if the OS fails to open a file or folder in its default application.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "features/open-in/src/lib.rs (`Launcher::open` returns `Result<(), String>`) and apps/desktop/src/workspace/system/open_in.rs surface errors as toasts (plus commit e48d1b6b for missing-folder toast on reveal).",
+      "status_evidence": "features/open-in/src/lib.rs (`Launcher::open` returns `Result<(), String>`) and apps/desktop/src/workspace/system/open_in.rs surface errors as toasts (plus commit e48d1b6b for missing-folder toast on reveal). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -478,7 +478,7 @@
       "summary": "Keep the OAuth redirect paste input's accessible name limited to its label rather than concatenating its trailing Continue button.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "features/connect/src/steps/auth.rs:277 sets `.label(label)` directly on TextInput without wrapping the Continue button in a `<label>`.",
+      "status_evidence": "features/connect/src/steps/auth.rs:277 sets `.label(label)` directly on TextInput without wrapping the Continue button in a `<label>`. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -559,7 +559,7 @@
       "summary": "Prevent text truncation in shell output, grep, titles, and file reads from splitting multi-byte characters or surrogate pairs.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Rust `String`/`&str` slicing enforces UTF-8 char boundaries everywhere (and plugins/browser/mcp.luau:28 explicitly walks UTF-8 boundaries).",
+      "status_evidence": "Rust `String`/`&str` slicing enforces UTF-8 char boundaries everywhere (and plugins/browser/mcp.luau:28 explicitly walks UTF-8 boundaries). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -657,7 +657,7 @@
       "summary": "Align Electron's Windows and macOS Hex installation checks with Rune's existing registry and Application Support detection.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Upstream ported Rune's own detection logic (`features/dictation` / `crates/hex-client`) into Electron.",
+      "status_evidence": "Upstream ported Rune's own detection logic (`features/dictation` / `crates/hex-client`) into Electron. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -727,7 +727,7 @@
       "summary": "Apply vertical roll-fade masks on animated numbers only while digits are rolling, not at rest.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "crates/opencode-ui/src/odometer.rs uses `rune_kit::RollingText`, which draws sharp unmasked digits at rest.",
+      "status_evidence": "crates/opencode-ui/src/odometer.rs uses `rune_kit::RollingText`, which draws sharp unmasked digits at rest. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -794,7 +794,7 @@
       "summary": "Detect if desktop drafts.sqlite was symlinked/copied from the CLI opencode.db and move it aside instead of corrupting it.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Electron-only drafts.sqlite guard; Rune stores its SQLite database in its own `brocode` app-data directory with explicit schema validation and damaged-DB recovery (`crates/opencode-storage/src/native/boot/damaged.rs`).",
+      "status_evidence": "Electron-only drafts.sqlite guard; Rune stores its SQLite database in its own `rune-opencode` app-data directory with explicit schema validation and damaged-DB recovery (`crates/opencode-storage/src/native/boot/damaged.rs`). [verified-hunks]",
       "depends_on": "none",
       "risks": "Saved data / DB path separation (already protected in opencode-storage).",
       "workstream": "none"
@@ -1405,7 +1405,7 @@
       "summary": "Keep the embedded browser pane live while dragging panel resize handles on macOS.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Rune draws CEF browser frames as native GPU textures inside the Rune scene graph (`ui.browserSurface`), so panes stay live during resize on all platforms without Electron's native-child-HWND jump.",
+      "status_evidence": "Rune draws CEF browser frames as native GPU textures inside the Rune scene graph (`ui.browserSurface`), so panes stay live during resize on all platforms without Electron's native-child-HWND jump. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -1449,7 +1449,7 @@
       "summary": "Keep long user prompts folded when transitioning from draft creation into the new session.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "crates/session-view/src/fold.rs:44-95 reads `s.fold_user_messages()` directly on every session view without a separate CreatingSession view missing the fold prop.",
+      "status_evidence": "crates/session-view/src/fold.rs:44-95 reads `s.fold_user_messages()` directly on every session view without a separate CreatingSession view missing the fold prop. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -1470,7 +1470,7 @@
       "summary": "Temporarily restored fading gradient dividers for timeline notices (immediately superseded by #64462).",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Superseded the same day by #64462 (b181df309d), which switched timeline notice dividers to flat muted lines (ported in #157).",
+      "status_evidence": "Superseded the same day by #64462 (b181df309d), which switched timeline notice dividers to flat muted lines (ported in #157). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -1909,7 +1909,7 @@
       "summary": "Prevent the SolidJS/TanStack timeline virtualizer from crashing when a row disappears mid-update.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "SolidJS/TanStack reactive flush bug; Rune rebuilds its virtualized row list synchronously per frame from an immutable snapshot (`crates/session-view/src/timeline/projection.rs`).",
+      "status_evidence": "SolidJS/TanStack reactive flush bug; Rune rebuilds its virtualized row list synchronously per frame from an immutable snapshot (`crates/session-view/src/timeline/projection.rs`). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -2018,7 +2018,7 @@
       "summary": "Inset the code block floating action bar's backdrop 1 px inside the 0.5 px border so it never paints over the border at fractional positions.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Inset the code-block floating action toolbar backdrop 1 pt inside the 0.5 pt border with clip_fade_linear(24, 0, 0, 8) and radius 5 (crates/session-view/src/style.rs, ws3/pin-wrap-math).",
+      "status_evidence": "Inset the code-block floating action toolbar backdrop 1 pt inside the 0.5 pt border with clip_fade_linear(24, 0, 0, 8) and radius 5 (crates/session-view/src/style.rs, ws3/pin-wrap-math). [verified-hunks]",
       "depends_on": "UP-060 (#64545)",
       "risks": "none",
       "workstream": "WS-3",
@@ -2064,7 +2064,7 @@
       "summary": "Composite project avatar image, backing, and border under one mask in CSS to eliminate light corner fringes.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Browser CSS multi-clip antialiasing artifact; Rune draws project icons onto a single GPU rounded surface via `crates/project-icon`.",
+      "status_evidence": "Browser CSS multi-clip antialiasing artifact; Rune draws project icons onto a single GPU rounded surface via `crates/project-icon`. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none",
@@ -2178,11 +2178,14 @@
       ],
       "summary": "Fix Home date headers disappearing while scrolling when SolidJS `<Index>` reuses header DOM nodes.",
       "size": "S",
-      "status": "not applicable",
-      "status_evidence": "SolidJS DOM `<Index>` + `offsetTop` bug; apps/desktop/src/shell/view/home.rs:172-186 uses Rune native `.sticky_top().stuck_fade()` keyed per group title.",
+      "status": "have it",
+      "status_evidence": "Merged in #1491 (dev 3ee3787d8e, head c42e14cf3b, CI run 46096068784 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): apps/desktop/src/shell/view/home.rs passes .stuck_fade(16.0, 16.0) instead of .stuck_fade(list_top + 16.0, 16.0), matching packages/app/src/home/scroll.ts (HOME_SESSION_HEADER_TEXT_HEIGHT=16, HOME_SESSION_HEADER_FADE_DISTANCE=16, opencode#64665) so single-session Home date headers stay visible at scroll 0. Verified headless on Windows x64 PR build (run 46096068784, 4/4 exit 0, peak <= 0.45 GiB): Wide and Medium single-session Today headers render at opacity: 1 (before: opacity: 0). Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
-      "workstream": "none"
+      "workstream": "none",
+      "rune_files": [
+        "apps/desktop/src/shell/view/home.rs"
+      ]
     },
     {
       "id": "UP-072",
@@ -2553,7 +2556,7 @@
       "summary": "Overlay live progress metadata onto running tool parts returned by `GET /api/session/:id/message`.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Server-side fix; crates/opencode-kit/src/model/transcript.rs already parses `metadata` JSON on `Part::Tool` in all states including `Running`.",
+      "status_evidence": "Server-side fix; crates/opencode-kit/src/model/transcript.rs already parses `metadata` JSON on `Part::Tool` in all states including `Running`. [verified-hunks]",
       "depends_on": "Newer OpenCode server",
       "risks": "none",
       "workstream": "none"
@@ -2990,7 +2993,7 @@
       "summary": "Allow clicking Execute call and output rows to toggle them open even while an unrelated text field (such as the browser address bar) holds a text selection.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Verified on dev: crates/session-view/src/tools/execute.rs:128,170 dispatches .on_press_tx(disclosure::toggle) directly without a global window.getSelection() guard, so an unrelated TextEdit selection never blocks toggling Execute rows.",
+      "status_evidence": "Verified on dev: crates/session-view/src/tools/execute.rs:128,170 dispatches .on_press_tx(disclosure::toggle) directly without a global window.getSelection() guard, so an unrelated TextEdit selection never blocks toggling Execute rows. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -3011,7 +3014,7 @@
       "summary": "Compute the message action menu's relative day label (Today / Yesterday / date) dynamically when the menu opens instead of caching the mount-time day.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Verified on dev: features/history/src/rewind/mod.rs:474-483,589-601,739-753 computes sent_label(mid, host.now_ms()) fresh on every menu open, never memoized at mount time.",
+      "status_evidence": "Verified on dev: features/history/src/rewind/mod.rs:474-483,589-601,739-753 computes sent_label(mid, host.now_ms()) fresh on every menu open, never memoized at mount time. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -3075,7 +3078,7 @@
       "summary": "Keep the embedded browser pane live while dragging panel resize handles on Windows.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Rune draws CEF browser frames as native GPU textures inside the Rune scene graph (ui.browserSurface), so the browser page stays live during panel resize on Windows, macOS, and Linux.",
+      "status_evidence": "Rune draws CEF browser frames as native GPU textures inside the Rune scene graph (ui.browserSurface), so the browser page stays live during panel resize on Windows, macOS, and Linux. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -3305,7 +3308,7 @@
       "summary": "Keep bottom padding and both Code and Output sections accessible inside the Execute details dialog when code and output are long.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Verified on dev: crates/session-view/src/tools/details.rs:108 wraps Execute Code and Output sections in scroller(\"body\") with bottom padding so both sections and padding remain reachable when long.",
+      "status_evidence": "Verified on dev: crates/session-view/src/tools/details.rs:108 wraps Execute Code and Output sections in scroller(\"body\") with bottom padding so both sections and padding remain reachable when long. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -3456,7 +3459,7 @@
       "summary": "Navigate back and forward through desktop route history when mouse Back/Forward side buttons are released.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Ported in apps/desktop/src/shell/view/mod.rs (non-wasm32 desktop shell root opts into PointerButton::Back/Forward and invokes App::navigate(false/true, tx) on release; browser surface excludes Back/Forward so embedded pointer capture never conflicts).",
+      "status_evidence": "Ported in apps/desktop/src/shell/view/mod.rs (non-wasm32 desktop shell root opts into PointerButton::Back/Forward and invokes App::navigate(false/true, tx) on release; browser surface excludes Back/Forward so embedded pointer capture never conflicts). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -3531,7 +3534,7 @@
       "summary": "Replace the New timeline subagent status chip+glyph with a 3x10 px rounded colored bar and status word, and drop row hover fill/title underline on subagent rows.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Replaced subagent status mark + hover fill in crates/session-view/src/activity/event_row.rs::subagent with a 3x10 rounded state-coloured bar + weight-530 status word, 6 pt row gap, no hover fill/underline, keeping focus ring and click-to-open (ws3/pin-wrap-math).",
+      "status_evidence": "Replaced subagent status mark + hover fill in crates/session-view/src/activity/event_row.rs::subagent with a 3x10 rounded state-coloured bar + weight-530 status word, 6 pt row gap, no hover fill/underline, keeping focus ring and click-to-open (ws3/pin-wrap-math). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-3"
@@ -3578,7 +3581,7 @@
       "summary": "Narrow Tailwind transition-colors to transition-[background-color,color] so CSS does not interpolate outline-color from dark currentColor on :focus-visible.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "CSS-only Tailwind transition-colors bug (interpolating outline-color from currentColor to border-focus); Rune draws focus rings natively without CSS outline-color transitions.",
+      "status_evidence": "CSS-only Tailwind transition-colors bug (interpolating outline-color from currentColor to border-focus); Rune draws focus rings natively without CSS outline-color transitions. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -3672,7 +3675,7 @@
       "summary": "Optimize SolidJS DOM rendering and formatting in the model picker for large provider catalogs.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "SolidJS DOM reactivity/layout optimization; Rune draws model picker rows natively without DOM node churn.",
+      "status_evidence": "SolidJS DOM reactivity/layout optimization; Rune draws model picker rows natively without DOM node churn. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "none"
@@ -4188,7 +4191,7 @@
       "summary": "The background pill orders subagents, shells and jobs by when each started (then by id), so a row never moves when the session list re-sorts by last update.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Already so: the pill's subagents (features/subagents/src/lib.rs), shells (shells/mod.rs) and scripts (jobs.rs) are each sorted by start time, then id, so a row never moves when the session list re-sorts",
+      "status_evidence": "Already so: the pill's subagents (features/subagents/src/lib.rs), shells (shells/mod.rs) and scripts (jobs.rs) are each sorted by start time, then id, so a row never moves when the session list re-sorts. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4336,7 +4339,7 @@
       "summary": "Sharing sign-ins with a remote server's pages copies cookies off the main thread, in batches, so the app doesn't stall.",
       "size": "M",
       "status": "have it",
-      "status_evidence": "Share sign-ins with remote servers (#353, #286, #486, #523): the two-way mirror runs in the browser engine process (apps/browser-engine/src/cookies.rs, CEF's asynchronous cookie visitor and set callbacks, writes in batches tracked by Draining), so the app's UI thread never waits on a copy. Not measured with a large cookie store.",
+      "status_evidence": "Share sign-ins with remote servers (#353, #286, #486, #523): the two-way mirror runs in the browser engine process (apps/browser-engine/src/cookies.rs, CEF's asynchronous cookie visitor and set callbacks, writes in batches tracked by Draining), so the app's UI thread never waits on a copy. Not measured with a large cookie store. Follow-up #1479 (dev 0ee555e43) gates initial remote HTTP(S) navigations until sign-in cookie mirroring settles.",
       "depends_on": "#286 (OS cookie encryption, CefCookieManager), UP-120 follow-ups",
       "risks": "none",
       "workstream": "WS-1"
@@ -4451,7 +4454,7 @@
       "summary": "Windows reopen where they were when snapped, moved or minimized.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Ported to official FROM opencode-rune by WINDOWS-UPSTREAM; apps/desktop/src/workspace/windows/placement.rs: a minimized window keeps its last shown frame; snapped or restored saves where it is on screen.",
+      "status_evidence": "Ported to official FROM opencode-rune by WINDOWS-UPSTREAM; apps/desktop/src/workspace/windows/placement.rs: a minimized window keeps its last shown frame; snapped or restored saves where it is on screen. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4474,7 +4477,7 @@
       "summary": "After Windows resumes from sleep the server event streams resync.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "Ported to official FROM opencode-rune by WINDOWS-UPSTREAM; apps/desktop/src/workspace/lifecycle/launch/network.rs: PowerRegisterSuspendResumeNotification wakes every window on resume to recheck and reconnect its servers.",
+      "status_evidence": "Ported to official FROM opencode-rune by WINDOWS-UPSTREAM; apps/desktop/src/workspace/lifecycle/launch/network.rs: PowerRegisterSuspendResumeNotification wakes every window on resume to recheck and reconnect its servers. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4610,7 +4613,7 @@
       "summary": "When the toast cap evicts the oldest notification, its Windows toast is taken out of Action Center too, not only forgotten.",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "features/notifications/src/lib.rs post(): at CAP the oldest shown notification is popped and sink.remove(&oldest) takes its toast back before the new one posts.",
+      "status_evidence": "features/notifications/src/lib.rs post(): at CAP the oldest shown notification is popped and sink.remove(&oldest) takes its toast back before the new one posts. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4653,7 +4656,7 @@
       "summary": "The first window is created and shown focused before it is registered, so its focus event had already passed: register() now records it as the last-focused window when win.isFocused().",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "apps/desktop/src/workspace/windows/mod.rs register() calls focused(id) right after pushing the window into OPEN, so the first window is the most recently focused from the start; on_focus (windows/open.rs) stamps it again on every later focus. Difference: ours stamps every registered window, also one restored in the background, where official stamps only a window that is focused at registration; the next real focus event corrects the order.",
+      "status_evidence": "apps/desktop/src/workspace/windows/mod.rs register() calls focused(id) right after pushing the window into OPEN, so the first window is the most recently focused from the start; on_focus (windows/open.rs) stamps it again on every later focus. Difference: ours stamps every registered window, also one restored in the background, where official stamps only a window that is focused at registration; the next real focus event corrects the order. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4725,7 +4728,7 @@
       "summary": "List, Glob and Grep rows (and the context group's search trigger) show the folder the tool ran in, relative to the project (/ for the project itself), instead of that folder's parent (new displayFolder).",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "crates/session-view/src/tools/mod.rs directory() already shows the searched folder relative to the session's directory, / for its root, used by tools/lists.rs search(); it was a deliberate difference (ours.md section 5.8) that official matches since 066336864f (displayFolder in packages/session-ui/src/tools/tool-renderer.tsx), so the ours.md entry is retired (23 Nov).",
+      "status_evidence": "crates/session-view/src/tools/mod.rs directory() already shows the searched folder relative to the session's directory, / for its root, used by tools/lists.rs search(); it was a deliberate difference (ours.md section 5.8) that official matches since 066336864f (displayFolder in packages/session-ui/src/tools/tool-renderer.tsx), so the ours.md entry is retired (23 Nov). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4771,7 +4774,7 @@
       "summary": "An unpackaged (local) run gets its own AppUserModelID, ai.opencode.desktop.local, instead of the installed dev channel's, so its taskbar button and toasts never merge with an installed copy; a start-menu Electron.lnk that claims the installed dev AUMID for a dev Electron is recognised as colliding.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "crates/win-install/src/product.rs Product::from_build: a local build (no channel or `local`) takes id com.apibrother.brocode.dev and scheme opencode-rune-dev, while every release build (release.yml sets OPENCODE_RUNE_BUILD_CHANNEL, no OPENCODE_RUNE_BUNDLE_ID) takes com.apibrother.brocode; harness runs take a scratch id (Product::with_id). Ours has no Electron shortcut to repair.",
+      "status_evidence": "crates/win-install/src/product.rs Product::from_build: a local build (no channel or `local`) takes id anomaly.opencode-rune.dev and scheme opencode-rune-dev, while every release build (release.yml sets OPENCODE_RUNE_BUILD_CHANNEL, no OPENCODE_RUNE_BUNDLE_ID) takes anomaly.opencode-rune; harness runs take a scratch id (Product::with_id). Ours has no Electron shortcut to repair. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4792,7 +4795,7 @@
       "summary": "The inbox gets a Drafts group: the open draft and every other draft tab still holding something, newest first, each opening its draft, with Discard draft in its context menu.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "opencode-rune #769 (c3fc7a0c09): apps/desktop/src/shell/view/inbox.rs draft_ids / draft_card, Drafts header above the groups, Discard draft closes the tab. Lists drafts with words; official also lists drafts holding only attachments or context items.",
+      "status_evidence": "opencode-rune #769 (c3fc7a0c09): apps/desktop/src/shell/view/inbox.rs draft_ids / draft_card, Drafts header above the groups, Discard draft closes the tab. Lists drafts with words; official also lists drafts holding only attachments or context items. Follow-up #1472 (dev f4627e2424) closed remaining partial-port edge cases.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -4881,7 +4884,7 @@
       "summary": "Pages and workers in the browser pane get no-op navigator.setAppBadge / clearAppBadge, so a site cannot draw on the app's taskbar button, Dock icon or launcher entry.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Checked in the engine by WS-1 (proof/ws1/badge-dev.json, engine revision 10): setAppBadge / clearAppBadge resolve but reach nothing of the app's. The engine is a separate windowless process with no taskbar button (LSUIElement on macOS, package-release.sh:192,228); Chromium badges only installed web apps; the app's badge comes only from its sessions (apps/desktop/src/workspace/windows/taskbar.rs) and its title is the fixed product name.",
+      "status_evidence": "Checked in the engine by WS-1 (proof/ws1/badge-dev.json, engine revision 10): setAppBadge / clearAppBadge resolve but reach nothing of the app's. The engine is a separate windowless process with no taskbar button (LSUIElement on macOS, package-release.sh:192,228); Chromium badges only installed web apps; the app's badge comes only from its sessions (apps/desktop/src/workspace/windows/taskbar.rs) and its title is the fixed product name. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-1"
@@ -4952,7 +4955,7 @@
       "summary": "No focus ring on text fields (composer, Home search) or scroll areas (timeline, Home's list); focus shows as the caret, the field's fill, or the items inside.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "opencode-rune #824 (305f5826): composer/mod.rs and home/search.rs drop focus_visible_within_ring; timeline/mod.rs and home.rs use no_focus_ring; session.rs drops the timeline-ring overlay. The draft's caret on a focus no press caused: the caret is part of the draft's state here (SavedDraft.caret) and no focus move rewrites it, by reading.",
+      "status_evidence": "opencode-rune #824 (305f5826): composer/mod.rs and home/search.rs drop focus_visible_within_ring; timeline/mod.rs and home.rs use no_focus_ring; session.rs drops the timeline-ring overlay. The draft's caret on a focus no press caused: the caret is part of the draft's state here (SavedDraft.caret) and no focus move rewrites it, by reading. Follow-up #1483 (dev b25ac0c9b) completed sidebar session-list successor and focus-rescue parity.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8",
@@ -5004,7 +5007,7 @@
       "summary": "~ in file links and reply code names the server's home folder; a ~ path in a reply becomes a link when the file is there.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "opencode-rune #826 (24dba76b): features/files/src/code_paths.rs reply_path_exists expands ~ with the host's home_directory before checking; links::classify already expanded ~ for markdown links and clicks. cargo check only.",
+      "status_evidence": "opencode-rune #826 (24dba76b): features/files/src/code_paths.rs reply_path_exists expands ~ with the host's home_directory before checking; links::classify already expanded ~ for markdown links and clicks. cargo check only. Follow-up #1472 (dev f4627e2424) closed remaining partial-port edge cases.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8",
@@ -5030,7 +5033,7 @@
       "summary": "Model picker web performance: coalesced row measuring, a non-inherited fade property, Kobalte's scroll lock only on touch, icon registry and menu-scroll read order.",
       "size": "M",
       "status": "not applicable",
-      "status_evidence": "Layout-thrash fixes in the DOM picker; the native picker (crates/session-view/src/pickers) has no style recalculation or forced layout. No visible change in official.",
+      "status_evidence": "Layout-thrash fixes in the DOM picker; the native picker (crates/session-view/src/pickers) has no style recalculation or forced layout. No visible change in official. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "WS-8"
@@ -5323,7 +5326,7 @@
       "summary": "The folder picker's middle-truncation markers show only for a row that really overflows at a fractional UI zoom (a CSS container-query threshold of 1.5lh for @pierre/trees).",
       "size": "XS",
       "status": "not applicable",
-      "status_evidence": "A CSS workaround for @pierre/trees' truncation markers under subpixel rounding. opencode-rune draws the folder picker itself and has no such marker (truncate_middle is used only in crates/session-view/src/video.rs). By reading.",
+      "status_evidence": "A CSS workaround for @pierre/trees' truncation markers under subpixel rounding. opencode-rune draws the folder picker itself and has no such marker (truncate_middle is used only in crates/session-view/src/video.rs). By reading. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -5372,8 +5375,8 @@
       ],
       "summary": "No focus ring round a focused file viewer, tool output region, error details box, What's New or the terminal; the file viewer and the tool output regions are no Tab stop any more (tabIndex -1: a click still focuses them so the keys scroll and search).",
       "size": "XS",
-      "status": "partly",
-      "status_evidence": "opencode-rune #881 (6e508f01): the keyboard's line in a file viewer or diff (crates/opencode-code-view/src/file/view.rs and diff/view.rs line_stop) drew Rune's default ring; it now sets no_focus_ring and shows by the line's hover fill (focus_fill); the terminal screen (features/terminal-surface/src/grid/mod.rs) sets no_focus_ring. Tool output, console and error details are not focusable in ours and What's New has no focus container: no ring, nothing to do. OPEN, owner question (24 Nov): official's viewer is no Tab stop at all; ours keeps one Tab stop per viewer (the cursor line, for commenting by keyboard). Found, not checked: official's tool output and error details take focus on a click so the keys scroll them; ours are not focusable. Ported by reading; run owed (CI build only).",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #881 (6e508f01) and completed in #1375 (8023e5d79, head 8399f8b044, CI run 45918796952 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): terminal screen (features/terminal-surface/src/grid/mod.rs), file/diff viewer line stops (crates/opencode-code-view/src/{file,diff}/view.rs), tool console bash-scroll & capped tool-output (crates/session-view/src/tools/console.rs), and tool error details (crates/session-view/src/tools/error.rs) are all click-focusable with tab_index(-1) and no_focus_ring (not Tab stops, no focus ring). Official: packages/session-ui/src/{components/file.{tsx,css},components/message-part.css,tools/tool-renderer.tsx}, packages/ui/src/components/error-details.{tsx,css}, packages/gui-plugins/src/terminal/terminal.tsx. Verified headless on Windows x64 PR build (4bd8a89126, run 45916050241), all cases pass: clicking bash-scroll region (tools-shell-long) and error details (tools-error) focuses each with focusVisible=false (zero ring); on Review/Inline diff Tab x3 skips diff lines while clicking a line focuses it with focusVisible=false. Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5444,7 +5447,7 @@
       "summary": "Unfavoriting a model with the mouse no longer scrolls the model list: a row the pointer made active is not scrolled to when the list reorders (search-list.tsx setActive(key, \"pointer\")).",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "Run by UPSTREAM-PROOF (a fixture with 28 models): ours differed, the list jumped to the row's new place when Unfavorite was pressed in its flyout (first row 179 -> -408). Ported in opencode-rune #1008 (b1cb9124): the flyout's press lights the row as the pointer does (Pickers::point) and hover::poll leaves the list where it is for a row the pointer lit (Highlight::pointed), as search-list.tsx setActive(key, \"pointer\"); Ctrl+F and Return on the flyout's item still follow the row. Run on its CI build: the first row stays at 179; the keys follow; Favorite pressed at the list's end leaves it at the end. Official side by its test.",
+      "status_evidence": "Run by headless verification (a fixture with 28 models): ours differed, the list jumped to the row's new place when Unfavorite was pressed in its flyout (first row 179 -> -408). Ported in opencode-rune #1008 (b1cb9124): the flyout's press lights the row as the pointer does (Pickers::point) and hover::poll leaves the list where it is for a row the pointer lit (Highlight::pointed), as search-list.tsx setActive(key, \"pointer\"); Ctrl+F and Return on the flyout's item still follow the row. Run on its CI build: the first row stays at 179; the keys follow; Favorite pressed at the list's end leaves it at the end. Official side by its test.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5545,7 +5548,7 @@
       "summary": "Linux only: with side tabs, the app menu button shows in the side tabs header (it was hidden with the vertical titlebar).",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "Ported in opencode-rune #1009 (8bc31926): on Linux the app menu's button leads the sidebar's header, as titlebar.tsx's linux() branch (ours had no app menu with Side tabs or the Inbox layout outside Windows). Type-checked for Linux x64 before merging, and RUN by LAUNCH-LINUX-d on the published dev-482 deb under headless weston and Xvfb: the app menu button is in the header with Side tabs and with the Inbox layout.",
+      "status_evidence": "Ported in opencode-rune #1009 (8bc31926): on Linux the app menu's button leads the sidebar's header, as titlebar.tsx's linux() branch (ours had no app menu with Side tabs or the Inbox layout outside Windows). Type-checked for Linux x64 before merging, and RUN by Linux launch track on the published dev-482 deb under headless weston and Xvfb: the app menu button is in the header with Side tabs and with the Inbox layout.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5573,7 +5576,7 @@
       "summary": "When a timeline row holding the focused control scrolls out of the mounted range, focus goes to the timeline viewport without scrolling, instead of being rescued to a control in another row (which scrolled the timeline to it).",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "Run by UPSTREAM-PROOF next to official on the head's build: with Copy response focused and the timeline wheeled to its top, the timeline stays still in both apps. One difference found and ported in opencode-rune #999 (a8b84776): ours moved focus to the header's Session details button when the focused row left the built range; each timeline row now returns focus to the timeline's scroll area (El::focus_return to scroll-<session>), as official's listRoot().focus({ preventScroll: true }). Run on #999's CI build: focus on the scroll region, no ring drawn, the timeline still. Not run: Page Up / Down from the region.",
+      "status_evidence": "Run by headless verification next to official on the head's build: with Copy response focused and the timeline wheeled to its top, the timeline stays still in both apps. One difference found and ported in opencode-rune #999 (a8b84776): ours moved focus to the header's Session details button when the focused row left the built range; each timeline row now returns focus to the timeline's scroll area (El::focus_return to scroll-<session>), as official's listRoot().focus({ preventScroll: true }). Run on #999's CI build: focus on the scroll region, no ring drawn, the timeline still. Not run: Page Up / Down from the region.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5621,7 +5624,7 @@
       "summary": "Settings lines up with Home (same column and search field placement) and Home keeps its layout steady at medium window widths.",
       "size": "S",
       "status": "have it",
-      "status_evidence": "opencode-rune #985 (98f18e5a): features/settings/src/shell.rs lays Settings in Home's 1056 box with 24 gutters (rail 256 with 0 / 12 padding, content max 728 with margins 28 / -4, the wide tier from 1008; 240 rail from 800 to 1007), page rows and Back at radius 6 with the layer-01 hover (rows over 120 ms, base ink), the search icon 6 / 2; apps/desktop/src/shell/view/home.rs: grid 1056, projects column 256, and from 768 to 1023 the picker sits in the search field in one 768 column with the header 48 from the top (header top 108), a pick closing a search that is not inline. By reading, compiled by CI; not run. To measure in a run: the page rows' icon-to-name gap (ours 8 -> 10 where official went 6 -> 8).",
+      "status_evidence": "opencode-rune #985 (98f18e5a): features/settings/src/shell.rs lays Settings in Home's 1056 box with 24 gutters (rail 256 with 0 / 12 padding, content max 728 with margins 28 / -4, the wide tier from 1008; 240 rail from 800 to 1007), page rows and Back at radius 6 with the layer-01 hover (rows over 120 ms, base ink), the search icon 6 / 2; apps/desktop/src/shell/view/home.rs: grid 1056, projects column 256, and from 768 to 1023 the picker sits in the search field in one 768 column with the header 48 from the top (header top 108), a pick closing a search that is not inline. By reading, compiled by CI; not run. To measure in a run: the page rows' icon-to-name gap (ours 8 -> 10 where official went 6 -> 8). Follow-up #1472 (dev f4627e2424) closed remaining partial-port edge cases.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5648,7 +5651,7 @@
       "summary": "Inbox sessions can be pinned, and archived sessions are listed in the sidebar (shell/titlebar/inbox.tsx, session search, the palette; a new icon; strings in every language).",
       "size": "L",
       "status": "have it",
-      "status_evidence": "opencode-rune #982 (ffbd2b68): the Inbox sidebar's sections follow inbox.tsx: pinned sessions (the shared navigation.pins) lead Recent in the pins' order with Desktop's pin glyph after the title, and a card's menu starts with Pin / Unpin; archived sessions are entries of the list (the newest 50 per server, read apart from the session list) under an Archived header that folds (archivedExpanded, shut at first), the last archived first; the Unread group and Recent's header are gone (done / failed / ready sort together, so reading one does not move it); the list's own right-click menu places Working on the shelf or in the list above Archived (workingPlacement). Official's catalogs synced to f25b09005e. By reading, compiled by CI; not run (handed to UPSTREAM-PROOF). Not removed yet: the archived search dialog's code, which has no entry point now.",
+      "status_evidence": "opencode-rune #982 (ffbd2b68): the Inbox sidebar's sections follow inbox.tsx: pinned sessions (the shared navigation.pins) lead Recent in the pins' order with Desktop's pin glyph after the title, and a card's menu starts with Pin / Unpin; archived sessions are entries of the list (the newest 50 per server, read apart from the session list) under an Archived header that folds (archivedExpanded, shut at first), the last archived first; the Unread group and Recent's header are gone (done / failed / ready sort together, so reading one does not move it); the list's own right-click menu places Working on the shelf or in the list above Archived (workingPlacement). Official's catalogs synced to f25b09005e. By reading, compiled by CI; not run (handed to headless verification). Not removed yet: the archived search dialog's code, which has no entry point now.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5700,7 +5703,7 @@
       "summary": "The file tree of the Files and Review panels moves to the right (or back) from a context menu on the sidebar or its toggle: Sidebar position > Left / Right; one preference for every side panel; the toggle, border and resize handle swap sides.",
       "size": "M",
       "status": "have it",
-      "status_evidence": "opencode-rune #984 (60b2784d): apps/desktop/src/plugin_host/native/sidebar.rs keeps sidebarSide (start / end) in review-panel-v2 beside sidebarOpened / sidebarWidth; a right-click on the sidebar or its toggle opens Sidebar position > Left / Right (physical: right is the end edge left to right); on the end edge the body's order, the sidebar's border, the resize handle and the toggle (8 from the inline end) swap sides, and plugins/review and plugins/file leave the toggle room at the end of the sidebar header and the shut toolbar (8 / 46, 8 / 54). Plugin contract 1.9: PanelSidebarInfo.side and Layout:MovePanelSidebar, as PanelSidebar.side() / move(). By reading, compiled by CI; not run (handed to UPSTREAM-PROOF).",
+      "status_evidence": "opencode-rune #984 (60b2784d): apps/desktop/src/plugin_host/native/sidebar.rs keeps sidebarSide (start / end) in review-panel-v2 beside sidebarOpened / sidebarWidth; a right-click on the sidebar or its toggle opens Sidebar position > Left / Right (physical: right is the end edge left to right); on the end edge the body's order, the sidebar's border, the resize handle and the toggle (8 from the inline end) swap sides, and plugins/review and plugins/file leave the toggle room at the end of the sidebar header and the shut toolbar (8 / 46, 8 / 54). Plugin contract 1.9: PanelSidebarInfo.side and Layout:MovePanelSidebar, as PanelSidebar.side() / move(). By reading, compiled by CI; not run (handed to headless verification).",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5748,7 +5751,7 @@
       "summary": "Performance only: while a batch of measured timeline rows is applied, TanStack's per-row scroll corrections are held and the last one is written once, so the batch forces one browser layout instead of one per row.",
       "size": "XS",
       "status": "not applicable",
-      "status_evidence": "By reading: this is about native DOM scroll writes forcing layout in official's TanStack virtualizer (session/timeline/virtualizer.tsx scrollToFn). Ours' timeline is Rune's virtual list: measured row sizes and the scroll anchor are applied in the frame's single layout pass, with no per-row scroll write to batch. Nothing a user sees differs.",
+      "status_evidence": "By reading: this is about native DOM scroll writes forcing layout in official's TanStack virtualizer (session/timeline/virtualizer.tsx scrollToFn). Ours' timeline is Rune's virtual list: measured row sizes and the scroll anchor are applied in the frame's single layout pass, with no per-row scroll write to batch. Nothing a user sees differs. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -5770,7 +5773,7 @@
       "summary": "New-session location dialog, the worktree step: the search field's leading icon is the back arrow in every step that owns Escape (it was the magnifying glass there), and the group's title \"Run session in\" is a heading named for the list, not a button or a Tab stop.",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "opencode-rune #1019 (03893b3f): features/switcher/src/project/view.rs shows the back arrow in the search field for every step but the first, and the step's title is a plain heading (project-switcher-title) with the list as a group it names; the title's button is gone. Run by UPSTREAM-PROOF on its CI build: the back arrow leads the search field in the worktree and branch steps and steps back to the projects; the title is a group that takes no focus (Tab goes field, arrow, field). Official side by its code and test.",
+      "status_evidence": "opencode-rune #1019 (03893b3f): features/switcher/src/project/view.rs shows the back arrow in the search field for every step but the first, and the step's title is a plain heading (project-switcher-title) with the list as a group it names; the title's button is gone. Run by headless verification on its CI build: the back arrow leads the search field in the worktree and branch steps and steps back to the projects; the title is a group that takes no focus (Tab goes field, arrow, field). Official side by its code and test.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5791,8 +5794,8 @@
       ],
       "summary": "In the composer's \"Session location unavailable\" card (a session whose folder is gone), the worktree list is a popover whose search field keeps focus while the pointer moves over rows (it was a menu, whose hovered item took focus); ten or more other worktrees add the search field.",
       "size": "M",
-      "status": "missing",
-      "status_evidence": "Not applicable as ours stands, and not decided: ours has no such card. A session whose folder is gone is moved to its project's main checkout on the next send, with a first line saying so (crates/opencode-kit/src/session_home.rs), where official lets the person choose a worktree or a directory (session/composer/location-missing.tsx, since opencode#56087). Owner question sent 24 Nov: keep ours or port the card; this row follows his answer.",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1376 (54f5b476f, head 970c5e4070, CI run 45916469768 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped; supersedes draft #1022): Session location unavailable card in composer slot (apps/desktop/src/session/composer/location_missing/{mod,sync,card,view}.rs) with Choose worktree opening the shared worktree dialog (features/switcher/src/project/mod.rs) where the search field keeps focus while hovering rows. Official: packages/app/src/session/composer/location-missing.tsx, new-session/location/{dialog.tsx,machine.ts}. Verified headless on Windows x64 PR build (970c5e4070, run 45916469768), all 3/3 cases pass: --scene location-missing renders Session location unavailable card in composer slot (prompt=false, queue=false); clicking Choose worktree opens shared Search worktrees dialog directly on worktree step (gone folder excluded) with project-switcher-input staying focused on row hover; --scene subagent keeps SubagentBar. Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -5813,7 +5816,7 @@
       "summary": "The base branch control's tooltip in a new session's composer lists two commands, each with its shortcut: Choose worktree (session.location.select), then Choose branch.",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "opencode-rune #1021 (f5c616ec): features/workspace-tools/src/new_worktree/mod.rs trigger_shell gives the tooltip two rows (El::help_row), Choose worktree with Bind::LocationSelect's keycaps, then Choose branch with Bind::BranchChoose's. Run by UPSTREAM-PROOF on its CI build: the pointer resting on \"from main\" draws two rows, each with its keycaps (Choose worktree CTRL ALT O; Choose base branch CTRL ALT B). Two differences left, seen in the run: ours draws the tooltip under the control with rows from the start edge; official places it on top with centred rows.",
+      "status_evidence": "opencode-rune #1021 (f5c616ec): features/workspace-tools/src/new_worktree/mod.rs trigger_shell gives the tooltip two rows (El::help_row), Choose worktree with Bind::LocationSelect's keycaps, then Choose branch with Bind::BranchChoose's. Run by headless verification on its CI build: the pointer resting on \"from main\" draws two rows, each with its keycaps (Choose worktree CTRL ALT O; Choose base branch CTRL ALT B). Two differences left, seen in the run: ours draws the tooltip under the control with rows from the start edge; official places it on top with centred rows.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5837,8 +5840,8 @@
       ],
       "summary": "The \"Session location unavailable\" card's Choose worktree opens the shared new-session location dialog (its worktree step) instead of a list of its own; the card's own popover, search and machine states for the list are gone, and one string is removed.",
       "size": "M",
-      "status": "missing",
-      "status_evidence": "Part of the card port (UP-CARD, decided 24 Nov under the parity rule): ours has no card yet (crates/opencode-kit/src/session_home.rs moves the session by itself). Port the card from this commit's shape.",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1376 (54f5b476f, head 970c5e4070, CI run 45916469768 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped; supersedes draft #1022): Choose worktree opens the shared new-session location dialog directly on the project's worktree step (open_worktree_dialog in features/switcher/src/project/mod.rs), removing the old silent auto-move (crates/opencode-kit/src/session_home.rs) and adding Server::move_session + session.moved SSE handling. Official: packages/app/src/new-session/location/{dialog.tsx,machine.ts}, session/composer/location-missing.tsx. Verified headless on Windows x64 PR build (970c5e4070, run 45916469768), all 3/3 cases pass: Choose worktree on --scene location-missing opens shared project-switcher Search worktrees dialog directly on worktree step (feature-01/02/03, reconnect-fix; gone folder excluded) while --scene subagent keeps SubagentBar cleanly. Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -5931,7 +5934,7 @@
       "summary": "An inline quote of one line (and a file or note reference) has its bar run 1 px past the line, so lowercase text reads centred on the bar; wrapped quotes are unchanged.",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "opencode-rune #1042 (b6cdcb48): crates/session-view/src/user_quotes.rs behind_bar gives a one-line quote 1 of room under its line, which the bar spans. Also in it: a quote's lines are laid out (kept by text and width), so a short quote that wraps past three lines can be opened (#976 asked fold::lines, which answers hard breaks alone under 360 bytes). RUN by UPSTREAM-PROOF on its CI build: a one-line quote and a file reference are 22 high over a 21 line (dev: 21 over 21); a 289-character quote with no break is three lines and a button, a press opens it to four (on dev it was clamped with no button: the fault was run too); a quote of exactly three lines has no button. Scroll cost, 34 inline quotes on screen at once (a 1280x5400 window, all 40 built, 48 wheel steps, 301 frames a run, three runs a side after a warm-up, the two builds in turn, alone in the capture window): frame CPU time median 1.53 / 1.46 / 1.29 ms on dev against 1.39 / 1.35 / 1.39; 99th 5.28 / 5.05 / 5.17 against 5.03 / 4.50 / 5.75; no frame over 16 ms; the session's first build 100 / 124 / 104 ms against 96 / 97 / 92. Headless, one machine, NVIDIA, CPU time of the frame.",
+      "status_evidence": "opencode-rune #1042 (b6cdcb48): crates/session-view/src/user_quotes.rs behind_bar gives a one-line quote 1 of room under its line, which the bar spans. Also in it: a quote's lines are laid out (kept by text and width), so a short quote that wraps past three lines can be opened (#976 asked fold::lines, which answers hard breaks alone under 360 bytes). RUN by headless verification on its CI build: a one-line quote and a file reference are 22 high over a 21 line (dev: 21 over 21); a 289-character quote with no break is three lines and a button, a press opens it to four (on dev it was clamped with no button: the fault was run too); a quote of exactly three lines has no button. Scroll cost, 34 inline quotes on screen at once (a 1280x5400 window, all 40 built, 48 wheel steps, 301 frames a run, three runs a side after a warm-up, the two builds in turn, alone in the capture window): frame CPU time median 1.53 / 1.46 / 1.29 ms on dev against 1.39 / 1.35 / 1.39; 99th 5.28 / 5.05 / 5.17 against 5.03 / 4.50 / 5.75; no frame over 16 ms; the session's first build 100 / 124 / 104 ms against 96 / 97 / 92. Headless, one machine, NVIDIA, CPU time of the frame.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5956,7 +5959,7 @@
       "summary": "The browser's attachment to sessions: (1) a session that runs in an open tab nobody has opened since the app started attaches as the routed one does, so its agent has the browser tools (a session the server resumed, or that an automation, a finished job or a subagent woke); (2) a session another window took comes back only when the person comes to it in this window (its route, a prompt, opening its browser), never on focus, a press, a key or an agent's edge; (3) when the window that took it lets it go (the server revokes the grant), the session attaches here again; (4) the browser can be opened here while another window holds it, which takes it back.",
       "size": "M",
       "status": "have it",
-      "status_evidence": "opencode-rune #1073 (66708c5b, by the agent ATTACH): the session's permissions (the browser grant) and the event session.permissions are read, which ours did not. RUN on its CI build next to dev's and next to official's own model under its test fixture, before and after official's commit: a session that runs in a tab nobody opened since launch: dev answers Unknown tool browser.tabs.list at every step (5 of 5); now attached 32 ms after its run starts, or at launch (1.02 s) when it already runs. A session another window took: dev never comes back; now it comes back when the person comes to its tab, sends a prompt (40 ms before the prompt's run) or opens its browser, and 7 ms after the other window lets go; not on a press, a key or leaving its tab, and a tab another window holds is not taken: every case as official after. Launch, same-tree pairs in turn (real windows, five tabs, 24 rounds a side): no row moves beyond the spread; one cost that shows: +0.45 ms from the server's answer to content live when a tab's session runs at launch (the frame that starts its attachment). Linux type-checked by LAUNCH-LINUX-d. Not run: official's Electron window (its model under its fixture stands in), two real windows of ours (the other window was a stand-in: one held attach request), the web check, macOS, a remote server.",
+      "status_evidence": "opencode-rune #1073 (66708c5b, by the agent attach track): the session's permissions (the browser grant) and the event session.permissions are read, which ours did not. RUN on its CI build next to dev's and next to official's own model under its test fixture, before and after official's commit: a session that runs in a tab nobody opened since launch: dev answers Unknown tool browser.tabs.list at every step (5 of 5); now attached 32 ms after its run starts, or at launch (1.02 s) when it already runs. A session another window took: dev never comes back; now it comes back when the person comes to its tab, sends a prompt (40 ms before the prompt's run) or opens its browser, and 7 ms after the other window lets go; not on a press, a key or leaving its tab, and a tab another window holds is not taken: every case as official after. Launch, same-tree pairs in turn (real windows, five tabs, 24 rounds a side): no row moves beyond the spread; one cost that shows: +0.45 ms from the server's answer to content live when a tab's session runs at launch (the frame that starts its attachment). Linux type-checked by Linux launch track. Not run: official's Electron window (its model under its fixture stands in), two real windows of ours (the other window was a stand-in: one held attach request), the web check, macOS, a remote server.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -5979,7 +5982,7 @@
       "summary": "A screen reader can read a working turn: official's two timelines marked every reply and tool row of a turn that is still working aria-hidden, although those rows hold controls that take focus (a tool's header, a link in a reply); the attribute is removed.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "By reading: ours never hid a working turn. The only a11y_hidden in crates/session-view/src/timeline are the meta lines (model and time, parts.rs), the pending label, and the Copy button while the turn is busy, which is also inert then, so it takes no focus; a reply's text, its links and tool headers are in the accessibility tree while the turn works. Not run with a screen reader.",
+      "status_evidence": "By reading: ours never hid a working turn. The only a11y_hidden in crates/session-view/src/timeline are the meta lines (model and time, parts.rs), the pending label, and the Copy button while the turn is busy, which is also inert then, so it takes no focus; a reply's text, its links and tool headers are in the accessibility tree while the turn works. Not run with a screen reader. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6034,7 +6037,7 @@
       "summary": "A reader who scrolled back keeps their place when the transcript is read again (each reconnect of the event stream, and a turn that ends with a tool still running): the newest page no longer replaces the loaded history. When the newest page does not reach the loaded messages, up to three older pages (20, 40, 140 messages) are read until they meet; after a longer absence only the newest messages stay, so the transcript never skips messages. A kept message that was still running is read again by id. An older page is dropped when a newer read replaced the transcript it continues.",
       "size": "M",
       "status": "have it",
-      "status_evidence": "opencode-rune #1090 (07b38b7b, by the agent ATTACH): a transcript read again never skips messages. The newest page read after a reconnect is followed by older pages of 20, 40 and 140 until it meets the loaded messages; past that the loaded history goes and the newest stay, as official. RUN on its CI build next to dev's, behind a simulated server whose network is taken away: messages gained while the stream was down and shown after the reconnect, dev -> this: 16 gained: 8 -> 16; 30: 8 -> 30; 60: 8 -> 60 (dev read the newest 12 once and never asked for the rest); nothing new, or fewer than 12 new: one read; 225 gained (too long to close): the newest stay with no hole in the rows built; a tool running when the stream dropped: dev lost its turn's closing reply and the next turn, this shows all; a reader 400 px up while it reconnects: the same seven rows at the same place. Ours never replaced the transcript, so the reader's place was already kept. Not ported: official's guard that drops an older page landing after a newer read replaced the transcript. Not run: official's app for these cases, the single-message read of a loaded message that was still running (the gap's page covered it in the run), a real window, macOS, Linux, a remote server.",
+      "status_evidence": "opencode-rune #1090 (07b38b7b, by the agent attach track): a transcript read again never skips messages. The newest page read after a reconnect is followed by older pages of 20, 40 and 140 until it meets the loaded messages; past that the loaded history goes and the newest stay, as official. RUN on its CI build next to dev's, behind a simulated server whose network is taken away: messages gained while the stream was down and shown after the reconnect, dev -> this: 16 gained: 8 -> 16; 30: 8 -> 30; 60: 8 -> 60 (dev read the newest 12 once and never asked for the rest); nothing new, or fewer than 12 new: one read; 225 gained (too long to close): the newest stay with no hole in the rows built; a tool running when the stream dropped: dev lost its turn's closing reply and the next turn, this shows all; a reader 400 px up while it reconnects: the same seven rows at the same place. Ours never replaced the transcript, so the reader's place was already kept. Not ported: official's guard that drops an older page landing after a newer read replaced the transcript. Not run: official's app for these cases, the single-message read of a loaded message that was still running (the gap's page covered it in the run), a real window, macOS, Linux, a remote server.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM",
@@ -6058,7 +6061,7 @@
       "summary": "Official's session commands and the header's controls that show a keybind are no longer rebuilt on every transcript change (each message, tool update and history page): the command list reads the transcript through memos of single facts, and keybind labels through a map that changes only when a keybind does.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "By reading: this is Solid's reactivity (a memo that reads the transcript notified the command list, which registered every keybind again and re-rendered the header's controls). Ours has no such subscription: the header is drawn from state each frame and a command's enabled state is read where it shows. Nothing a user sees differs. Not measured.",
+      "status_evidence": "By reading: this is Solid's reactivity (a memo that reads the transcript notified the command list, which registered every keybind again and re-rendered the header's controls). Ours has no such subscription: the header is drawn from state each frame and a command's enabled state is read where it shows. Nothing a user sees differs. Not measured. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6083,7 +6086,7 @@
       "summary": "A history page that lands costs official its own messages and not the loaded transcript in four passes: the todo pill reads the transcript only while a turn runs and todos are on, and the background jobs' history and the timeline's part lists read each message through its own memo.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "By reading: Solid memo granularity in packages/app/src/session/requests/background.ts and packages/session-ui/src/timeline/projection.ts; when the todo pill shows is unchanged. Ours has none of these memos. What a landed page costs ours is not compared here (the regression round's history rows measure it).",
+      "status_evidence": "By reading: Solid memo granularity in packages/app/src/session/requests/background.ts and packages/session-ui/src/timeline/projection.ts; when the todo pill shows is unchanged. Ours has none of these memos. What a landed page costs ours is not compared here (the regression round's history rows measure it). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6177,7 +6180,7 @@
       "summary": "A crash of official's page (its error boundary) is sent to Sentry as it happens only on the local, dev and beta channels; on the production channel it is sent only when the person clicks Report on the error page.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "By reading: ours has no Sentry client and sends a crash to no service (a search of apps/desktop/src, crates and features for `sentry` finds none); after an unexpected close the next launch shows a notice with Export logs (apps/desktop/src/workspace/system/crash_notice.rs), which writes a file and uploads nothing. So there is nothing to gate by channel. Ours has no Report button either: that is a difference older than this commit, not part of it.",
+      "status_evidence": "By reading: ours has no Sentry client and sends a crash to no service (a search of apps/desktop/src, crates and features for `sentry` finds none); after an unexpected close the next launch shows a notice with Export logs (apps/desktop/src/workspace/system/crash_notice.rs), which writes a file and uploads nothing. So there is nothing to gate by channel. Ours has no Report button either: that is a difference older than this commit, not part of it. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6200,8 +6203,8 @@
       ],
       "summary": "Four gaps of the Consolidated navigation: a middle click on a pinned session unpins it and closes its tab; a pin group's chevron (vertical) and, under Consolidated, a Recent group header's chevron show only on hover or keyboard focus; Home's project picker names the focused server, with the server glyph, in place of All projects when there are several servers and no project is chosen.",
       "size": "S",
-      "status": "partly",
-      "status_evidence": "Ported in opencode-rune #1144 (2e0d7d31), with its four open hover/focus/fade differences closed in #1262 (75cae151) on the Rune pin 5342f14d (rune#2231, rune#2215): a middle click on a pinned session unpins it (apps/desktop/src/shell/tabs/pins.rs), Home's picker names the focused server when no project is chosen (shell/view/home/projects.rs), and a pin group's and Recent group's header chevron and menu button follow official's hover and focus (shell/view/sidebar/pinned_area.rs, recent.rs: 150 ms chevron fade in and out, chevron stays visible while hovering the menu button, keyboard focus on the toggle shows the ring and chevron with no hover fill and no menu button, Recent header has no hover fill and turns its label to base ink on hover). Run headless on Windows x64 CI builds: #1144's middle click and Home picker ran on #1144's build; #1262's 9 cases ran on 0b4db7a00 (run 45711964463) beside before build #1271 278f9aaf38 (29 launches, exit 0), confirming 150 ms chevron fade (0.837 / 0.163 at 60 ms), pointer on menu button keeps chevron and fill, Tab on toggle shows no fill and no menu button, Recent header no fill and base ink on hover, and terminal quote icon label + tooltip. Partly because two differences remain open: (1) a Recent header's words turn to base ink while hovering its Group and sort button where official keeps them muted (packages/app/src/shell/titlebar/recent-sessions.tsx:1201): needs a Rune addition for a member naming its hover group (Rune draft owed); (2) the chevron turns at once on toggle press (0 px diff at 60 ms vs settled in case 7) because the toggle's press calls tx.instant(), where official turns over 150 ms. Not run: a real window, touch, top tabs' pin groups, the Recent arrangement's own grouped header, macOS, Linux.",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1144 (2e0d7d31), #1262 (75cae151), and completed in #1375 (8023e5d79, head 8399f8b044, CI run 45918796952 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): middle click unpins pinned sessions, Home picker names focused server, pin/Recent headers fade chevrons over 150 ms, toggle presses omit tx.instant() so group_chevron rotates over 150 ms (apps/desktop/src/shell/view/sidebar/{pinned_area,recent}.rs), and HOVERED_HEADER slot tracks Recent heading pointer hover so hovering Group and sort keeps the heading label muted while keeping the chevron visible. Official: packages/app/src/{home/projects/{region,view}.tsx,shell/titlebar/{pinned-area,recent-sessions,tab-nav}.tsx}. #1144 and #1262 verified headless (9/9 cases on 0b4db7a00); Verified headless on Windows x64 PR build (4bd8a89126, run 45916050241) beside before build (5a027d8785), all cases pass: on sidebar-consolidated-list-grouped, hovering heading turns 'Needs attention' to #fafafaff while hovering sibling sliders button keeps it muted #aeaeaeff and chevron opacity=1 (before: #fafafaff); chevron mid-frame at 60 ms differs from settled by 37 px vs 0 px before (smooth 150 ms rotation). Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6222,7 +6225,7 @@
       "summary": "Official's renderer reads the build's channel from VITE_OPENCODE_CHANNEL when it decides which Sentry integrations to leave out on the production channel, and leaves out the browser-session one there as well.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "By reading: the change is in official's Sentry start-up alone (packages/desktop/src/renderer/startup/sentry.ts). Ours has no Sentry client and sends a crash to no service (see UP-225), so there is nothing to configure.",
+      "status_evidence": "By reading: the change is in official's Sentry start-up alone (packages/desktop/src/renderer/startup/sentry.ts). Ours has no Sentry client and sends a crash to no service (see UP-225), so there is nothing to configure. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6335,11 +6338,18 @@
       ],
       "summary": "The browser's import dialog in two groups: what comes over (Sign-ins, Browsing history) and from which sites: a radio choice 'All sites' (with the count) or 'Only sites I choose', which shows the search and the site list under it with nothing ticked; one box in the list's header ticks or clears every shown site (mixed when some are ticked) in place of the Select all / Select none buttons; the 'Choose sites' disclosure in the footer is gone; a profile picker ('From') shows only where the dialog has several profiles to offer, and a Settings row opens it for its own profile, named in the title with the profile as a badge; a new dialog size 'tall' (480 x 600, fixed top edge); the Settings row's button says 'Import', not 'Import...', and a browser's profile name beside it is a badge.",
       "size": "L",
-      "status": "partly",
-      "status_evidence": "Ported in opencode-rune #1202 (56bd7bb4; plugin contract 1.11): the browser Import dialog is organized into two groups (Include: Sign-ins and Browsing history; Sites: All sites with count, or Only sites I choose with search, select-all checkbox and site list), with the profile shown as a badge beside the browser title when opened from a Settings row, and the dialog keeping its top edge when the list opens; Return on a checkbox starts the import. Two older faults were fixed in the same change: Settings > Browser now lists profiles on its first open without leaving the page, and working copies of another browser's cookie database left behind if the app ended during a read are claimed by an OS lock file and swept once after launch (official packages/gui-plugins/src/browser/profile/index.ts:102, database.ts:62-86). Official: packages/gui-plugins/src/browser/site-chooser.tsx, settings.tsx, panel.tsx. Run headless on Windows x64 CI builds under sealed scratch roots (wall clock only, every process environment verified under the root before the first tap): cases 7, 1, 2, 3 (400 sites, tall and short windows) and 6 (Return on checkbox) held on b7edbacba beside before build cc991c6505; on the merged head 0e3df708a beside before build 278f9aaf38: shared strings, press on the words of Only sites I choose (140 wide, label 116) and press beside, first-open frame check (16.9 ms before, 41.0 ms new; an earlier 2.3 s frame did not recur), sweep cases 8-10 (planted copy+lock removed; no-lock copy waits 10 min; real lock swept after quick end; mid-read Cookies copy not caught, case 8 stands for it), and all three shared-file samples (Add extension framed list, address field, /rename row). Not run: case 4 (pane offer) and case 5 (cookie import). Partly because three named differences from official remain open (follow-ups owed): (1) the From picker is a menu button rather than a select (needs a select in the plugin kit, select.css:22-45); (2) the Import button while importing uses the kit's loading look rather than a disabled primary button with a 14 pt spinner (site-chooser.tsx:682-694); (3) list rows are list items with checkboxes rather than a listbox of options (site-chooser.tsx:570-591).",
+      "status": "have it",
+      "status_evidence": "Merged in #1202 + #1385 (dev 1d614619e1, CI run 46008071378 green, contract 1.12): adds ui.select (rune_kit::Select + Menu::picker) for the From profile picker, renders the busy Import primary button disabled with a 14 pt ink-colored spinner and not-allowed cursor, and switches the site chooser to dedicated ui.listbox / ui.option host nodes (selected=chosen) with presentation-only checkboxes. Verified headless on Windows x64 PR build (run 46008071378, peak <= 0.50 GiB): Only sites I choose renders with zero plugin error, role=listbox + 4 role=option rows, presentation checkboxes role=group focusable=false, Import disabled at 0 of 4 and enabled after Select all (4 of 4). Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
-      "workstream": "UPSTREAM"
+      "workstream": "UPSTREAM",
+      "rune_files": [
+        "apps/desktop/src/plugin_host/ui/nodes.rs",
+        "crates/opencode-plugin-runtime/src/ui_nodes.rs",
+        "crates/opencode-plugin-spec/contract.json",
+        "plugins/browser/plugin.toml",
+        "plugins/browser/settings.luau"
+      ]
     },
     {
       "id": "UP-233",
@@ -6453,8 +6463,8 @@
       ],
       "summary": "In the Review and file panels, Shift+F10 with the focus on the file tree toggle opens the 'Sidebar position' menu (Left, Right) under the toggle, at its start corner; Escape or a choice gives the focus back to the toggle, and the arrow keys walk into the submenu, where Return picks. The file tree's filter field keeps its own menu. A patch to the menu library keeps a submenu's first item from taking the focus back after a key moved it.",
       "size": "XS",
-      "status": "missing",
-      "status_evidence": "Run on a build of dev on the Rune pin d5c7a5ad (opencode-rune #1192's own Windows x64 PR build, head cc991c65; headless, the app's fixture file, no server), the toggle focused by pressing it twice: Shift+F10 opens the menu with its one row, Sidebar position, and the focus is on that row; Escape closes it and the toggle has the focus again, with its ring; Shift+F10, Down, Right opens the submenu with Left checked and the focus on it, and Down, Return puts the tree on the right, both menus gone and the focus on the toggle. What differs, and keeps this missing: the menu opens at the window's bottom-left corner, over the composer, where official opens it at the toggle's own corner (its left and bottom, its right in a right-to-left page: packages/session-ui/src/v2/components/session-file-panel-v2.tsx:101-115). The app passes the point it is given through unchanged (apps/desktop/src/plugin_host/native/sidebar.rs:150-158, crates/opencode-ui/src/popup/view.rs:62-64), so the point Rune handed it was the window's corner, where Rune's rule as written gives the focused element's left and bottom (Rune runtime/input/secondary.rs:446-498, selection/links.rs:203, at the pin); why it did not is not determined: a pass on another focused control decides whether every keyboard menu opens there. Not run: Shift+F10 in the filter field, which has its own menu; a right-to-left layout; a real window. Official's test: packages/app/component-tests/panel-sidebar-side.spec.ts:62-91.",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1374 (e12d405ab, head 68529d4c09, CI run 45915758641 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): apps/desktop/src/plugin_host/native/sidebar.rs anchors Shift+F10 / Menu key (tx.by_keys()) on chrome::sidebar_toggle directly to PopupAnchor::Key(toggle_key) with Align::Start (toggle's start-bottom corner, left in LTR / right in RTL), while the sidebar body ignores tx.by_keys() so the filter field keeps its own menu. Official: packages/session-ui/src/v2/components/session-file-panel-v2.tsx:35,96-117. Verified headless on Windows x64 PR build (68529d4c09, run 45915758641) beside before build (5a027d8785), all 3/3 cases pass (5/5 launches exit 0): Shift+F10 on focused review-tree-toggle opens Sidebar position anchored at its start-bottom corner [480,136,146,32], Escape and Shift+F10+Down+Right+Down+Enter move sidebar Right (x 480 -> 1228) and return focus to toggle, and Shift+F10 in review-filter does not open Sidebar position. Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6652,7 +6662,7 @@
       "summary": "Patches Electron's app-builder-lib NSIS Windows installer to smooth the 7-Zip extraction progress bar with live status and throughput readouts.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Electron NSIS / app-builder-lib patch only (installer.nsh + patches/app-builder-lib@26.15.7.patch). Brocode ships its own custom Rust Win32 TaskDialog setup bootstrapper in apps/installer/src/{install,pages}.rs that unpacks an embedded payload.zip in a few seconds with a Win32 marquee bar.",
+      "status_evidence": "Electron NSIS / app-builder-lib patch only (installer.nsh + patches/app-builder-lib@26.15.7.patch). OpenCode (Rune) ships its own custom Rust Win32 TaskDialog setup bootstrapper in apps/installer/src/{install,pages}.rs that unpacks an embedded payload.zip in a few seconds with a Win32 marquee bar. apps/installer is intentionally kept as-is (no NSIS installer changes). [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPDATER"
@@ -6673,7 +6683,7 @@
       "summary": "Keeps the View code action button aligned to the top title line of an expanded execute tool call rather than drifting down into the gap above its expanded body.",
       "size": "XS",
       "status": "have it",
-      "status_evidence": "Already holds by construction in crates/session-view/src/tools/mod.rs:371-376,390-398 and execute.rs:28-51,236-254: trigger() renders line at a fixed 28 pt height (h(28.0).center_y()) holding button (h(28.0)) and the 24x24 View code button, while disclosure() stacks the revealed body below line with its 4 pt top gap (body(list, false, 4.0)) strictly inside body so opening an execute call never stretches line or shifts View code off the title line. Official: packages/session-ui/src/timeline-next/timeline-next.css:384,466,494.",
+      "status_evidence": "Already holds by construction in crates/session-view/src/tools/mod.rs:371-376,390-398 and execute.rs:28-51,236-254: trigger() renders line at a fixed 28 pt height (h(28.0).center_y()) holding button (h(28.0)) and the 24x24 View code button, while disclosure() stacks the revealed body below line with its 4 pt top gap (body(list, false, 4.0)) strictly inside body so opening an execute call never stretches line or shifts View code off the title line. Official: packages/session-ui/src/timeline-next/timeline-next.css:384,466,494. [verified-hunks]",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6796,7 +6806,7 @@
       "summary": "Displays image attachments returned in tool call results as clickable 88 px 3:2 thumbnail tiles below the tool call in the timeline (fetching media: refs or inline data: images from the tool result on demand and opening the image preview on click).",
       "size": "M",
       "status": "have it",
-      "status_evidence": "Ported in opencode-rune #1321 (b60e692ec, head 3d13135037, CI run 45848899722 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped) on top of Rune's existing Part::Tool.files parsing, RowContent::ToolImages, and images::gallery bento grid + lightbox: removed duplicate step-images-* inside open Block::Group (crates/session-view/src/turns/view.rs), rendered failed image refs as retryable OUTLINE_PHOTO button tiles with pointer cursor (crates/session-view/src/images/mod.rs, timeline/attachments.rs, scripts/cursor-allow.txt), and guarded grouped_read with !images::shows(files) (crates/session-view/src/turns/mod.rs). Official: packages/session-ui/src/tools/tool-result-images.tsx, timeline-next/tools/{tool-display,context-group}.tsx, components/message-part.css. Verified headless on Windows x64 PR build (--scene tool-result-images), all 3/3 cases pass: folded group shows loaded PNG + retryable failed tile, expanding group shows zero duplicate step-images-*, clicking loaded tile opens full-size image-preview lightbox. Not run: real window, macOS, Linux.",
+      "status_evidence": "Ported in opencode-rune #1321 (b60e692ec, head 3d13135037, CI run 45848899722 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped) on top of Rune's existing Part::Tool.files parsing, RowContent::ToolImages, and images::gallery bento grid + lightbox: removed duplicate step-images-* inside open Block::Group (crates/session-view/src/turns/view.rs), rendered failed image refs as retryable OUTLINE_PHOTO button tiles with pointer cursor (crates/session-view/src/images/mod.rs, timeline/attachments.rs, scripts/cursor-allow.txt), and guarded grouped_read with !images::shows(files) (crates/session-view/src/turns/mod.rs). Official: packages/session-ui/src/tools/tool-result-images.tsx, timeline-next/tools/{tool-display,context-group}.tsx, components/message-part.css. Verified headless on Windows x64 PR build (--scene tool-result-images), all 3/3 cases pass: folded group shows loaded PNG + retryable failed tile, expanding group shows zero duplicate step-images-*, clicking loaded tile opens full-size image-preview lightbox. Not run: real window, macOS, Linux. Follow-up #1476 (dev c83e0e2e1) restored tool-result image tile hover border parity.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6819,7 +6829,7 @@
       "summary": "Asks the user in a confirmation modal before opening a folder from an opencode:// project deep link (Cancel focused by default, warning that opening a folder runs plugins/settings, queueing multiple links one at a time) and rejects non-local, relative, traversal, UNC/network-share, and control/bidi paths.",
       "size": "M",
       "status": "have it",
-      "status_evidence": "Ported in opencode-rune #1317 (886bbea31, head dfd82914dd, CI run 45840207387 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): adds is_local_directory validation, explicit DeepLinkConfirm state machine (Asking/Idle with queued links), and Cancel-autofocused DialogOpenDeepLink modal (DialogSize::Normal, Fit::Content, LTR mono folder badge, warning text, Open project Contrast button) in apps/desktop/src/workspace/system/deep_links.rs, registered at DEEP_LINK_OVERLAY_ID in apps/desktop/src/kernel.rs, guarded in type_to_compose.rs, with 5 official strings in crates/opencode-i18n/locales/official/en.json. Official: packages/app/src/shell/deep-links/{machine.ts,deep-links.tsx}, runtime/i18n/en.ts. Verified headless on Windows x64 PR build (--scene deep-link-confirm), all 3/3 cases pass (6/6 launches exit 0): modal renders with Cancel focused by default, stray Enter and Escape decline and advance queued links, Open project accepts. Not run: OS URL scheme handoff in a real window, macOS, Linux.",
+      "status_evidence": "Ported in opencode-rune #1317 (886bbea31, head dfd82914dd, CI run 45840207387 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): adds is_local_directory validation, explicit DeepLinkConfirm state machine (Asking/Idle with queued links), and Cancel-autofocused DialogOpenDeepLink modal (DialogSize::Normal, Fit::Content, LTR mono folder badge, warning text, Open project Contrast button) in apps/desktop/src/workspace/system/deep_links.rs, registered at DEEP_LINK_OVERLAY_ID in apps/desktop/src/kernel.rs, guarded in type_to_compose.rs, with 5 official strings in crates/opencode-i18n/locales/official/en.json. Official: packages/app/src/shell/deep-links/{machine.ts,deep-links.tsx}, runtime/i18n/en.ts. Verified headless on Windows x64 PR build (--scene deep-link-confirm), all 3/3 cases pass (6/6 launches exit 0): modal renders with Cancel focused by default, stray Enter and Escape decline and advance queued links, Open project accepts. Not run: OS URL scheme handoff in a real window, macOS, Linux. Follow-up #1472 (dev f4627e2424) closed remaining partial-port edge cases.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6844,7 +6854,7 @@
       "summary": "Adds a Linux-only Settings > General > Smooth scrolling switch (off by default, applies after restart) controlling Electron's Chromium --disable-smooth-scrolling command-line switch so mouse-wheel scrolling matches native Linux apps.",
       "size": "S",
       "status": "not applicable",
-      "status_evidence": "Electron/Chromium Linux command-line switch workaround (app.commandLine.appendSwitch('disable-smooth-scrolling') in packages/desktop/src/main/native/smooth-scrolling.ts). Brocode is a native GPU desktop app, not an Electron/Chromium shell, so the Chromium smooth-scrolling flag does not apply.",
+      "status_evidence": "Electron/Chromium Linux command-line switch workaround (app.commandLine.appendSwitch('disable-smooth-scrolling') in packages/desktop/src/main/native/smooth-scrolling.ts). OpenCode (Rune) is a native GPU desktop app, not an Electron/Chromium shell, so the Chromium smooth-scrolling flag does not apply.",
       "depends_on": "none",
       "risks": "none",
       "workstream": "UPSTREAM"
@@ -6871,11 +6881,17 @@
       ],
       "summary": "Adds an experimental Automations view (Settings > Experimental toggle + Automations sidebar/titlebar entry + /automations route) showing each server's scheduled/event automations, where they run, which session they wake, and pause/resume/delete controls.",
       "size": "L",
-      "status": "missing",
-      "status_evidence": "Not yet ported (also includes #66635 93e053ff89 follow-up passing the Home automations entry into projects view as props). Official: packages/app/src/automations/{format,model,route,source,view}.*, settings/experimental/experimental.tsx, shell/{routes/routes,tabs/tabs,titlebar/titlebar}.tsx, home/{route,projects/*}.tsx, runtime/i18n/en.ts.",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1377 (506b5822e, head b2d53dd655, CI run 45919467456 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): adds opencode-kit automation model/client, Settings > Experimental > Automations toggle + search + 51 i18n keys, Route::Automations + AutomationsFeature split list/inspector + delete confirmation dialog + sidebar/titlebar/Home entry points (including #66635 93e053ff89 prop-passing shape) + --scene automations/automations-empty/automations-off. Official: packages/app/src/automations/{format,model,route,source,view}.*, settings/experimental/experimental.tsx, shell/{routes/routes,tabs/tabs,titlebar/titlebar}.tsx, home/{route,projects/*}.tsx, runtime/i18n/en.ts. Post-merge verified headless on Windows x64 PR build (run 45919467456, 13/13 passes exit 0), all 5/5 cases pass: --scene automations sidebar count/groups/inspector, Pause/Resume/Delete dialog, prompt/shell/subagent rows + Done toggle + search filter, New automation & empty example pre-fill /automation, and --scene automations-off + Settings > Experimental toggle. Not run: real window, macOS, Linux.",
       "depends_on": "none",
       "risks": "none",
-      "workstream": "UPSTREAM"
+      "workstream": "UPSTREAM",
+      "extra_shas": [
+        "93e053ff89"
+      ],
+      "extra_prs": [
+        66635
+      ]
     },
     {
       "id": "UP-255",
@@ -6898,9 +6914,1883 @@
       ],
       "summary": "Gates Code Mode execute script diffs/counts behind the server's full_codemode flag and switches execute calls under full_codemode to a flat layout that places the script's Output disclosure row after its file changes with tighter script-to-changes spacing.",
       "size": "M",
-      "status": "missing",
-      "status_evidence": "Port in draft opencode-rune #1329 (head c56158077a, CI running, not yet run): adds Server::flags (GET /api/experimental/flag), explicit per-(server, directory) LocationFlags state machine in apps/desktop/src/session/meta/flags.rs wired to TimelineHost::full_codemode, gates turns::fold_with_flags script diffs/counts behind full_codemode, switches execute calls under full_codemode to the flat locked-open layout with script_output_for_{steps,blocks} moving Output after the script's last change, updates M/S block and open-group spacing, and adds --scene tools-execute-codemode-{off,on,standalone}. Official: packages/app/src/session/timeline/{controller,message-timeline}.tsx, packages/session-ui/src/timeline/{script-output,facts,projection}.ts, timeline-next/{row,tools/context-group}.tsx, tools/tool-renderer.tsx.",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1329 (5fc2a6de9, head de9079d0a2, CI run 45866130904 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): adds Server::flags (GET /api/experimental/flag), explicit per-(server, directory) LocationFlags state machine in apps/desktop/src/session/meta/flags.rs wired to TimelineHost::full_codemode, gates turns::fold_with_flags script diffs/counts behind full_codemode, switches execute calls under full_codemode to the flat locked-open layout with script_output_for_{steps,blocks} moving Output after the script's last file change, and updates M/S block and open-group spacing. Official: packages/app/src/session/timeline/{controller,message-timeline}.tsx, packages/session-ui/src/timeline/{script-output,facts,projection}.ts, timeline-next/{row,tools/context-group}.tsx, tools/tool-renderer.tsx. Verified headless on Windows x64 PR build (--scene tools-execute-codemode-{off,on,standalone}), all 3/3 cases pass (4/4 launches exit 0): full_codemode=false hides script diffs and keeps collapsible Execute; full_codemode=true grouped and standalone render locked-open flat Execute, script diff card, and Output 16 px after diff card with interactive console expansion. Not run: real window, macOS, Linux.",
       "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "extra_shas": [
+        "1f66f5f4ad"
+      ],
+      "extra_prs": [
+        66469
+      ]
+    },
+    {
+      "id": "UP-256",
+      "window": "post-1120",
+      "pr": 66637,
+      "sha": "9f49f9e37a",
+      "title": "fix(session-ui): keep sticky file headers under the taller group header",
+      "merged": "2026-11-26",
+      "packages": [
+        "session-ui"
+      ],
+      "main_files": [
+        "packages/session-ui/src/components/message-part.css",
+        "packages/session-ui/src/tools/tool-renderer.tsx"
+      ],
+      "summary": "Keeps nested sticky file headers below the taller expanded context-group header (--sticky-accordion-top) and accounts for trigger marginTop when collapsing a stuck legacy group header.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Already holds by construction in crates/session-view/src/turns/view.rs: nested file headers receive cx.sticky = top + 28.0 + GROUP_GAP (automatically tracking GROUP_GAP on dev and when bumped to M=20 in #1329), trigger pad matches h(GROUP_GAP), and Rune never uses the legacy CSS negative margin-block trigger hack. Official: packages/session-ui/src/components/message-part.css:2232-2235, tools/tool-renderer.tsx:507-513.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-257",
+      "window": "post-1120",
+      "pr": 66638,
+      "sha": "a956150945",
+      "title": "fix(session-ui): keep a script's Output when its changes are grouped",
+      "merged": "2026-11-26",
+      "packages": [
+        "session-ui"
+      ],
+      "main_files": [
+        "packages/session-ui/src/timeline/script-output.ts",
+        "packages/session-ui/src/timeline/timeline-row.ts"
+      ],
+      "summary": "Restricts TimelineRow.scriptChanges to file-card rows (group.type === 'file') so a script whose changes are folded into a separate grouped summary row keeps its Output row under its steps and stands M apart from the summary group.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Shipped in opencode-rune #1329 (5fc2a6de9, head de9079d0a2, CI run 45866130904 green; Linux arm64 skipped): both turns::script_output_for_blocks (crates/session-view/src/turns/mod.rs) and rhythm::edges_of script_changes (crates/session-view/src/timeline/rhythm.rs) match only Block::Calls { kind: Calls::Files } and never Block::Group, so grouped changes never steal a preceding script's Output row and keep M block separation. Official: packages/session-ui/src/timeline/{script-output,timeline-row}.ts.",
+      "depends_on": "UP-255",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-258",
+      "window": "post-1120",
+      "pr": 66650,
+      "sha": "82d8fc5bec",
+      "title": "feat(session-ui): count a script's steps instead of the script with full_codemode",
+      "merged": "2026-11-26",
+      "packages": [
+        "session-ui"
+      ],
+      "main_files": [
+        "packages/session-ui/src/timeline/facts.ts",
+        "packages/session-ui/src/timeline-next/tools/activity-label.ts",
+        "packages/session-ui/src/timeline-next/tools/context-group.tsx",
+        "packages/session-ui/src/tools/context-group-label.ts"
+      ],
+      "summary": "With full_codemode enabled, activity group headers count each execute script's nested steps (mapping Bun.write to edit and Bun.file to read, ignoring other Bun calls, letting edit lead only once changed files land) instead of counting the script itself as a command.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1340 (c5b343e41, head 9ce13a37a7, CI run 45886401880 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): adds activity::activity_with(steps, script_steps) and script_step_calls in crates/session-view/src/activity/label.rs (Bun.write -> edit, Bun.file -> read, ignores other Bun calls, non-background shells, fallback to execute when empty, edit leads only once files land), passes s.full_codemode(session) in turns/view.rs, and hashes metadata.toolCalls in timeline/mod.rs group_hash. Official: packages/session-ui/src/timeline/facts.ts, timeline-next/tools/{activity-label.ts,context-group.tsx}, tools/{context-group-label.ts,tool-renderer.tsx}. Verified headless on Windows x64 PR build (b113398d10, run 45883612173) beside before build (de9079d0a2), all 3/3 cases pass (4/4 launches exit 0): tools-execute-codemode-on reads 'Edited main.rs - 1 read' (before: 'Edited main.rs - 1 command'), tools-execute-codemode-bun reads 'Explored 1 file, 1 search', tools-execute-codemode-off reads 'Ran 1 command'. Not run: real window, macOS, Linux.",
+      "depends_on": "UP-255",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-259",
+      "window": "post-1120",
+      "pr": 64797,
+      "sha": "b15f4e9301",
+      "title": "feat(app): bundle OpenMono as the default mono font",
+      "merged": "2026-11-26",
+      "packages": [
+        "app",
+        "ui",
+        "gui-plugins"
+      ],
+      "main_files": [
+        "packages/app/src/index.css",
+        "packages/app/src/settings/model.tsx",
+        "packages/app/src/settings/about/notices/notices.ts",
+        "packages/app/src/runtime/i18n/en.ts",
+        "packages/ui/src/styles/theme.css",
+        "packages/gui-plugins/src/terminal/terminal.tsx"
+      ],
+      "summary": "Replaces IBM Plex Mono and JetBrainsMono Nerd Font Mono with bundled OpenMono (Regular, Bold, Italic, and Nerd Fonts icons) as the default code and terminal mono font, updating Settings > Appearance defaults, About typeset copy, and OpenMono + Nerd Fonts third-party notices.",
+      "size": "M",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1346 (088e3beee, head 14fec3dcb2, CI run 45897512979 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): bundles reconstructed full non-ligature 1-cell OpenMono-{Regular,Bold,Italic,Icons}.ttf faces + OpenMono-OFL.txt (removing IBMPlexMono-* and JetBrainsMonoNerdFontMono-*), updates apps/desktop/src/lib.rs, scripts/web.ps1, appearance FACE_WEIGHTS/defaults/legacy settings migration, terminal cell metrics & fallback, plugin appearance.font('mono'), all 62 official locales typeset copy + en.json notice strings, THIRD_PARTY_NOTICES.md Section 1 (OpenMono + Nerd Fonts v3.5.1 + collapsible licenses), and fixes pre-existing UTF-8 slicing panic in notices.rs. Official: packages/app/src/{index.css,settings/model.tsx,settings/about/notices/notices.ts,runtime/i18n/*.ts}, packages/ui/src/styles/theme.css, packages/gui-plugins/src/terminal/terminal.tsx. Verified headless on Windows x64 PR build beside before build (b113398d10), all 4/4 cases pass: Appearance shows OpenMono placeholders, About reads 'Typeset in Inter and OpenMono', Third-party notices opens exit 0 with OpenMono + Nerd Fonts v3.5.1 (0 IBM Plex/JetBrains hits), code block and Terminal/Pane render cleanly in OpenMono with single-cell Nerd Font glyphs. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-260",
+      "window": "post-1120",
+      "pr": 66531,
+      "sha": "d382c66c6d",
+      "title": "feat(ui): add Sakura, Espresso, Witch Hazel, E-Ink, and Dune themes",
+      "merged": "2026-11-26",
+      "packages": [
+        "ui"
+      ],
+      "main_files": [
+        "packages/ui/src/theme/context.tsx",
+        "packages/ui/src/theme/v2/resolve.ts",
+        "packages/ui/src/theme/themes/dune.json",
+        "packages/ui/src/theme/themes/eink.json",
+        "packages/ui/src/theme/themes/espresso.json",
+        "packages/ui/src/theme/themes/poimandres.json",
+        "packages/ui/src/theme/themes/sakura.json",
+        "packages/ui/src/theme/themes/witchhazel.json"
+      ],
+      "summary": "Adds five new built-in themes (Sakura, Espresso, Witch Hazel, E-Ink, and Dune), updates the Poimandres light palette, and refines the v2 light neutral scale and monochrome hue-scale resolver.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Ported in opencode-rune #1357 (d1489639c, head 46a8006530, CI run 45904428317 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): regenerated apps/desktop/assets/themes.json (47 themes total) via apps/desktop/tools/themes.ts against official d382c66c6d packages/ui/src/theme, adding Dune, E-Ink, Espresso, Sakura, and Witch Hazel, updating Poimandres light palette, and applying v2/resolve.ts light neutral & monochrome hue scales. Official: packages/ui/src/theme/{context.tsx,v2/resolve.ts,themes/{dune,eink,espresso,poimandres,sakura,witchhazel}.json}. Verified headless on Windows x64 PR build (5a027d8785, run 45901077585) beside before build (14fec3dcb2), all 2/2 cases pass (11/11 launches exit 0): Theme picker lists 47 items (OpenCode first, rest alphabetical) including all 5 new themes (before: 42 items), and all 5 new palettes plus updated Poimandres light render distinctly while oc-2 dark stays unchanged. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-261",
+      "window": "post-1120",
+      "pr": 66736,
+      "sha": "93e15e2557",
+      "title": "fix: use the same provider order in desktop, the TUI and auth login",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "cli",
+        "tui"
+      ],
+      "main_files": [
+        "packages/app/src/providers/catalog/order.ts",
+        "packages/app/src/providers/connect/dialog.tsx"
+      ],
+      "summary": "Aligns desktop provider catalog and Connect dialog provider ordering with TUI and CLI auth login.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1399 (dev 366cdf7df8, CI run 46008899849 green): aligned canonical POPULAR provider order (opencode-go, opencode, openai, anthropic, claude-agent, github-copilot, google, openrouter, vercel) across pickers, Settings > Models, Settings > Providers, and Connect dialog. Post-merge verified headless on Windows x64 PR build (run 46008899849, 6/6 passes exit 0, peak <= 0.67 GiB): Settings > Models provider order matches canonical OpenAI -> Anthropic -> Google, and Settings > Providers + Model picker smoke passes exit 0. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1399
+      ],
+      "rune_files": [
+        "crates/session-view/src/pickers/host.rs",
+        "features/connect/src/view.rs",
+        "features/settings/src/pages/models.rs",
+        "features/settings/src/pages/providers.rs"
+      ]
+    },
+    {
+      "id": "UP-262",
+      "window": "post-1120",
+      "pr": 66558,
+      "sha": "2535f4a2b0",
+      "title": "fix(app): open the row below after archiving the open inbox session",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/shell/tabs/tabs.tsx",
+        "packages/app/src/shell/titlebar/inbox.tsx",
+        "packages/app/src/shell/titlebar/inbox-successor.ts"
+      ],
+      "summary": "After archiving the currently open session from the sidebar inbox list, selects and opens the next row below it (or above if last) instead of jumping away.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Merged in #1403 (dev b38eea2222, CI run 46017629411 green): adds inbox_successor and SidebarInbox::shown snapshot so archiving or deleting the open sidebar session opens the nearest visible row below it (or above if last). Headless build verified (run 46014218715, 6/6 exit 0, peak <= 0.51 GiB; live archive/delete path not exercised on no-server fixture). Not run: real window, live server, macOS, Linux. Follow-up #1483 (dev b25ac0c9b) completed sidebar session-list successor and focus-rescue parity.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1403
+      ],
+      "rune_files": [
+        "apps/desktop/src/session/inbox/order.rs",
+        "apps/desktop/src/session/inbox/model.rs",
+        "apps/desktop/src/session/menu.rs",
+        "apps/desktop/src/shell/tabs/actions.rs"
+      ]
+    },
+    {
+      "id": "UP-263",
+      "window": "post-1120",
+      "pr": 66500,
+      "sha": "30db303dc5",
+      "title": "fix(app): keep the selected session in the collapsed Working section",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/shell/titlebar/inbox.tsx"
+      ],
+      "summary": "Keeps the active/selected session row visible inside the collapsed Working section of the sidebar inbox list rather than hiding it.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1403 (dev b38eea2222, CI run 46017629411 green): keeps the selected working session visible when Working is collapsed (inline, bottom shelf, Sections::rows keyboard nav, and Home/End). Verified headless on Windows x64 PR build (run 46014218715, 6/6 exit 0, peak <= 0.51 GiB): collapsing Working with a selected working row keeps it visible in inbox-working-rows. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1403
+      ],
+      "rune_files": [
+        "apps/desktop/src/session/inbox/order.rs",
+        "apps/desktop/src/session/inbox/model.rs",
+        "apps/desktop/src/shell/view/inbox.rs"
+      ]
+    },
+    {
+      "id": "UP-264",
+      "window": "post-1120",
+      "pr": 66547,
+      "sha": "b64f928fd0",
+      "title": "fix(app): keep the inbox list in place when a focused session changes section",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "ui"
+      ],
+      "main_files": [
+        "packages/app/src/shell/titlebar/inbox.tsx",
+        "packages/ui/src/context/focus-rescue.tsx"
+      ],
+      "summary": "Prevents the sidebar inbox list from jumping scroll position when a focused session moves between inbox sections.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Merged in #1403 (dev b38eea2222, CI run 46017629411 green): follows a focused session card across main list / Working shelf remounts via tx.focus(key, false) without scrolling the list. Headless build verified (run 46014218715, 6/6 exit 0, peak <= 0.51 GiB; live section move not exercised on no-server fixture). Not run: real window, live server, macOS, Linux. Follow-up #1483 (dev b25ac0c9b) completed sidebar session-list successor and focus-rescue parity.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1403
+      ],
+      "rune_files": [
+        "apps/desktop/src/shell/view/inbox.rs"
+      ]
+    },
+    {
+      "id": "UP-265",
+      "window": "post-1120",
+      "pr": 66499,
+      "sha": "5ca42a3e0c",
+      "title": "feat(desktop): first-quit notice that OpenCode keeps running, and a setting to stop it on quit",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "desktop"
+      ],
+      "main_files": [
+        "packages/app/src/settings/general/general.tsx",
+        "packages/app/src/runtime/i18n/en.ts",
+        "packages/desktop/src/main/lifecycle/background-notice.ts",
+        "packages/desktop/src/main/service/keep-running.ts"
+      ],
+      "summary": "Shows a first-quit notice explaining that OpenCode's background service keeps running after quit, and adds a Settings > General toggle to stop the background service on quit.",
+      "size": "M",
+      "status": "have it",
+      "status_evidence": "Merged in #1408 (dev 8effe4f95c, CI run 46014613580 green): adds first-quit background-service notice modal, Settings > General Keep running in the background toggle, and sidecar stop-on-quit. Verified headless on Windows x64 PR build (3/3 cases PASS: settings-preferences switch toggle, Settings search highlight, and background-notice modal Open Settings flow). Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1408
+      ],
+      "rune_files": [
+        "features/settings/src/pages/general.rs",
+        "features/settings/src/search/mod.rs",
+        "apps/desktop/src/workspace/lifecycle/quit.rs"
+      ]
+    },
+    {
+      "id": "UP-266",
+      "window": "post-1120",
+      "pr": 66494,
+      "sha": "80bd09332b",
+      "title": "fix(app): show the Recent header in the inbox sidebar again",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/shell/titlebar/inbox.tsx"
+      ],
+      "summary": "Restores the Recent section header in the sidebar inbox list when Recent sessions are shown.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1403 (dev b38eea2222, CI run 46017629411 green): restores visible Recent section header above Recent rows in sidebar. Verified headless on Windows x64 PR build (run 46014218715, 6/6 exit 0, peak <= 0.51 GiB): --scene layout-inbox shows Recent header cleanly above Recent rows. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1403
+      ],
+      "rune_files": [
+        "apps/desktop/src/shell/view/inbox.rs"
+      ]
+    },
+    {
+      "id": "UP-267",
+      "window": "post-1120",
+      "pr": 66751,
+      "sha": "9b1992045a",
+      "title": "fix(session-ui): group a script's file changes into one patch group",
+      "merged": "2026-11-27",
+      "packages": [
+        "session-ui"
+      ],
+      "main_files": [
+        "packages/session-ui/src/tools/tool-renderer.tsx",
+        "packages/session-ui/src/timeline-next/timeline-next.css"
+      ],
+      "summary": "Groups a Code Mode execute script's multiple file changes into a single patch group card matching direct multi-file patches.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Merged in #1402 (dev 32c394e814, CI run 46010205048 green): groups consecutive diff-bearing script file changes into one stacked patch group (stacked_group with shared outer corners, -1 pt border overlap, per-file disclosure keyed by first change id, scriptChangeRuns) while keeping direct edits as separated cards. Post-merge verified headless on Windows x64 PR build (run 46010205048, peak <= 0.54 GiB, exit 0): tools-execute-codemode-on, standalone, and tools-edit render stacked script file changes with script-output preserved. Not run: real window, macOS, Linux.",
+      "depends_on": "UP-255",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1402
+      ],
+      "rune_files": [
+        "crates/session-view/src/tools/files.rs",
+        "crates/session-view/src/tools/script.rs"
+      ]
+    },
+    {
+      "id": "UP-268",
+      "window": "post-1120",
+      "pr": 66789,
+      "sha": "0a4e0109b5",
+      "title": "feat(ui): taller tooltip lines and colored tooltip text",
+      "merged": "2026-11-27",
+      "packages": [
+        "ui"
+      ],
+      "main_files": [
+        "packages/ui/src/overlays/tooltip/tooltip.css",
+        "packages/ui/src/overlays/tooltip/tooltip.tsx"
+      ],
+      "summary": "Updates tooltip line-height for readability and adds tone/colored tooltip text styling.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1401 (dev 26ad040cab, CI run 46009928636 green): adds opencode_ui::tooltip (COMPACT_PADDING 4px 6px, COMPACT_LINE_HEIGHT 16px, TooltipTextVariant base/muted/faint/accent/warning, tooltip_text) and applies compact tooltip padding and line-height on HelpLook. Post-merge verified headless on Windows x64 PR build (run 46009928636, peak <= 0.54 GiB, exit 0): compact tooltip renders cleanly with COMPACT_PADDING/COMPACT_LINE_HEIGHT and opencode_ui::tooltip exported. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1401
+      ],
+      "rune_files": [
+        "crates/opencode-ui/src/tooltip.rs",
+        "crates/opencode-ui/src/lib.rs",
+        "apps/desktop/src/shell/view/mod.rs"
+      ]
+    },
+    {
+      "id": "UP-269",
+      "window": "post-1120",
+      "pr": 66608,
+      "sha": "b7a7135bb9",
+      "title": "feat(app): choose a model from a searchable list after connecting a provider",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/providers/connect/connected-models.tsx",
+        "packages/app/src/providers/connect/dialog.tsx",
+        "packages/app/src/providers/connect/dialog-machine.ts",
+        "packages/app/src/providers/connect/controller.ts",
+        "packages/app/src/providers/connect/remote.tsx"
+      ],
+      "summary": "Replaces the post-connect provider models grid with a searchable model list allowing direct model selection after connecting a provider.",
+      "size": "M",
+      "status": "have it",
+      "status_evidence": "Merged in #1400 (dev 8b2d35fa58, CI run 46026815605 green): replaces post-connect models grid with a searchable model list allowing direct model selection after connecting a provider. Verified headless on Windows x64 PR build (3/3 cases PASS: single-provider search/highlight/empty state, multi-provider OpenAI/Anthropic section headers with workspace prefix stripped, and keyboard confirm). Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1400
+      ],
+      "rune_files": [
+        "features/connect/src/view.rs",
+        "features/connect/src/models.rs",
+        "features/connect/src/machine.rs"
+      ]
+    },
+    {
+      "id": "UP-270",
+      "window": "post-1120",
+      "pr": 66818,
+      "sha": "98bc686252",
+      "title": "feat(app): browser address bar and recent pages in the side panel New tab",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "gui-plugins",
+        "plugin"
+      ],
+      "main_files": [
+        "packages/app/src/runtime/plugin/new-tab-machine.ts",
+        "packages/app/src/runtime/plugin/side-region.tsx",
+        "packages/gui-plugins/src/browser/address-field.tsx",
+        "packages/gui-plugins/src/browser/new-tab.tsx",
+        "packages/plugin/src/gui/builtin.ts"
+      ],
+      "summary": "Adds the browser address bar and recent pages list directly inside the side panel New tab view so users can type/pick a URL or reopen recent pages without opening a blank browser tab first.",
+      "size": "M",
+      "status": "have it",
+      "status_evidence": "Merged in #1416 (dev 2e6dc21b72, CI run 46029446644 green, contract 1.13): adds session.panel.new and session.panel.new.list slots, pins browser address bar at top of side panel New tab, lists recent pages below launchers above recently closed, and removes the standalone Browser launcher row and mod+t browser newTab override. Verified headless on Windows x64 PR build (4/4 cases PASS: --scene side-new-tab bar/recent layout, address editing, suggestions dropdown, and opening a browser tab replacing New tab). Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1416
+      ],
+      "rune_files": [
+        "crates/opencode-plugin-spec/contract.json",
+        "features/panels/src/menus.rs",
+        "apps/desktop/src/plugin_host/ui/surfaces.rs",
+        "plugins/browser/init.luau",
+        "plugins/browser/panel.luau"
+      ]
+    },
+    {
+      "id": "UP-271",
+      "window": "post-1120",
+      "pr": 66823,
+      "sha": "8815bc9d47",
+      "title": "feat(session-ui): show quotes inline in user messages in every build",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "session-ui"
+      ],
+      "main_files": [
+        "packages/app/src/session/timeline/inline-quotes.ts",
+        "packages/session-ui/src/message/message-content.tsx"
+      ],
+      "summary": "Removes the local/dev build-channel gate so inline quotes render inside user message bubbles in every build channel.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1413 (dev e9ea53d0ad, CI run 46018492315 green): enables TimelineHost::inline_quotes by default in session-view and removes the build_channel() gate in desktop host so inline quotes render in every build. Post-merge verified headless on Windows x64 PR build (run 46018492315, 2/2 passes exit 0, peak <= 0.36 GiB): user message renders inline quote inside user bubble with zero raw '>' text; build_channel gate removal verified by code inspection. Not run: real window, release channel build, macOS, Linux.",
+      "pr_refs": [
+        1413
+      ],
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "rune_files": [
+        "crates/session-view/src/lib.rs",
+        "apps/desktop/src/shell/view/session/host.rs"
+      ]
+    },
+    {
+      "id": "UP-272",
+      "window": "post-1120",
+      "pr": 66805,
+      "sha": "9dff0b8255",
+      "title": "fix(i18n): fix a batch of mistranslations and misplaced labels",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "ui",
+        "gui-plugins"
+      ],
+      "main_files": [
+        "packages/app/src/runtime/i18n/en.ts",
+        "packages/app/src/runtime/i18n/uk.ts",
+        "packages/ui/src/i18n/uk.ts",
+        "packages/gui-plugins/src/details/i18n/uk.ts",
+        "packages/gui-plugins/src/ssh/i18n/uk.ts"
+      ],
+      "summary": "Adds shell/subagent permission tool labels across all locales and fixes mistranslations and misplaced labels in hr, hu, is, lt, uk, vi, fa, ru, tr, and built-in plugin catalogs.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Merged in #1415 (dev d2824173d7, CI run 46022706386 green): synced 65 official and built-in plugin locale JSON catalogs matching opencode#66805 (shell/subagent permission tool labels + hr/hu/is/lt/uk/vi/fa/ru/tr fixes). Post-merge verified headless on Windows x64 PR build (run 46022706386, 2/2 passes exit 0, peak <= 0.52 GiB): --scene settings-about --language uk renders the updated Ukrainian Settings sidebar and About catalog cleanly vs baseline. Not run: real window, macOS, Linux.",
+      "pr_refs": [
+        1415
+      ],
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "rune_files": [
+        "crates/opencode-i18n/locales/official/en.json",
+        "crates/opencode-i18n/locales/official/uk.json",
+        "plugins/details/locales/uk.json",
+        "plugins/ssh/locales/uk.json"
+      ]
+    },
+    {
+      "id": "UP-273",
+      "window": "post-1120",
+      "pr": 66853,
+      "sha": "b40acc9eb0",
+      "title": "fix(session-ui): group unknown tools as \"Tool\" in step-counted headers",
+      "merged": "2026-11-27",
+      "packages": [
+        "session-ui",
+        "ui"
+      ],
+      "main_files": [
+        "packages/session-ui/src/timeline-next/tools/activity-label.ts",
+        "packages/session-ui/src/tools/context-group-label.ts",
+        "packages/ui/src/i18n/en.ts"
+      ],
+      "summary": "When counting a script's steps (full_codemode), groups unrecognized tools into one trailing 'tool' entry in activity headers instead of listing raw tool names.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1435 (dev 5b4bfe9c43, CI run 46044004770 green): adds ui.timeline.activity.otherTool and ui.tool.other to en.json and collapses unrecognized tools into one trailing 'tool' in activity_with when script_steps is true. Post-merge verified headless on Windows x64 PR build (run 46044004770, 7/7 passes exit 0, peak <= 0.52 GiB): unknown-only script tools render 'Used tool', mixed known + unknown render 'Used Questions, tool', and regression scenes stay unchanged. Not run: real window, macOS, Linux.",
+      "pr_refs": [
+        1435
+      ],
+      "depends_on": "UP-258",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "rune_files": [
+        "crates/opencode-i18n/locales/official/en.json",
+        "crates/session-view/src/activity/label.rs"
+      ]
+    },
+    {
+      "id": "UP-274",
+      "window": "post-1120",
+      "pr": 61288,
+      "sha": "999950b2fc",
+      "title": "fix(client): treat an empty XDG_STATE_HOME as unset",
+      "merged": "2026-11-27",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/service-probe.ts"
+      ],
+      "summary": "Treats an empty XDG_STATE_HOME environment variable as unset when resolving opencode/service.json, matching the XDG specification.",
+      "size": "XS",
+      "status": "have it",
+      "rune_files": [
+        "apps/desktop/src/workspace/servers/sidecar/service.rs",
+        "crates/opencode-kit/src/local_service.rs"
+      ],
+      "status_evidence": "Already holds by construction: both apps/desktop/src/workspace/servers/sidecar/service.rs:112 (std::env::var_os(\"XDG_STATE_HOME\").filter(|v| !v.is_empty())) and crates/opencode-kit/src/local_service.rs:55 (var(k).filter(|v| !v.is_empty())) treat empty XDG_STATE_HOME as unset and fall back to <home>/.local/state. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-275",
+      "window": "post-1120",
+      "pr": 66825,
+      "sha": "eb010a1a68",
+      "title": "feat(app): answer questions from the composer in the New question UI experiment",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "session-ui"
+      ],
+      "main_files": [
+        "packages/app/src/session/requests/session-question-dock-classic.tsx",
+        "packages/app/src/session/requests/question-answer-composer.css",
+        "packages/app/src/session/requests/session-question-dock.tsx",
+        "packages/app/src/settings/experimental/experimental.tsx",
+        "packages/app/src/settings/model.tsx"
+      ],
+      "summary": "Replaces the old experimental keyboard-first question dock with the composer-integrated New question UI experiment (settings.general.questionComposer, preset answers card above custom answer composer + actions, removing session-question-dock-experimental and newQuestionUI).",
+      "size": "L",
+      "status": "have it",
+      "status_evidence": "Merged in #1444 (dev 32623b8bbe, CI run 46049645624 green): replaces retired experimental question dock (face.rs) with composer-integrated dock (composer.rs), adds general.questionComposer setting (local/dev/pr), and adds --scene question-composer. Post-merge verified headless on Windows x64 PR build (run 46049645624, 3/3 cases PASS, peak <= 0.88 GiB): --scene question-composer renders borderless listbox + header close button with 8 pt gap over raised composer card; --scene question keeps Classic dock bit-identical; Settings > Experimental shows New question UI ('Answer questions from the composer') ON by default and toggles OFF cleanly. Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "pr_refs": [
+        1444
+      ],
+      "rune_files": [
+        "crates/session-view/src/dock/question/composer.rs",
+        "crates/session-view/src/dock/question/mod.rs",
+        "crates/session-view/src/dock/mod.rs",
+        "features/settings/src/lib.rs",
+        "features/settings/src/pages/experimental.rs"
+      ]
+    },
+    {
+      "id": "UP-276",
+      "window": "post-1120",
+      "pr": 66618,
+      "sha": "ca43c2f68d",
+      "title": "feat(app): rename Component Lab to Lab, with pages and states",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "gui-plugins"
+      ],
+      "main_files": [
+        "packages/gui-plugins/src/debug/bar.tsx",
+        "packages/gui-plugins/src/debug/i18n/en.ts",
+        "packages/app/src/runtime/i18n/en.ts"
+      ],
+      "summary": "Renames Component Lab to Lab in the debug bar (LAB button and tooltip) and updates lab.* strings across all 63 locale catalogs.",
+      "size": "XS",
+      "status": "have it",
+      "status_evidence": "Merged in #1446 (dev 15d849e85d, CI run 46055012594 green): switches debug bar button to lab.label/lab.tip and syncs 126 debug/official locale JSON files matching opencode#66618. Post-merge verified headless on Windows x64 PR build (run 46055012594, 2/2 passes exit 0, peak <= 0.43 GiB): debug bar renders 'LAB' with tooltip 'Open the Lab: every page, with live controls and its states' vs baseline 'COMPONENTS'. Not run: real window, macOS, Linux.",
+      "pr_refs": [
+        1446
+      ],
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "rune_files": [
+        "plugins/debug/init.luau",
+        "plugins/debug/locales/en.json",
+        "crates/opencode-i18n/locales/official/en.json"
+      ]
+    },
+    {
+      "id": "UP-277",
+      "window": "post-1120",
+      "pr": 66887,
+      "sha": "36bfb85cd1",
+      "title": "fix(app): keep tab widths while closing tabs with the mouse",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/runtime/plugin/tab-strip-widths.ts",
+        "packages/app/src/runtime/plugin/side-region.tsx"
+      ],
+      "summary": "Holds side panel tab widths while closing tabs with the mouse (Chrome-style) so the next tab's close button slides under the pointer, releasing when leaving the strip, resizing, blurring, or opening/moving tabs.",
+      "size": "S",
+      "status": "have it",
+      "status_evidence": "Merged in #1460 (dev e5935c1037, CI run 46077977384 green): adds StripWidthHold explicit state machine in features/panels/src/state/width_hold.rs wired into strip.rs, pane.rs memo hash, and window blur in apps/desktop/src/shell/view/mod.rs. Verified headless on Windows x64 PR build (run 46077977384, 5/5 cases PASS, peak <= 0.51 GiB): non-last mouse close holds tab widths with next close button at exact X, strip leave releases hold immediately, double-close accumulates hold, last-tab close expands, and + releases cleanly. Not run: real window, macOS, Linux. Follow-up #1472 (dev f4627e2424) closed remaining partial-port edge cases.",
+      "pr_refs": [
+        1460
+      ],
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM",
+      "rune_files": [
+        "features/panels/src/state/width_hold.rs",
+        "features/panels/src/view/strip.rs",
+        "features/panels/src/view/pane.rs",
+        "apps/desktop/src/shell/view/mod.rs"
+      ]
+    },
+    {
+      "id": "UP-278",
+      "window": "post-1120",
+      "pr": 66469,
+      "sha": "1f66f5f4ad",
+      "title": "feat(server): expose resolved feature flags at /api/experimental/flag",
+      "merged": "2026-11-25",
+      "packages": [
+        "app",
+        "server"
+      ],
+      "main_files": [
+        "packages/app/src/session/timeline/cache.ts",
+        "packages/app/src/shell/routes/session-ui-provider.tsx"
+      ],
+      "summary": "Exposes resolved server feature flags (including full_codemode) at GET /api/experimental/flag and reads them in the desktop timeline provider.",
+      "size": "S",
+      "status": "have it",
+      "rune_files": [
+        "apps/desktop/src/workspace/servers/runtime.rs",
+        "crates/session-view/src/lib.rs"
+      ],
+      "pr_refs": [
+        1329
+      ],
+      "status_evidence": "Merged in #1329 (dev 5fc2a6de94, alongside UP-255): fetches GET /api/experimental/flag per server and passes full_codemode through TimelineHost::full_codemode. Verified headless on Windows x64 PR build (3/3 PASS).",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-279",
+      "window": "post-1120",
+      "pr": 66635,
+      "sha": "93e053ff89",
+      "title": "fix(app): pass the Home automations entry into the projects view instead of reading contexts there",
+      "merged": "2026-11-26",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/home/projects/controller.tsx",
+        "packages/app/src/home/projects/region.tsx",
+        "packages/app/src/home/projects/view.tsx"
+      ],
+      "summary": "Passes the Home automations entry directly into the projects view rather than reading SolidJS contexts inside the view component.",
+      "size": "XS",
+      "status": "have it",
+      "rune_files": [
+        "apps/desktop/src/shell/view/home.rs",
+        "apps/desktop/src/surfaces/automations/mod.rs"
+      ],
+      "pr_refs": [
+        1377
+      ],
+      "status_evidence": "Merged in #1377 (dev 506b5822e8, alongside UP-254): Home automations entry is passed cleanly into the Home projects/sidebar views. Verified headless on Windows x64 PR build (5/5 PASS).",
+      "depends_on": "UP-254",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-280",
+      "window": "post-1120",
+      "pr": 66694,
+      "sha": "9c3f8311a6",
+      "title": "feat(server): sync and write several experimental spaces in one request",
+      "merged": "2026-11-27",
+      "packages": [
+        "server",
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/effect/generated/client.ts",
+        "packages/client/src/promise/generated/client.ts"
+      ],
+      "summary": "Server experimental spaces batch sync/write endpoint plus regenerated TypeScript SDK clients; no desktop UI consumer.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side experimental spaces API and regenerated TS SDK clients (packages/client/src/{effect,promise}/generated/) with no desktop UI behavior.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-281",
+      "window": "post-1120",
+      "pr": 66717,
+      "sha": "ace8a5302e",
+      "title": "fix(core): read effort and system update flags from models.dev",
+      "merged": "2026-11-27",
+      "packages": [
+        "core",
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Server model-resolver reads effort and system update flags from models.dev and updates generated OpenAPI/TS client types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side packages/core/src/{models-dev,model-resolver}.ts and regenerated TS SDK types only; desktop UI reads model metadata from server API. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-282",
+      "window": "post-1120",
+      "pr": 66768,
+      "sha": "740bd1d732",
+      "title": "feat(ui): add icon audits to Components Lab",
+      "merged": "2026-11-27",
+      "packages": [
+        "ui"
+      ],
+      "main_files": [
+        "packages/ui/package.json",
+        "packages/ui/script/generate-icon-usage.ts",
+        "packages/ui/src/icons/icon/icon-audit-data.ts"
+      ],
+      "summary": "Adds icon usage generation script and audit stories to SolidJS Components Lab.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: SolidJS/Storybook Components Lab developer icon-usage generator and audit stories only; no runtime desktop UI change.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-283",
+      "window": "post-1120",
+      "pr": 66813,
+      "sha": "138cc9aedb",
+      "title": "fix(tui): second batch of small TUI bug fixes",
+      "merged": "2026-11-27",
+      "packages": [
+        "tui",
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/solid/data.ts"
+      ],
+      "summary": "TUI bug fixes plus a shared Solid client fix to refresh catalogs when provider/model/agent/command/skill.updated SSE events arrive without a location.",
+      "size": "XS",
+      "status": "have it",
+      "rune_files": [
+        "apps/desktop/src/session/events/mod.rs",
+        "features/composer-input/src/slash.rs",
+        "features/mentions/src/search.rs",
+        "features/mentions/src/lib.rs",
+        "features/settings/src/jobs.rs",
+        "features/settings/src/pages/extensions.rs"
+      ],
+      "status_evidence": "Merged in #1474 (dev 2ba252006d, head 84d6a6951e, CI run 46084604472 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): wires command.updated, skill.updated, and agent.updated (directory-scoped and locationless) in apps/desktop/src/session/events/mod.rs to invalidate Slash, step CatalogEvent::Invalidated in Mentions (with live poll re-fetch when open), and reload Settings Extensions skills. Post-merge verified headless on Windows x64 PR build (run 46084604472, peak <= 0.83 GiB): typing '/' fetches /api/command #1, locationless SSE command.updated immediately triggers /api/command #2 and populates /deferred-plugin-cmd live while the slash menu is open (before build stayed stale). Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-284",
+      "window": "post-1120",
+      "pr": 66806,
+      "sha": "c02e6ecc1a",
+      "title": "fix: fix a batch of Windows tooling and test harness issues",
+      "merged": "2026-11-27",
+      "packages": [
+        "app",
+        "core"
+      ],
+      "main_files": [
+        "packages/app/package.json",
+        "packages/app/src/custom-elements.d.ts"
+      ],
+      "summary": "Fixes Bun/Windows test harness scripts, packages/app/package.json scripts, and TypeScript custom-elements.d.ts declarations.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: Bun/TypeScript test harness, package.json scripts, and custom-elements.d.ts web type declarations only; no desktop runtime behavior change. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-285",
+      "window": "post-1120",
+      "pr": 66899,
+      "sha": "f5683d1e69",
+      "title": "feat(app): ship automations and clean up the list",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/automations/format.ts",
+        "packages/app/src/automations/model.ts",
+        "packages/app/src/automations/route.tsx",
+        "packages/app/src/automations/source.ts",
+        "packages/app/src/automations/view.tsx",
+        "packages/app/src/home/projects/view.tsx",
+        "packages/app/src/settings/experimental/experimental.tsx",
+        "packages/app/src/shell/titlebar/titlebar.tsx"
+      ],
+      "summary": "Ships Automations by removing the Settings > Experimental gate, cleans up list rows with trigger-first subtitles and status pill chips (Live/Failed/Ended/shortDuration), removes Runs on and unknown creator rows, and falls back to 'another session' for unknown prompt recipients.",
+      "size": "M",
+      "status": "have it",
+      "rune_files": [
+        "apps/desktop/src/surfaces/automations/format.rs",
+        "apps/desktop/src/surfaces/automations/list.rs",
+        "apps/desktop/src/surfaces/automations/detail.rs",
+        "apps/desktop/src/surfaces/automations/view.rs",
+        "apps/desktop/src/surfaces/automations/mod.rs",
+        "apps/desktop/src/surfaces/automations/source.rs",
+        "apps/desktop/src/shell/view/sidebar.rs",
+        "features/settings/src/lib.rs"
+      ],
+      "status_evidence": "Merged in #1471 (dev 4b446fe3be, CI run 46083827450): removes general.automations experimental gate, always exposes Automations in Home/sidebar/titlebar/commands, updates list rows with trigger-first subtitles and status pill chips (Live/Failed/Ended/short_duration), drops Runs on and unknown creator row, and falls back to automations.session.unknown ('another session'). Post-merge verified headless on Windows x64 PR build (run 46083827450, 7/7 exit 0, peak <= 0.78 GiB): --scene automations renders pill chips ['2h','1d','2d','Live','Failed'], trigger-first subtitles, sidebar count 4, and inspector without Runs on; default Home exposes home-automations and titlebar automations without experimental flag; Settings > Experimental omits settings-automations. Not run: real window, macOS, Linux.",
+      "depends_on": "UP-254",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-286",
+      "window": "post-1120",
+      "pr": 66900,
+      "sha": "5410c21e3e",
+      "title": "fix(app): only call a cron every N hours when it covers the whole day",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/automations/format.ts"
+      ],
+      "summary": "Restricts the 'Every N hours at :MM' cron phrasing to evenly spaced hour lists that span the entire 24-hour day, keeping partial-day ranges like 0 9-17 * * * as raw cron text.",
+      "size": "XS",
+      "status": "have it",
+      "rune_files": [
+        "apps/desktop/src/surfaces/automations/format.rs"
+      ],
+      "status_evidence": "Merged in #1471 (dev 4b446fe3be, CI run 46083827450): apps/desktop/src/surfaces/automations/format.rs checks hours.len() * step == 24 with uniform spacing before formatting automations.trigger.hours. Post-merge verified headless on Windows x64 PR build (run 46083827450, 7/7 exit 0): --scene automations renders 'Every 6 hours at :30' for full-day evenly spaced cron. Not run: real window, macOS, Linux.",
+      "depends_on": "UP-285",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-287",
+      "window": "post-1120",
+      "pr": 66207,
+      "sha": "2545a8720f",
+      "title": "fix(core): report skills that fail to load instead of crashing",
+      "merged": "2026-11-25",
+      "packages": [
+        "core",
+        "protocol",
+        "client"
+      ],
+      "main_files": [
+        "packages/protocol/src/groups/session.ts",
+        "packages/client/src/promise/generated/client.ts",
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Adds structured SkillLoadError ({ skill, message }, HTTP 502) to session prompt and skill endpoints so failed skill loads report the skill name and reason cleanly instead of crashing.",
+      "size": "XS",
+      "status": "have it",
+      "rune_files": [
+        "crates/opencode-kit/src/wire_error.rs",
+        "crates/opencode-kit/src/client.rs",
+        "crates/opencode-runtime/src/machines/send_reason.rs",
+        "features/inbox/src/send_failed/mod.rs",
+        "apps/desktop/src/workspace/system/errors.rs"
+      ],
+      "status_evidence": "Merged in #1474 (dev 2ba252006d, head 84d6a6951e, CI run 46084604472 green across guardrails + macOS/Win x64/Win arm64/Linux x64; Linux arm64 skipped): decodes structured SkillLoadError ({ skill, message }, HTTP 502) in crates/opencode-kit/src/wire_error.rs, marks it non-transient and failed_for_sure, cleans up orphan sessions in Server::start_as, and surfaces skill-specific errors in UserError, send_reason, and journaled outbox (Verdict::Rejected). Post-merge verified headless on Windows x64 PR build (run 46084604472, peak <= 0.83 GiB): HTTP 502 SkillLoadError classifies as rejected (non-transient), shows 'Not sent - Skill \"broken-skill\": missing SKILL.md frontmatter' + Retry, and restores draft into composer (before build stuck on Checking delivery / server error). Not run: real window, macOS, Linux.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-288",
+      "window": "post-1114",
+      "pr": 63923,
+      "sha": "d759c548aa",
+      "title": "perf(app): measure main-thread work to scroll history",
+      "merged": "2026-11-14",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/perf/timeline.bench.ts"
+      ],
+      "summary": "Benchmark harness metric update in packages/app/perf/timeline.bench.ts.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: web timeline benchmark harness script only; no desktop runtime change.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-289",
+      "window": "post-1114",
+      "pr": 64281,
+      "sha": "7745079647",
+      "title": "feat(core): add the full_codemode feature flag, off unless opted in",
+      "merged": "2026-11-16",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Adds full_codemode server feature flag and regenerates TS client types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side flag definition and generated TS SDK types only (desktop flag reading landed in #1329 / UP-255).",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-290",
+      "window": "post-1114",
+      "pr": 64460,
+      "sha": "00016308be",
+      "title": "feat(app): add focus rings and focus visibility review stories to components lab",
+      "merged": "2026-11-17",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/components-lab/force-focus.ts"
+      ],
+      "summary": "Adds focus-ring and focus-visibility review stories and helper to SolidJS Components Lab.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: SolidJS Storybook focus-review helper/stories only; no runtime desktop UI change.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-291",
+      "window": "post-1114",
+      "pr": 64490,
+      "sha": "0e447fce16",
+      "title": "feat(stories): cover device pairing flows in the Components Lab",
+      "merged": "2026-11-17",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/servers/connect/screen.tsx"
+      ],
+      "summary": "Extracts ConnectServerForm scanner prop for Components Lab pairing stories and component tests.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: SolidJS Storybook/test dependency injection refactor in screen.tsx only; no runtime UI change.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-292",
+      "window": "post-1114",
+      "pr": 64515,
+      "sha": "007afb1b0c",
+      "title": "feat(core): choose tools and Code Mode placement from the session's model",
+      "merged": "2026-11-18",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/effect/tool.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/tool.ts"
+      ],
+      "summary": "Server tool/Code Mode placement selection and JS plugin SDK tool type updates.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server core tool selection and JS plugin adapter types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-293",
+      "window": "post-1114",
+      "pr": 63989,
+      "sha": "4c5298bce4",
+      "title": "Opentui 0.9.0",
+      "merged": "2026-11-19",
+      "packages": [
+        "latex",
+        "plugin"
+      ],
+      "main_files": [
+        "packages/latex/src/markdown.ts",
+        "packages/plugin/package.json"
+      ],
+      "summary": "Upgrades OpenTUI to 0.9.0 and updates TUI markdown latex renderer and plugin peer deps.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: TUI OpenTUI 0.9.0 dependency/renderer upgrade only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-294",
+      "window": "post-1114",
+      "pr": 64956,
+      "sha": "b9a2dc32cb",
+      "title": "feat(tui): add a Scripts tab to the composer picker",
+      "merged": "2026-11-19",
+      "packages": [
+        "client",
+        "plugin"
+      ],
+      "main_files": [
+        "packages/client/src/solid/data.ts",
+        "packages/plugin/src/tui/context.ts"
+      ],
+      "summary": "Adds Scripts tab to the TUI composer picker and TUI Solid job data helper.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: TUI composer picker and TUI-only Solid data helpers.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-295",
+      "window": "post-1114",
+      "pr": 64947,
+      "sha": "53212a6125",
+      "title": "feat(core): revoke ChatGPT sign-in on logout",
+      "merged": "2026-11-19",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/effect/integration.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/integration.ts"
+      ],
+      "summary": "Revokes ChatGPT OAuth token on server logout and updates JS plugin integration types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side logout revocation and JS plugin adapter types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-296",
+      "window": "post-1114",
+      "pr": 65013,
+      "sha": "0071deec8c",
+      "title": "feat(core): machine names in paths",
+      "merged": "2026-11-19",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Adds server machine-prefixed path support and regenerates TS client types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side machine path handling and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-297",
+      "window": "post-1114",
+      "pr": 65003,
+      "sha": "ec5461ed17",
+      "title": "feat(core): use models.dev's recommended API behind a flag",
+      "merged": "2026-11-19",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Server models.dev recommended API behind flag and regenerated TS client types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server core flag/resolver and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-298",
+      "window": "post-1114",
+      "pr": null,
+      "sha": "16bbbe635c",
+      "title": "feat(core): add flagged home folder memory workspace",
+      "merged": "2026-11-19",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Adds server flagged home-folder memory workspace and regenerates TS client types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side memory workspace feature and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-299",
+      "window": "post-1120",
+      "pr": 65268,
+      "sha": "32330f55b5",
+      "title": "feat(cli): add, list and remove machines",
+      "merged": "2026-11-20",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/effect/generated/client.ts",
+        "packages/client/src/promise/generated/client.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/errors.ts",
+        "packages/protocol/src/groups/experimental.ts"
+      ],
+      "summary": "Adds CLI/server machines add/list/remove endpoints and regenerates protocol/TS SDK clients.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server/CLI machines API and generated TS SDK clients; no desktop UI consumer.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-300",
+      "window": "post-1120",
+      "pr": 65295,
+      "sha": "b5424afe62",
+      "title": "fix(core): machine review fixes",
+      "merged": "2026-11-20",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/client.ts",
+        "packages/protocol/src/groups/machine.ts"
+      ],
+      "summary": "Server/CLI machine worker review fixes and regenerated protocol/TS client.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server/CLI machine worker fixes and generated TS SDK only; no desktop UI surface. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-301",
+      "window": "post-1120",
+      "pr": 65296,
+      "sha": "cb82da7cde",
+      "title": "feat(core): replace the automations flag with an automations config key",
+      "merged": "2026-11-21",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/groups/automation.ts"
+      ],
+      "summary": "Replaces server automations flag with automations config key in schema/protocol/TS types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side config key and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-302",
+      "window": "post-1120",
+      "pr": 65347,
+      "sha": "cfb1b4afbc",
+      "title": "feat(cli): show how machines connect",
+      "merged": "2026-11-20",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/groups/machine.ts"
+      ],
+      "summary": "CLI machine connection status endpoints and regenerated protocol/TS SDK clients.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: CLI/server machines API and generated TS SDK only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-303",
+      "window": "post-1120",
+      "pr": 65491,
+      "sha": "387140811c",
+      "title": "feat(core): list voice models from models.dev",
+      "merged": "2026-11-21",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/groups/voice.ts"
+      ],
+      "summary": "Server voice model listing from models.dev and regenerated protocol/TS SDK types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server voice API and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-304",
+      "window": "post-1120",
+      "pr": 65271,
+      "sha": "1645a8aa5a",
+      "title": "feat(mcp): follow the MCP Events beta for push delivery",
+      "merged": "2026-11-21",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Server MCP Events push delivery support and regenerated TS SDK types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server MCP Events push backend and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-305",
+      "window": "post-1120",
+      "pr": 65664,
+      "sha": "04a10583c8",
+      "title": "feat(core): turn on video generation by default",
+      "merged": "2026-11-23",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/client.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/groups/generate.ts"
+      ],
+      "summary": "Enables server video generation by default and updates protocol/TS SDK clients.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server video generation default and generated TS SDK only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-306",
+      "window": "post-1120",
+      "pr": 65671,
+      "sha": "8c0be712aa",
+      "title": "fix(core): delete blobs a week after they were written",
+      "merged": "2026-11-22",
+      "packages": [
+        "protocol"
+      ],
+      "main_files": [
+        "packages/protocol/src/groups/blob.ts"
+      ],
+      "summary": "Deletes server blobs 7 days after creation and updates protocol OpenAPI description.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server blob-store 7-day retention (packages/core/src/blob-store.ts) and OpenAPI doc string in packages/protocol/src/groups/blob.ts only. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-307",
+      "window": "post-1120",
+      "pr": 65725,
+      "sha": "571619bc15",
+      "title": "feat(core): call the OpenCode API from Code Mode with opencode:// fetch in local builds",
+      "merged": "2026-11-23",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Server Code Mode opencode:// fetch in local builds and regenerated TS SDK types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server Code Mode runtime and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-308",
+      "window": "post-1120",
+      "pr": 65747,
+      "sha": "26f4041911",
+      "title": "feat(plugin): let plugins create, list and delete automations",
+      "merged": "2026-11-23",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/effect/plugin.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/plugin.ts"
+      ],
+      "summary": "Exposes automation CRUD to server-side JS/Effect plugins.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server JS/Effect plugin SDK only; desktop Luau plugins use opencode-plugin-spec.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-309",
+      "window": "post-1120",
+      "pr": 65441,
+      "sha": "b8cbd0e43c",
+      "title": "fix(client): honor event cancellation after source completion",
+      "merged": "2026-11-23",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/shared-events.ts"
+      ],
+      "summary": "Honors AbortSignal cancellation after source completion in JS shared-events AsyncIterator.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: TypeScript AsyncIterator implementation in packages/client/src/shared-events.ts; Rune uses Rust SSE channels. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-310",
+      "window": "post-1120",
+      "pr": 65819,
+      "sha": "698800f59c",
+      "title": "fix(plugin): lower the @opentui peer floor to 0.8.0 and stop raising it on upgrades",
+      "merged": "2026-11-23",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/package.json"
+      ],
+      "summary": "Lowers @opentui peer dependency floor to 0.8.0 in packages/plugin/package.json.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: npm @opentui peer dependency floor and upgrade script only. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-311",
+      "window": "post-1120",
+      "pr": 64156,
+      "sha": "4cf9db9574",
+      "title": "fix(latex): support the LaTeX control space in math",
+      "merged": "2026-11-23",
+      "packages": [
+        "latex"
+      ],
+      "main_files": [
+        "packages/latex/src/symbols.ts"
+      ],
+      "summary": "Adds control space (backslash + space/tab/newline) to TypeScript packages/latex/src/symbols.ts.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop codebase: official packages/latex TypeScript parser only; Rune renders math via embedded ratex-math WASM in anomalyco/rune, which already natively supports LaTeX control space. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-312",
+      "window": "post-1120",
+      "pr": 65837,
+      "sha": "02ccc5c7cc",
+      "title": "docs(protocol): clarify session API descriptions",
+      "merged": "2026-11-23",
+      "packages": [
+        "protocol"
+      ],
+      "main_files": [
+        "packages/protocol/src/groups/message.ts",
+        "packages/protocol/src/groups/session.ts"
+      ],
+      "summary": "Clarifies OpenAPI descriptions in packages/protocol/src/groups/{message,session}.ts.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: protocol OpenAPI doc strings only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-313",
+      "window": "post-1120",
+      "pr": 65841,
+      "sha": "91365c8caa",
+      "title": "docs(protocol): describe API request parameters",
+      "merged": "2026-11-23",
+      "packages": [
+        "protocol"
+      ],
+      "main_files": [
+        "packages/protocol/src/groups/location.ts",
+        "packages/protocol/src/groups/mcp.ts",
+        "packages/protocol/src/groups/permission.ts",
+        "packages/protocol/src/groups/persistent-pty.ts",
+        "packages/protocol/src/groups/project.ts",
+        "packages/protocol/src/groups/pty.ts"
+      ],
+      "summary": "Describes API request parameters in packages/protocol/src/groups/*.ts.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: protocol OpenAPI parameter doc strings only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-314",
+      "window": "post-1120",
+      "pr": 63669,
+      "sha": "30ef864fe7",
+      "title": "feat(core): add agent instructions and use them for Plan mode",
+      "merged": "2026-11-23",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Adds server agent instructions for Plan mode and regenerates TS SDK types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server core Plan mode instructions and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-315",
+      "window": "post-1120",
+      "pr": 65980,
+      "sha": "57f83d690d",
+      "title": "fix(plugin): honor abort signals in Promise plugin API calls",
+      "merged": "2026-11-24",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/promise/adapter.ts"
+      ],
+      "summary": "Honors AbortSignal in server Promise plugin adapter calls.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server JS Promise plugin adapter (packages/plugin/src/promise/adapter.ts) only; Rune runs Luau GUI plugins. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-316",
+      "window": "post-1120",
+      "pr": 66041,
+      "sha": "883c871683",
+      "title": "fix(plugin): reject aborted Promise plugin calls with the signal's reason",
+      "merged": "2026-11-24",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/promise/adapter.ts"
+      ],
+      "summary": "Rejects aborted server Promise plugin calls with signal.reason.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server JS Promise plugin adapter (packages/plugin/src/promise/adapter.ts) only; Rune runs Luau GUI plugins. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-317",
+      "window": "post-1120",
+      "pr": 66102,
+      "sha": "71324e2063",
+      "title": "fix(plugin): preserve completed errors on late abort",
+      "merged": "2026-11-24",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/promise/adapter.ts"
+      ],
+      "summary": "Preserves completed errors on late abort in server Promise plugin adapter.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server JS Promise plugin adapter (packages/plugin/src/promise/adapter.ts) only; Rune runs Luau GUI plugins. [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-318",
+      "window": "post-1120",
+      "pr": 66140,
+      "sha": "9964772701",
+      "title": "chore(core): revert niche fixes from the daily review job",
+      "merged": "2026-11-24",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/promise/adapter.ts"
+      ],
+      "summary": "Reverts niche daily-review fixes in core and JS Promise plugin adapter.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server core and JS Promise plugin adapter only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-319",
+      "window": "post-1120",
+      "pr": 66248,
+      "sha": "a4bea47aa5",
+      "title": "docs(plugin): describe the new quote text in ComposerQuote",
+      "merged": "2026-11-25",
+      "packages": [
+        "plugin"
+      ],
+      "main_files": [
+        "packages/plugin/src/gui/host-apis.ts"
+      ],
+      "summary": "Updates JSDoc comment describing ComposerQuote text in packages/plugin/src/gui/host-apis.ts.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: TypeScript JSDoc comment update only; no runtime behavior change.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-320",
+      "window": "post-1120",
+      "pr": 66130,
+      "sha": "4c2977b82e",
+      "title": "feat(core): add push notifications for the mobile apps",
+      "merged": "2026-11-24",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/script/generate.ts",
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/effect/generated/client.ts",
+        "packages/client/src/promise/generated/client.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/errors.ts"
+      ],
+      "summary": "Adds server mobile push notification endpoints and regenerates protocol/TS SDK clients.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: mobile push notification server API and generated TS SDK only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-321",
+      "window": "post-1120",
+      "pr": 66306,
+      "sha": "a73e0db2f3",
+      "title": "docs(protocol): name HTTP routes in session prompt description",
+      "merged": "2026-11-25",
+      "packages": [
+        "protocol"
+      ],
+      "main_files": [
+        "packages/protocol/src/groups/session.ts"
+      ],
+      "summary": "Documents HTTP route paths in packages/protocol/src/groups/session.ts.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: protocol OpenAPI doc comment only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-322",
+      "window": "post-1120",
+      "pr": 66348,
+      "sha": "f8fc24ea5c",
+      "title": "fix(server): unarchive a session when a person sends it input",
+      "merged": "2026-11-25",
+      "packages": [
+        "protocol"
+      ],
+      "main_files": [
+        "packages/protocol/src/groups/session.ts"
+      ],
+      "summary": "Server unarchives archived sessions on user input and updates OpenAPI description.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side handler in packages/server/src/handlers/session.ts and OpenAPI description in packages/protocol/src/groups/session.ts only (desktop already handles session.unarchived in apps/desktop/src/session/events/mod.rs:675-687). [verified-hunks]",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-323",
+      "window": "post-1120",
+      "pr": 65136,
+      "sha": "c9afad6206",
+      "title": "feat(core): preserve subagent session IDs across compaction",
+      "merged": "2026-11-25",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Preserves subagent session IDs across server compaction and regenerates TS SDK types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server compaction backend and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-324",
+      "window": "post-1120",
+      "pr": 66278,
+      "sha": "d09b189ba1",
+      "title": "feat(core): agent(), llm() and structured JSON Schema output in Code Mode",
+      "merged": "2026-11-26",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Adds agent(), llm(), and structured JSON Schema output to server Code Mode runtime.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server Code Mode runtime and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-325",
+      "window": "post-1120",
+      "pr": 65877,
+      "sha": "697db19210",
+      "title": "feat: ship model speeds by removing the model_speeds flag",
+      "merged": "2026-11-26",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Removes server model_speeds feature flag and updates schema/CLI/generated TS types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server models-dev flag removal and generated TS SDK types only; Rune desktop has no model_speeds flag check.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-326",
+      "window": "post-1120",
+      "pr": 63998,
+      "sha": "d580636cd4",
+      "title": "feat(server): experimental spaces",
+      "merged": "2026-11-26",
+      "packages": [
+        "client",
+        "plugin",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/effect/generated/client.ts",
+        "packages/client/src/promise/generated/client.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/event.ts"
+      ],
+      "summary": "Adds experimental server spaces endpoints and regenerates protocol/TS/plugin SDK clients.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side experimental spaces API and generated SDK clients; no desktop UI consumer.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-327",
+      "window": "post-1120",
+      "pr": 66627,
+      "sha": "d97b2265ee",
+      "title": "feat(core): read voice, embedding and transcription models from config",
+      "merged": "2026-11-26",
+      "packages": [
+        "client"
+      ],
+      "main_files": [
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "summary": "Reads voice/embedding/transcription models from server config and updates generated TS types.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server config schema and generated TS SDK types only.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-328",
+      "window": "post-1120",
+      "pr": 66668,
+      "sha": "63b7f04555",
+      "title": "feat(server): batch writes for experimental spaces",
+      "merged": "2026-11-26",
+      "packages": [
+        "client",
+        "protocol"
+      ],
+      "main_files": [
+        "packages/client/src/effect/api/api.ts",
+        "packages/client/src/effect/generated/client.ts",
+        "packages/client/src/promise/generated/client.ts",
+        "packages/client/src/promise/generated/types.ts",
+        "packages/protocol/src/groups/space.ts"
+      ],
+      "summary": "Adds batch writes for experimental server spaces and regenerates protocol/TS SDK clients.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: server-side experimental spaces batch API and generated TS SDK only; no desktop UI consumer.",
+      "depends_on": "none",
+      "risks": "none",
+      "workstream": "UPSTREAM"
+    },
+    {
+      "id": "UP-329",
+      "window": "post-1120",
+      "pr": 66926,
+      "sha": "f7ac3ac447",
+      "title": "fix(app): guard channel lookup in settings catalog",
+      "merged": "2026-11-27",
+      "packages": [
+        "app"
+      ],
+      "main_files": [
+        "packages/app/src/settings/search-catalog.ts"
+      ],
+      "summary": "Adds optional chaining on import.meta.env?.VITE_OPENCODE_CHANNEL in packages/app/src/settings/search-catalog.ts so non-Vite/test runtimes do not throw when import.meta.env is undefined.",
+      "size": "XS",
+      "status": "not applicable",
+      "status_evidence": "Not applicable to Rune desktop: 1-line Vite JS optional-chaining guard (import.meta.env?.VITE_OPENCODE_CHANNEL) in packages/app/src/settings/search-catalog.ts:157; Rune checks the build channel safely via features/settings/src/host.rs (DEFAULT_CONFIG.build_channel) and question_composer_available() without panicking. [verified-hunks]",
+      "depends_on": "UP-275",
       "risks": "none",
       "workstream": "UPSTREAM"
     }

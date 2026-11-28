@@ -49,7 +49,10 @@ pub enum Waiting {
 }
 
 /// The status line's words under a working turn (`timeline-next/status.ts`'s `timelineStatus`):
-/// Working, unless the turn waits on the user or on a shell command.
+/// Working, unless the turn waits on the user, on a shell command or on its subagents. The
+/// subagent wait is this app's own: official's status line goes with its session's own run, and
+/// here a session whose subagents still run stays live under it (`TimelineHost::is_session_live`),
+/// where Working read as the model thinking while nothing in the session itself ran.
 pub fn status<S: TimelineHost>(s: &S, session: &str) -> &'static str {
     if let Some(label) = s.working_label_for(session).or(s.working_state().label) {
         return label;
@@ -59,11 +62,32 @@ pub fn status<S: TimelineHost>(s: &S, session: &str) -> &'static str {
         Some(Waiting::Answer) => return opencode_i18n::t!("session.timeline.status.waitingAnswer"),
         None => {}
     }
-    let shell = s.with_transcript(session, |t| {
-        let Some(opencode_kit::model::Message::Assistant(a)) = t.messages.iter().rev().find(|m| matches!(m, opencode_kit::model::Message::Assistant(_))) else { return false };
-        matches!(a.parts.last(), Some(opencode_kit::model::Part::Tool { name, status: opencode_kit::model::ToolStatus::Running | opencode_kit::model::ToolStatus::Pending, .. }) if crate::activity::rules::current_name(name) == "shell")
-    });
-    if shell == Some(true) { opencode_i18n::t!("session.timeline.status.waitingShell") } else { opencode_i18n::t!("session.timeline.status.working") }
+    // The call the turn's last step ends on while it runs, and how many of it run there: a
+    // foreground subagent holds its turn as a shell command does.
+    let blocking = s.with_transcript(session, |t| {
+        use opencode_kit::model::{Message, Part, ToolStatus};
+        let Some(Message::Assistant(a)) = t.messages.iter().rev().find(|m| matches!(m, Message::Assistant(_))) else { return None };
+        // A running call's tool: whether it is a shell, or a subagent.
+        let running = |p: &Part| match p {
+            Part::Tool { name, status: ToolStatus::Running | ToolStatus::Pending, .. } => {
+                let name = crate::activity::rules::current_name(name);
+                Some((name == "shell", name == "subagent"))
+            }
+            _ => None,
+        };
+        let (shell, subagent) = a.parts.last().and_then(running)?;
+        Some((shell, subagent, a.parts.iter().filter(|p| matches!(running(p), Some((_, true)))).count()))
+    }).flatten();
+    let subagents = match blocking {
+        Some((true, ..)) => return opencode_i18n::t!("session.timeline.status.waitingShell"),
+        Some((_, true, n)) => n,
+        _ => s.subagents_awaited(session),
+    };
+    match subagents {
+        0 => opencode_i18n::t!("session.timeline.status.working"),
+        1 => opencode_i18n::t!("rune.session.status.waitingSubagent"),
+        _ => opencode_i18n::t!("rune.session.status.waitingSubagents"),
+    }
 }
 
 /// Whether the running turn ends in its Thinking row, which stands in for the status line's
@@ -80,7 +104,7 @@ pub fn thinking<S: TimelineHost>(s: &S, session: &str) -> bool {
         // The turn's work: what follows the last message that is neither a step nor a notice.
         let start = t.messages.iter().rposition(|m| !matches!(m, Message::Assistant(_) | Message::Notice(_))).map_or(0, |i| i + 1);
         let entries = crate::timeline::entries(&t.messages[start..], &detail);
-        matches!(crate::turns::fold_with(&entries, true, &detail).last(), Some(crate::turns::Block::Thought { live: true, .. }))
+        matches!(crate::turns::fold_with_flags(&entries, true, &detail, s.full_codemode(session)).last(), Some(crate::turns::Block::Thought { live: true, .. }))
     }) == Some(true)
 }
 

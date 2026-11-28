@@ -318,17 +318,16 @@ fn exec_network_get(att: &mut SessionAttachment, app: &mut App, cmd: &Command) -
     let include_body = cmd.action.get("includeBody").and_then(Value::as_bool).unwrap_or(false);
     // Official `diagnostics.ts:287`: `includeResponseBody ?? includeBody`.
     let include_resp = cmd.action.get("includeResponseBody").and_then(Value::as_bool).unwrap_or(include_body);
-    let max_body = cmd
-        .action
-        .get("maxBodyChars")
-        .and_then(Value::as_u64)
+    let max_body = cmd.action.get("maxBodyChars").and_then(Value::as_u64)
         .map_or(20_000, |v| (v as usize).clamp(1, 20_000));
     // The request body is only what Chromium captured inline (`maxPostDataSize`), never
     // `Network.getRequestPostData`, as official (`diagnostics-machine.ts:289-300`).
+    let host = &mut app.workspace_panes.browser.host;
     if include_resp
         && hop.response_body_fetchable()
-        && app.workspace_panes.browser.host.engine_agent_tools()
-        && let Ok(cdp_req) = app.workspace_panes.browser.host.send_typed_cdp(
+        && host.engine_agent_tools()
+        && host.tab_open_in_engine(host_id)
+        && let Ok(cdp_req) = host.send_typed_cdp(
             host_id,
             "Network.getResponseBody",
             json!({ "requestId": hop.native_id }),

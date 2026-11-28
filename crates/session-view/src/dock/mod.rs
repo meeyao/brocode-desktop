@@ -31,9 +31,9 @@ pub trait DockHost: ComposerHost {
     fn dock_auto_accept(&self) -> bool {
         false
     }
-    /// Whether questions take the new keyboard-first dock (Desktop's Settings › Experimental ›
-    /// New question UI) instead of its default Classic one.
-    fn dock_new_question_ui(&self) -> bool {
+    /// Whether questions answer from the composer (Desktop's Settings › Experimental ›
+    /// New question UI, `general.questionComposer`, `opencode#66825`) instead of Classic.
+    fn dock_question_composer(&self) -> bool {
         false
     }
     /// The key that moves the question dock on, or submits it on the last question (Desktop's
@@ -72,13 +72,10 @@ pub fn face<S: DockHost>(s: &S, p: &Pal) -> Option<Vec<El>> {
     question::face(s, p).or_else(|| permission::face(s, p))
 }
 
-/// Whether the face draws its own surfaces instead of the composer's card: the Classic question
-/// (a raised body over its footer tray) and the permission (a raised card).
+/// Whether the face draws its own surfaces instead of the composer's card: both the Classic and
+/// composer-integrated question docks (`opencode#66825`) and the permission dock draw their own cards.
 pub fn bare<S: DockHost>(s: &S) -> bool {
-    match question::id(s) {
-        Some(_) => question::classic(s),
-        None => permission::asked(s).is_some(),
-    }
+    question::id(s).is_some() || permission::asked(s).is_some()
 }
 
 pub use opencode_ui::palette::flat;

@@ -13,7 +13,7 @@ use rune::time::Instant;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use super::worker::{Handshake, StreamEffect, StreamEvent, StreamState, stream_step};
+use super::worker::{CONNECT_TIMEOUT, Handshake, StreamEffect, StreamEvent, StreamState, stream_step};
 use super::{Incoming, Server};
 use crate::wire_error::{WireError, WireKind};
 
@@ -63,7 +63,7 @@ pub(super) fn read_events(server: &Server, idle: Duration, inbox_tx: &Sender<Inc
             match events(&server, idle, &inbox_tx, &wake, &mut state).await {
                 Ok(()) => return,
                 Err(e) => {
-                    for effect in stream_step(&mut state, StreamEvent::Failed(e)) {
+                    for effect in stream_step(&mut state, StreamEvent::Failed { error: e, now: Instant::now() }) {
                         match effect {
                             StreamEffect::ReportDown { error, wake: news } => {
                                 if inbox_tx.send(Incoming::StreamDown(error)).is_err() {
@@ -74,10 +74,9 @@ pub(super) fn read_events(server: &Server, idle: Duration, inbox_tx: &Sender<Inc
                                     wake();
                                 }
                             }
-                            StreamEffect::WatchReach => server.watch_reach(None),
-                            StreamEffect::Wait { backoff_ms } => {
-                                // Wait out the backoff, or less when a reconnect is asked for.
-                                let until = Instant::now() + Duration::from_millis(backoff_ms);
+                            StreamEffect::Wait { delay_ms } => {
+                                // Official `reconnectDelay = 1_000`, interruptible by `wake_reconnects`.
+                                let until = Instant::now() + Duration::from_millis(delay_ms);
                                 while Instant::now() < until && RETRY.load(Ordering::Relaxed) == generation {
                                     sleep(Duration::from_millis(100)).await;
                                 }
@@ -108,7 +107,7 @@ async fn events(server: &Server, idle: Duration, inbox: &Sender<Incoming>, wake:
     }
     init.set_headers(&headers);
     let request = web_sys::Request::new_with_str_and_init(&format!("{}/api/event", server.base), &init).map_err(|_| page("bad request"))?;
-    let response = with_idle(window.fetch_with_request(&request), idle, &abort)
+    let response = with_idle(window.fetch_with_request(&request), CONNECT_TIMEOUT, &abort)
         .await
         .map_err(|e| down(e.unwrap_or_else(WireKind::Unreachable)))?;
     let response: web_sys::Response = response.dyn_into().map_err(|_| page("not a response"))?;
@@ -140,7 +139,7 @@ async fn events(server: &Server, idle: Duration, inbox: &Sender<Incoming>, wake:
             let Some(message) = super::event_line(line.trim_end_matches(['\n', '\r'])) else { continue };
             let connected = matches!(&message, Incoming::Event { ty, .. } if ty == "server.connected");
             let mut pending_frame = Some(message);
-            for effect in stream_step(state, StreamEvent::Frame { connected }) {
+            for effect in stream_step(state, StreamEvent::Frame { connected, now: Instant::now() }) {
                 match effect {
                     StreamEffect::DeliverHandshake(h) => {
                         let msg = match h {

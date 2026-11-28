@@ -236,7 +236,10 @@ fn reply_path_exists(srv: &Server, dir: &str, home: &str, code: &str) -> bool {
     }
     let (path, _) = file_link(code);
     let home = home.replace('\\', "/");
-    let expanded = path.strip_prefix("~/").or((path == "~").then_some("")).filter(|_| !home.is_empty()).map(|rest| format!("{}/{rest}", home.trim_end_matches('/')));
+    let expanded = path.strip_prefix("~/").or((path == "~").then_some("")).filter(|_| !home.is_empty()).map(|rest| {
+        let base = home.trim_end_matches('/');
+        if rest.is_empty() { base.to_owned() } else { format!("{base}/{rest}") }
+    });
     let path = expanded.unwrap_or(path);
     if path.is_empty() || path.starts_with('~') || path.starts_with("//") || browser_policy::is_raw_unc_href(&path) {
         return false;

@@ -102,8 +102,6 @@ The zips are ad-hoc signed, not notarized: right-click → Open, or `xattr -dr c
 
 ## Run from source
 
-Start an OpenCode server locally (`opencode serve --service` or **OpenCode Desktop**), then run:
-
 ```sh
 cargo run -p opencode-desktop -- --live
 ```

@@ -94,7 +94,8 @@ pub fn classify(href: &str, base: &str, directory: &str, home: &str) -> Link {
     let (directory, home) = (directory.replace('\\', "/"), home.replace('\\', "/"));
     let dir = directory.trim_end_matches('/');
     let joined = if let Some(rest) = path.strip_prefix("~/").or((path == "~").then_some("")) {
-        format!("{}/{rest}", home.trim_end_matches('/'))
+        let base = home.trim_end_matches('/');
+        if rest.is_empty() { base.to_owned() } else { format!("{base}/{rest}") }
     } else if is_absolute(&path) {
         path
     } else {

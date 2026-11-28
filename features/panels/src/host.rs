@@ -152,6 +152,19 @@ pub trait PanelsHost: opencode_kernel::AppEnv {
         let _ = ctx;
         Vec::new()
     }
+    /// Renders plugin slots on the side panel's New tab view (`session.panel.new`, `session.panel.new.list`).
+    fn panel_new_tab_slots(
+        &self,
+        p: &Pal,
+        slot: &str,
+        session_id: &str,
+        pane: SessionPane,
+        width: f32,
+        focus_token: Option<u64>,
+    ) -> Vec<El> {
+        let _ = (p, slot, session_id, pane, width, focus_token);
+        Vec::new()
+    }
     /// Runs launcher entry `id` of `plugin` in `pane`.
     fn open_panel_entry(&mut self, plugin: &str, id: &str, pane: SessionPane, tx: &mut Tx) {
         let _ = (plugin, id, pane, tx);

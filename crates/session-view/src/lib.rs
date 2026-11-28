@@ -109,6 +109,12 @@ macro_rules! delegate_view_state {
 pub trait TimelineHost: Sized + 'static {
     fn knobs(&self) -> &Knobs;
     fn clock(&self) -> f64;
+    /// Current display refresh rate in Hz when the host knows it (e.g. from Rune's
+    /// `FrameEncoded::refresh_hz`), used to pace streaming text bursts at the display's cadence
+    /// rather than Desktop's fixed 24 ms timer. `None` keeps the 24 ms fallback.
+    fn display_hz(&self) -> Option<f64> {
+        None
+    }
     fn now_ms(&self) -> i64 {
         0
     }
@@ -206,6 +212,11 @@ pub trait TimelineHost: Sized + 'static {
     fn session_waiting(&self, _session: &str) -> Option<working::Waiting> {
         None
     }
+    /// How many subagents alone keep session `session` live: its own turn has stopped and it
+    /// waits to hear back from them, which its status line says in place of Working.
+    fn subagents_awaited(&self, _session: &str) -> usize {
+        0
+    }
     fn session_revert(&self, _session: &str) -> Option<&str> {
         None
     }
@@ -260,11 +271,10 @@ pub trait TimelineHost: Sized + 'static {
     fn fold_user_messages(&self) -> bool {
         true
     }
-    /// A sent prompt shows its quotes and comments inline in its bubble (`user_quotes`) instead of
-    /// as comment cards. Desktop turns it on in local and dev builds only
-    /// (`packages/app/src/session/timeline/inline-quotes.ts`).
+    /// A sent prompt shows its quotes and comments inline in its bubble (`user_quotes`) in every
+    /// build (`packages/session-ui/src/message/message-content.tsx`, `opencode#66823`).
     fn inline_quotes(&self) -> bool {
-        false
+        true
     }
     /// Desktop supplies contextual actions and resolves media on the session's own machine.
     fn reply_link_menu(&mut self, _url: &str, _press: rune::PointerPress, _tx: &mut Tx) -> bool { false }
@@ -470,6 +480,11 @@ pub trait TimelineHost: Sized + 'static {
     }
     /// Settings › Preferences › Changed files: a finished turn lists the files it changed.
     fn turn_diffs(&self) -> bool {
+        false
+    }
+    /// The server's `full_codemode` flag (`GET /api/experimental/flag`, `opencode#66509`):
+    /// gates script file diffs/counts and enables the flat execute layout.
+    fn full_codemode(&self, _session: &str) -> bool {
         false
     }
     /// Settings › Preferences › Wrap code blocks (`general.wrapCodeBlocks`, anomalyco/opencode#64545).

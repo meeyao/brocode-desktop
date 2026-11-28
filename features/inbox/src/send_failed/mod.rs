@@ -526,6 +526,11 @@ pub fn send_failed(host: &mut dyn SendFailedHost, id: &str, error: &WireError) -
             return true;
         }
         eprintln!("brocode: prompt send failed: {error}");
+        let why = if error.is_skill_load_error() {
+            error.message().map(str::to_owned).unwrap_or_else(|| reason::words(error).to_owned())
+        } else {
+            reason::words(error).to_owned()
+        };
         if sent.journaled {
             let code = error.status();
             opencode_platform::telemetry::send_receipt(&sent.session, id, "write failed", code.unwrap_or(0));
@@ -534,16 +539,16 @@ pub fn send_failed(host: &mut dyn SendFailedHost, id: &str, error: &WireError) -
                 outbox::Operation::Worktree { .. } | outbox::Operation::Revert => false,
                 _ => true,
             };
-            let verdict = if code.is_some_and(|n| (400..500).contains(&n) && !matches!(n, 408 | 425 | 429)) {
+            let verdict = if error.is_skill_load_error() || code.is_some_and(|n| (400..500).contains(&n) && !matches!(n, 408 | 425 | 429)) {
                 Verdict::Rejected
             } else if code.is_none() && error.failed_for_sure() && not_started {
                 Verdict::Unsent
             } else {
                 Verdict::Lost
             };
-            (reason::words(error).to_owned(), verdict)
+            (why, verdict)
         } else {
-            (reason::words(error).to_owned(), if error.failed_for_sure() { Verdict::Unsent } else { Verdict::Lost })
+            (why, if error.failed_for_sure() { Verdict::Unsent } else { Verdict::Lost })
         }
     };
     step_send(host, id, Event::WriteFailed { why, verdict });

@@ -1,4 +1,4 @@
-# OpenCode plugin API reference (contract 1.11)
+# Brocode plugin API reference (contract 1.13)
 
 > Generated from crates/opencode-plugin-spec/contract.json by `cargo run -p opencode-plugin-spec -- --write`. Do not edit. For a walkthrough, read [Writing a plugin](writing-a-plugin.md).
 
@@ -6,7 +6,7 @@ Contents: [Versioning](#versioning) · [Modules and globals](#modules-and-global
 
 ## Versioning
 
-Contract versions are `MAJOR.MINOR`. This is contract `1.11`.
+Contract versions are `MAJOR.MINOR`. This is contract `1.13`.
 
 - A plugin names the contract it targets in plugin.toml: `contract = "1.0"`.
 - Minor versions (1.1, 1.2, …) only add: new optional properties on `ui.*` nodes and specs, new semantic tokens (each with a 1.0 fallback token), new services, methods, signals, contribution kinds and enum values. A plugin that targets 1.0 runs unchanged on every 1.x host.
@@ -557,6 +557,9 @@ The plugin's own messages in the interface language, and numbers, dates and list
 | `ui.checkbox(props: UiCheckboxProps) -> UiNode` | control | [`UiCheckboxProps`](#uicheckboxprops) | Desktop's compact checkbox with its label. Since 1.7. |
 | `ui.radio(props: UiRadioProps) -> UiNode` | control | [`UiRadioProps`](#uiradioprops) | A radio row. |
 | `ui.field(props: UiFieldProps) -> UiNode` | control | [`UiFieldProps`](#uifieldprops) | The app's own text field. |
+| `ui.listbox(props: UiListboxProps?, children: { UiNode }?) -> UiNode` | layout | [`UiListboxProps`](#uilistboxprops) | A listbox container (`role="listbox"`) of selectable `ui.option` rows. Since 1.12. |
+| `ui.option(props: UiOptionProps?, children: { UiNode }?) -> UiNode` | layout | [`UiOptionProps`](#uioptionprops) | One selectable option row (`role="option"`) inside a `ui.listbox`. Since 1.12. |
+| `ui.select(props: UiSelectProps) -> UiNode` | control | [`UiSelectProps`](#uiselectprops) | Desktop's select dropdown control. Since 1.12. |
 | `ui.segmented(props: UiSegmentedProps) -> UiNode` | control | [`UiSegmentedProps`](#uisegmentedprops) | The app's segmented control. |
 | `ui.loader(props: UiLoaderProps?) -> UiNode` | control | [`UiLoaderProps`](#uiloaderprops) | The app's spinner. |
 | `ui.progressCircle(props: UiProgressCircleProps) -> UiNode` | content | [`UiProgressCircleProps`](#uiprogresscircleprops) | The app's progress ring: a track and an arc from twelve o'clock, clockwise. |
@@ -780,6 +783,8 @@ A fixed place in the app's shell that a slot fills.
 | `"session.header"` | The end of the session header, before the usage numbers. |
 | `"session.location.menu"` | Rows in the session's project and location menu. |
 | `"session.panel.end"` | The actions after the side panel's tabs. |
+| `"session.panel.new"` | The top of the side panel's New tab view, above its launchers. |
+| `"session.panel.new.list"` | Below the launchers of the side panel's New tab view, before Recently closed. |
 
 ### HostSettingsPage
 
@@ -1754,6 +1759,7 @@ Also takes every field of [`UiLayoutProps`](#uilayoutprops).
 | `checked` | `boolean` | Ticked. |
 | `indeterminate` | `boolean?` | Some of what it stands for is ticked: the box shows a dash, as Desktop's `indeterminate`. A press still reports the opposite of `checked`. Since 1.11. |
 | `surface` | `("base" \| "layer-1")?` | The background the box sits on: `base` (the default) or `layer-1`, as Desktop's `surface`; an unticked box takes its fill. |
+| `presentation` | `boolean?` | Draws only the checkbox box visually with no role, focus or click handler, for use inside an `option` row (Desktop's `Checkbox presentation`). Since 1.12. |
 | `disabled` | `boolean?` | Cannot change; drawn at half opacity. |
 | `onChange` | `UiHandler?` | Runs with the new state in `event.checked`. |
 
@@ -1806,6 +1812,45 @@ One item of `ui.segmented`.
 | `icon` | `IconName` | Its icon. |
 | `label` | `string` | Its accessible name and tooltip. |
 | `key` | `string?` | Its element's key. Defaults to `id`. |
+
+### UiListboxProps
+
+`ui.listbox` props: a listbox container (`role="listbox"`) holding `ui.option` rows.
+
+Also takes every field of [`UiFrameProps`](#uiframeprops).
+
+### UiOptionProps
+
+`ui.option` props: one selectable option row (`role="option"`) inside a `ui.listbox`.
+
+Also takes every field of [`UiFrameProps`](#uiframeprops).
+
+| Field | Type | Description |
+|---|---|---|
+| `selected` | `boolean?` | Whether this option is selected (`aria-selected`). Since 1.12. |
+
+### UiSelectOption
+
+One option of `ui.select`.
+
+| Field | Type | Description |
+|---|---|---|
+| `value` | `string` | What `onChange` receives in `event.value`. |
+| `label` | `string` | The option's visible text. |
+
+### UiSelectProps
+
+`ui.select` props: Desktop's `Select` dropdown control (`select-v2`). Desktop's plugin API calls it `Select`.
+
+Also takes every field of [`UiLayoutProps`](#uilayoutprops).
+
+| Field | Type | Description |
+|---|---|---|
+| `value` | `string?` | The selected option's `value`. |
+| `placeholder` | `string?` | Text shown when no option matches `value`. |
+| `options` | `{ UiSelectOption }` | The options, in order. |
+| `disabled` | `boolean?` | Cannot open; drawn at half opacity. |
+| `onChange` | `UiHandler?` | Runs when an option is picked, with its value in `event.value`. |
 
 ### UiSegmentedProps
 
@@ -2781,6 +2826,7 @@ A page to open.
 | `url` | `string` | The URL, or a local `:port`. Defaults to `about:blank`. |
 | `sessionId` | `string?` | The session whose side region gets the page's tab. Defaults to the routed session. |
 | `background` | `boolean?` | Opens the tab without moving the keyboard: focus stays where it is. |
+| `pane` | `string?` | The side-region pane (`side`, `split`, or `bottom`) to open the page's tab in. |
 
 ### BrowserShowOptions
 
@@ -3364,6 +3410,9 @@ What a slot's render receives.
 | `active` | `boolean?` | `session.header`: the timeline is on screen. |
 | `compact` | `boolean?` | `session.header`: the title needs the room, so draw the compact form. |
 | `shown` | `boolean?` | `session.location.menu`: the menu is open. |
+| `pane` | `string?` | New tab slots: the pane (`side`, `split`, or `bottom`). |
+| `width` | `number?` | New tab slots: the pane's available width in points. |
+| `focusToken` | `number?` | New tab slots: incremented when the user explicitly asked for this New tab, so its first field takes focus once. |
 
 ### SlotSpec
 

@@ -19,7 +19,7 @@ mod pty_handoff;
 mod service;
 mod shell_env;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, Once, OnceLock, mpsc};
@@ -77,6 +77,23 @@ pub fn reconnect() -> Result<Server, String> {
     request(true)
 }
 
+/// Resolves the OpenCode CLI command and service environment identically to [`ensure_service`]:
+/// bundled/staged `opencode-cli` first, then login-shell `PATH`, standard install locations, and
+/// official Desktop's CLI (mirroring official Desktop's `ctx.cli` in
+/// `packages/gui-plugins/src/pairing/main.ts:76-81`).
+pub fn resolve_cli_command() -> (Option<Vec<String>>, BTreeMap<String, String>) {
+    let (_, isolated) = server_flags();
+    let env = shell_env::service_env(isolated);
+    let command = cli::resolve(&env, isolated).ok().map(|c| c.command).filter(|c| !c.is_empty());
+    (command, env)
+}
+
+/// Full user environment merged with the cached Unix login-shell environment, or `None` on
+/// Windows or when the login shell probe is unavailable.
+pub fn login_env() -> Option<BTreeMap<String, String>> {
+    shell_env::login_env()
+}
+
 /// Latest published local background service, if any (non-blocking).
 pub fn current() -> Option<Server> {
     let m = MANAGER.get()?;
@@ -107,6 +124,25 @@ pub fn dispose() {
     let Some(m) = MANAGER.get() else { return };
     m.disposed.store(true, Ordering::Relaxed);
     dispatch(m, Event::Disposed);
+}
+
+/// Disposes waiters on app quit and stops the local background service when the user
+/// turned off "Keep running in the background" (`packages/desktop/src/main/service/background-service.ts:48-57`,
+/// `opencode#66499`). Never stops a reused development server.
+pub fn shutdown_on_quit(stop_service: bool) {
+    dispose();
+    if !stop_service || !managed() {
+        return;
+    }
+    let (reuse, isolated) = server_flags();
+    // A reused development server belongs to whoever started it (`background-service.ts:123`).
+    if reuse {
+        return;
+    }
+    let Some(file) = registration_file(false, isolated) else { return };
+    if let Err(err) = service::stop(&file, service::PtyMode::Clear, service::DEFAULT_TIMING) {
+        eprintln!("opencode-rune: failed to stop local background service on quit: {err}");
+    }
 }
 
 fn server_from_http(http: &HttpBase) -> Server {

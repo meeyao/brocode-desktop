@@ -286,6 +286,12 @@ impl Mentions {
     pub fn invalidate_cache(&mut self) {
         *self.cache.get_mut() = Default::default();
     }
+
+    /// Marks the cached `/api/agent` + `/api/skill` catalog stale when `agent.updated` or
+    /// `skill.updated` arrives (`packages/client/src/solid/data.ts:1522-1540`, `opencode#66813`).
+    pub fn invalidate_catalog(&mut self, dir: Option<&str>) {
+        search::step_catalog(&mut self.seq, &mut self.catalog, search::CatalogEvent::Invalidated { directory: dir });
+    }
 }
 
 /// Display title for a session, falling back to the localized "Untitled session" label.
@@ -524,6 +530,10 @@ pub fn poll(host: &mut dyn MentionsHost, tx: &mut Tx) -> bool {
     if catalog.is_none() && files.is_none() && sessions.is_none() && !due {
         if indexed {
             host.mentions_mut().invalidate_cache();
+        }
+        if host.is_live() && host.mention_query().is_some() && matches!(host.mentions().catalog, search::Catalog::Unread) {
+            sync_search(host, tx);
+            return true;
         }
         return indexed;
     }

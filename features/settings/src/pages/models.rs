@@ -188,7 +188,8 @@ fn server(s: &dyn SettingsHost) -> Option<String> {
     s.persists().then(|| s.live_server_base()).flatten()
 }
 
-const POPULAR: [&str; 8] = ["opencode-go", "opencode", "anthropic", "github-copilot", "openai", "google", "openrouter", "vercel"];
+// `packages/app/src/providers/catalog/order.ts` (`opencode#66736`).
+const POPULAR: [&str; 9] = ["opencode-go", "opencode", "openai", "anthropic", "claude-agent", "github-copilot", "google", "openrouter", "vercel"];
 
 /// The models the search finds, each provider's together by name, the providers in Desktop's
 /// order: the popular ones first, then by name.

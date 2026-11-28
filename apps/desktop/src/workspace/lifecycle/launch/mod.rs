@@ -74,9 +74,11 @@ pub enum Phase {
     /// off-first-screen built-ins so starting them on the single browser thread does not delay
     /// these reads' answers.
     Probing { rx: Receiver<Ready>, again: Option<Again>, accepted: Accepted, defer_plugins: bool },
-    /// No server answered: the next try is at `retry_at` (`App::clock`), or, when nothing
-    /// accepted a connection there (`retry_at` infinite), once its health says it answers.
-    Offline { retries: u32, retry_at: f64 },
+    /// Half created for a server not yet listed or signed out (no live endpoint to probe).
+    Unlisted,
+    /// No server answered: the next try is at `retry_at` (`App::clock`), or immediately when a
+    /// newer health probe (`health_version`) reports Healthy.
+    Offline { retries: u32, retry_at: f64, health_version: u64 },
     /// The first reads landed (a headless run reads them before its first frame).
     #[default]
     Connected,
@@ -98,8 +100,8 @@ pub enum LaunchEvent {
     /// poll reached it).
     Answering,
     /// The probe answered: the server answered (`Some(true)`), didn't (`Some(false)`), or the
-    /// window falls back to the fixture (`None`); `refused` when nothing accepted a connection.
-    Landed { reached: Option<bool>, refused: bool, now: f64 },
+    /// window falls back to the fixture (`None`), at the current `health_version`.
+    Landed { reached: Option<bool>, now: f64, health_version: u64 },
 }
 
 #[derive(Debug, PartialEq)]
@@ -135,14 +137,14 @@ impl Phase {
                 Effects::two(Repaint, Probe { beta_tabs: false, fallback_fixture: false, again: Some(Again { retries, quiet }), grace: if quiet { Duration::ZERO } else { grace } })
             }
             (Phase::Offline { .. }, LaunchEvent::NetworkUp) => Effects::one(Probe { beta_tabs: false, fallback_fixture: false, again: Some(Again { retries: 0, quiet: true }), grace: Duration::ZERO }),
-            (Phase::Offline { retries, retry_at }, LaunchEvent::Answering) if retry_at.is_infinite() => {
+            (Phase::Offline { retries, .. }, LaunchEvent::Answering) => {
                 Effects::one(Probe { beta_tabs: false, fallback_fixture: false, again: Some(Again { retries, quiet: true }), grace: Duration::ZERO })
             }
-            (Phase::Offline { retries, retry_at }, LaunchEvent::Tick { now }) if now + 1e-3 >= retry_at => {
+            (Phase::Offline { retries, retry_at, .. }, LaunchEvent::Tick { now }) if now + 1e-3 >= retry_at => {
                 Effects::one(Probe { beta_tabs: false, fallback_fixture: false, again: Some(Again { retries, quiet: true }), grace: Duration::ZERO })
             }
-            (Phase::Offline { retries, retry_at }, LaunchEvent::Tick { .. }) => {
-                *self = Phase::Offline { retries, retry_at };
+            (Phase::Offline { retries, retry_at, health_version }, LaunchEvent::Tick { .. }) => {
+                *self = Phase::Offline { retries, retry_at, health_version };
                 Effects::none()
             }
             (Phase::Probing { again, defer_plugins, .. }, LaunchEvent::Landed { reached: Some(true), .. }) => {
@@ -158,13 +160,11 @@ impl Phase {
                 effects.extend(defer_plugins.then_some(StartPlugins));
                 effects
             }
-            (Phase::Probing { again, defer_plugins, .. }, LaunchEvent::Landed { reached: Some(false), refused, now }) => {
+            (Phase::Probing { again, defer_plugins, .. }, LaunchEvent::Landed { reached: Some(false), now, health_version }) => {
                 let retries = again.map_or(0, |a| a.retries);
-                // A server that refuses waits for the reach watcher, which wakes nothing until
-                // it accepts; one that accepts but fails its reads tries again on a timer.
-                let retry_at = if refused { f64::INFINITY } else { now + retry_delay(retries) };
-                *self = Phase::Offline { retries: retries.saturating_add(1), retry_at };
-                let wake = (!refused).then_some(WakeAt(retry_at));
+                let retry_at = now + retry_delay(retries);
+                *self = Phase::Offline { retries: retries.saturating_add(1), retry_at, health_version };
+                let wake = Some(WakeAt(retry_at));
                 let plugins = defer_plugins.then_some(StartPlugins);
                 // A try the app made on its own that misses again changes nothing on screen.
                 if again.is_some_and(|a| a.quiet) {
@@ -187,7 +187,7 @@ impl Phase {
 
     /// No server answered: Home shows the card, a session the unavailable panel.
     pub fn offline(&self) -> bool {
-        matches!(self, Phase::Offline { .. } | Phase::Probing { again: Some(_), .. })
+        matches!(self, Phase::Unlisted | Phase::Offline { .. } | Phase::Probing { again: Some(_), .. })
     }
 
     /// The card's button says Checking: a probe the person asked for is on its way.
@@ -278,13 +278,12 @@ pub struct Launch {
 /// server); `on_ready` takes this thread up instead, with whatever it has already read.
 #[cfg(not(target_arch = "wasm32"))]
 struct Early {
+    server: ServerId,
     rx: Receiver<Ready>,
     accepted: Accepted,
     beta_tabs: bool,
     fallback_fixture: bool,
     grace: Duration,
-    /// The window's quiet poll, once `on_ready` has it: the thread wakes nothing before that, so
-    /// nothing is polled or drawn ahead of the first frame.
     wake: std::sync::Arc<std::sync::OnceLock<rune::Waker>>,
 }
 
@@ -331,14 +330,15 @@ pub(crate) fn story_offline(s: &mut App, checking: bool) {
         std::mem::forget(answer);
         Phase::Probing { rx, again: Some(Again { retries: 0, quiet: false }), accepted: Accepted::default(), defer_plugins: false }
     } else {
-        Phase::Offline { retries: 0, retry_at: f64::INFINITY }
+        Phase::Offline { retries: 0, retry_at: f64::INFINITY, health_version: 0 }
     };
     s.launch.set_phase(&server, phase);
 }
 
-/// How often the setup card tries again on its own.
+/// First-reads retry backoff: starts at official `reconnectDelay = 1_000` (1 s) and caps at
+/// `SERVER_HEALTH_POLL_MS` (10 s); `LaunchEvent::Answering` and `NetworkUp` retry immediately.
 fn retry_delay(attempt: u32) -> f64 {
-    (0.25 * 2_f64.powi(attempt.min(4) as i32)).min(3.0)
+    (1.0 * 2_f64.powi(attempt.min(4) as i32)).min(10.0)
 }
 
 pub(crate) fn network_available(s: &mut App, tx: &mut Tx) {
@@ -346,14 +346,16 @@ pub(crate) fn network_available(s: &mut App, tx: &mut Tx) {
         return;
     }
     Server::wake_reconnects();
-    // The engine's background download, when it waits for the network, tries again now.
+    crate::servers::health::retry_quiet(s, tx);
     #[cfg(not(target_arch = "wasm32"))]
     s.workspace_panes.browser.host.network_changed();
-    if let Some(server) = window_server(s) {
-        crate::reconnect::step_link(s, &server, opencode_kit::servers::link::Event::NetworkChanged, tx);
+    for key in s.checkout.keys() {
+        crate::reconnect::step_link(s, key.as_str(), opencode_kit::servers::link::Event::NetworkChanged, tx);
+        let _ = crate::servers::runtime::with_server(s, &key, |s| {
+            step(s, LaunchEvent::NetworkUp, tx);
+            s.pump_outbox();
+        });
     }
-    step(s, LaunchEvent::NetworkUp, tx);
-    s.pump_outbox();
 }
 
 /// `setup`: connects now unless `on_ready` will start the reads (or a synchronous live probe found no server).
@@ -389,20 +391,23 @@ pub fn setup(s: &mut App) {
                 }
             })),
         );
-        s.launch.early = Some(Early { rx, accepted, beta_tabs, fallback_fixture, grace, wake });
+        s.launch.early = Some(Early { server, rx, accepted, beta_tabs, fallback_fixture, grace, wake });
     }
 }
 
-/// How long `server`'s probe keeps trying: only the local default address may be a server still
-/// starting (see `GRACE`).
 fn probe_grace(s: &App, server: &str) -> Duration {
-    if server == opencode_kit::client::DEFAULT_SERVER || s.launch.grace.is_some() { s.launch.grace.unwrap_or(GRACE) } else { Duration::ZERO }
+    if server == opencode_kit::servers::ServerKey::SIDECAR || server == opencode_kit::client::DEFAULT_SERVER || s.launch.grace.is_some() {
+        s.launch.grace.unwrap_or(GRACE)
+    } else {
+        Duration::ZERO
+    }
 }
 
-/// The thread `setup` started, when it was started for this probe: its wake is the window's from
-/// here on, and one poll takes what it has already sent.
 #[cfg(not(target_arch = "wasm32"))]
-fn take_early(s: &mut App, beta_tabs: bool, fallback_fixture: bool, grace: Duration, tx: &mut Tx) -> Option<(Receiver<Ready>, Accepted)> {
+fn take_early(s: &mut App, server: &str, beta_tabs: bool, fallback_fixture: bool, grace: Duration, tx: &mut Tx) -> Option<(Receiver<Ready>, Accepted)> {
+    if s.launch.early.as_ref().is_none_or(|e| e.server != server) {
+        return None;
+    }
     let early = s.launch.early.take()?;
     if (early.beta_tabs, early.fallback_fixture, early.grace) != (beta_tabs, fallback_fixture, grace) {
         return None;
@@ -481,7 +486,14 @@ pub fn browser_waker(handle: rune::AppHandle<App>) -> rune::Waker {
             pending.store(false, Ordering::Release);
             crate::surfaces::browser::rpc::express::poll(s);
             let changed = s.poll_browser();
-            crate::surfaces::browser::rpc::poll(s, tx) | changed
+            let rpc_changed = crate::surfaces::browser::rpc::poll(s, tx);
+            if !changed
+                && !rpc_changed
+                && let Some(at) = s.workspace_panes.browser.host.scroll_cursor_wake_at()
+            {
+                tx.wake_after(at.saturating_duration_since(rune::time::Instant::now()));
+            }
+            changed | rpc_changed
         });
     })
 }
@@ -567,7 +579,7 @@ fn step(s: &mut App, event: LaunchEvent, tx: &mut Tx) -> bool {
         match effect {
             LaunchEffect::Probe { beta_tabs, fallback_fixture, again, grace } => {
                 #[cfg(not(target_arch = "wasm32"))]
-                let early = if again.is_none() { take_early(s, beta_tabs, fallback_fixture, grace, tx) } else { None };
+                let early = if again.is_none() { take_early(s, &server, beta_tabs, fallback_fixture, grace, tx) } else { None };
                 #[cfg(target_arch = "wasm32")]
                 let early = None;
                 let (rx, accepted) = early.unwrap_or_else(|| boot::spawn_probe(s, beta_tabs, fallback_fixture, grace, again.is_some()));
@@ -704,7 +716,8 @@ fn first_reads(s: &mut App, tx: &mut Tx) -> bool {
         if window_phase(s).is_some_and(|p| matches!(p, Phase::Offline { retry_at, .. } if now + 1e-3 >= *retry_at)) {
             step(s, LaunchEvent::Tick { now }, tx);
         }
-        if window_phase(s).is_some_and(|p| matches!(p, Phase::Offline { retry_at, .. } if retry_at.is_infinite()))
+        let health_v = crate::servers::health::version();
+        if window_phase(s).is_some_and(|p| matches!(p, Phase::Offline { health_version, .. } if *health_version != health_v))
             && matches!(
                 crate::servers::health::get(crate::servers::runtime::active(s)),
                 Some(opencode_servers::health::Health::Probe(opencode_servers::health::ProbeResult::Healthy { .. }))
@@ -729,12 +742,10 @@ fn first_reads(s: &mut App, tx: &mut Tx) -> bool {
             server: None,
             beta_tabs: None,
             first: Some(Err("The first server reads stopped".into())),
-            refused: false,
             page: None,
         },
     };
     let reached = ready.first.as_ref().map(Result::is_ok);
-    let refused = ready.refused;
     s.launch.early_page = ready.page;
     // A launch that reached nobody must not read as one whose server answered: the reads that
     // failed (no connection, a refused or failed TLS handshake, a bad answer) or found no server
@@ -742,7 +753,7 @@ fn first_reads(s: &mut App, tx: &mut Tx) -> bool {
     rune::marks::mark(if reached == Some(true) { "server.answered" } else { "server.failed" });
     tx.instant();
     let Some(result) = ready.first else {
-        step(s, LaunchEvent::Landed { reached, refused, now }, tx);
+        step(s, LaunchEvent::Landed { reached, now, health_version: crate::servers::health::version() }, tx);
         s.launch.cold_transcript = None;
         crate::windows::peer::leave_server(s);
         s.transcripts.clear();
@@ -751,11 +762,11 @@ fn first_reads(s: &mut App, tx: &mut Tx) -> bool {
         s.load_fixture(crate::FIXTURE);
         return true;
     };
-    if let (Some(actual), Source::Live { server, .. }) = (ready.server, &mut *s.source) {
+    if crate::servers::runtime::active(s).is_sidecar()
+        && let (Some(actual), Source::Live { server, .. }) = (ready.server, &mut *s.source)
+    {
         *server = actual.clone();
-        if crate::servers::runtime::active(s).is_sidecar() {
-            crate::servers::runtime::moved(s, &actual);
-        }
+        crate::servers::runtime::moved(s, &actual);
     }
     if let Some(tabs) = ready.beta_tabs {
         let drafts: Vec<_> = s.tabs.drain(..).filter(crate::tabs::Tab::is_draft).collect();
@@ -766,7 +777,7 @@ fn first_reads(s: &mut App, tx: &mut Tx) -> bool {
         Ok(first) => {
             s.apply_first(first);
             rune::marks::mark("server.first_reads");
-            step(s, LaunchEvent::Landed { reached, refused, now }, tx);
+            step(s, LaunchEvent::Landed { reached, now, health_version: crate::servers::health::version() }, tx);
             s.show_outbox();
             s.pump_outbox();
             true
@@ -775,7 +786,7 @@ fn first_reads(s: &mut App, tx: &mut Tx) -> bool {
         // (`packages/app/src/shell/tabs/tabs.tsx`): Home shows the card, a session whose server
         // hasn't answered the unavailable panel (`view::session_state`).
         Err(e) => {
-            let shown = step(s, LaunchEvent::Landed { reached, refused, now }, tx);
+            let shown = step(s, LaunchEvent::Landed { reached, now, health_version: crate::servers::health::version() }, tx);
             if shown {
                 s.diag.status = e.into();
             }

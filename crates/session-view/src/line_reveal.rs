@@ -92,31 +92,68 @@ impl Hold {
     }
 }
 
-/// `TEXT_RENDER_PACE_MS`: one paced slice each this long.
-const PACE: f64 = 0.024;
+/// Desktop's `TEXT_RENDER_PACE_MS` (`packages/session-ui/src/message/paced-text-machine.ts`):
+/// 24 ms fallback when the display refresh rate is unknown or slower, and the reference time base
+/// for slice sizing so high-refresh displays keep the same catch-up rate without 42 fps stepping.
+const BASE_PACE: f64 = 0.024;
+/// Upper bound on paced text updates per second: displays at 60–180 Hz (including 120/144/160 Hz)
+/// step on every refresh; faster panels (240–500 Hz) lock to an integer frame divisor (e.g. 240 Hz
+/// -> 120 Hz, 360 Hz -> 180 Hz) to bound per-frame markdown/layout work with zero beat judder.
+const MAX_PACE_HZ: f64 = 180.0;
 /// `TEXT_RENDER_IMMEDIATE`: a live backlog up to this long shows at once.
 const IMMEDIATE: usize = 512;
+/// `nextSliceEnd` maximum bytes per [`BASE_PACE`] window.
+const BASE_MAX_SLICE: f64 = 256.0;
+/// `nextSliceEnd` remaining fraction kept per [`BASE_PACE`] window (`1 - 1/4`).
+const BASE_KEEP: f64 = 0.75;
+
+/// Target reveal cadence derived from the window's display refresh rate.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PaceCadence {
+    /// Target interval between paced slices (seconds).
+    pub interval: f64,
+    /// Earliest interval after the last slice before the next slice fires (seconds). When synced
+    /// to a known display rate this sits a quarter display frame below `interval` so minor
+    /// compositor/vsync jitter never skips a frame and halves the rate, while mid-frame wakes
+    /// still wait for the next refresh.
+    pub guard: f64,
+}
+
+impl PaceCadence {
+    pub fn for_display_hz(display_hz: Option<f64>) -> Self {
+        let Some(hz) = display_hz.filter(|hz| hz.is_finite() && *hz > 1.0 / BASE_PACE) else {
+            return Self { interval: BASE_PACE, guard: BASE_PACE };
+        };
+        let divisor = if hz > MAX_PACE_HZ { (hz / MAX_PACE_HZ).ceil() } else { 1.0 };
+        let interval = (divisor / hz).min(BASE_PACE);
+        let guard = ((divisor - 0.25) / hz).clamp(0.001, interval);
+        Self { interval, guard }
+    }
+}
 
 /// A streamed text part's reveal: Desktop's `PacedTextState`
-/// (`session-ui/src/message/paced-text-machine.ts:13-16`). A live backlog of more than
-/// [`IMMEDIATE`] bytes (a reconnect's catch-up, a fast model's burst) shows in slices, one each
-/// [`PACE`], rather than all at once. `disposed` is the part leaving [`Hold`]. Desktop counts
+/// (`packages/session-ui/src/message/paced-text-machine.ts:13-16`), adapted to step at the
+/// display's refresh cadence rather than Desktop's fixed 24 ms DOM throttle while preserving
+/// Desktop's bytes/sec throughput and [`IMMEDIATE`] fast path. A live backlog of more than
+/// [`IMMEDIATE`] bytes (a reconnect's catch-up, a fast model's burst) shows in display-paced
+/// slices rather than all at once. `disposed` is the part leaving [`Hold`]. Desktop counts
 /// UTF-16 units; these count bytes, cut on character boundaries.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Paced {
     /// The whole text shows: `shown` bytes of it, `sig` the signature of those bytes.
     Synced { shown: usize, sig: u64 },
-    /// `shown` bytes of a `target` bytes long text show; the next slice is due at `due` on the
-    /// app clock. A delta while it paces keeps the due slice, so a steady stream can't postpone it.
-    Pacing { shown: usize, sig: u64, target: usize, due: f64 },
+    /// `shown` bytes of a `target` bytes long text show; the last slice landed (or pacing began)
+    /// at `at` and the next slice is due at `due` on the app clock. A delta while it paces keeps
+    /// the due slice no later than before, so a steady stream can't postpone it.
+    Pacing { shown: usize, sig: u64, target: usize, at: f64, due: f64 },
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum PacedEvent<'a> {
-    /// The part's text now, and whether its turn streams (`sync`).
-    Sync { text: &'a str, live: bool, now: f64 },
+    /// The part's text now, whether its turn streams (`sync`), and the display's reveal cadence.
+    Sync { text: &'a str, live: bool, now: f64, cadence: PaceCadence },
     /// The clock reached `now` (`tick`): a due slice shows.
-    Tick { text: &'a str, now: f64 },
+    Tick { text: &'a str, now: f64, cadence: PaceCadence },
 }
 
 impl Paced {
@@ -128,20 +165,23 @@ impl Paced {
     /// `transitionPacedText`. Returns the next slice's due time while it paces.
     pub fn step(&mut self, event: PacedEvent) -> Option<f64> {
         *self = match (*self, event) {
-            (Paced::Pacing { shown, target, due, .. }, PacedEvent::Tick { text, now }) if now + 1e-9 >= due && text.is_char_boundary(target) => {
+            (Paced::Pacing { shown, target, at, due, .. }, PacedEvent::Tick { text, now, cadence })
+                if now + 1e-9 >= due && text.is_char_boundary(target) =>
+            {
                 if target - shown <= IMMEDIATE {
                     Paced::mount(&text[..target])
                 } else {
-                    let end = slice_end(&text[..target], shown);
+                    let dt = (now - at).clamp(cadence.interval, BASE_PACE);
+                    let end = slice_end(&text[..target], shown, dt);
                     if end >= target {
                         Paced::mount(&text[..target])
                     } else {
-                        Paced::Pacing { shown: end, sig: sig(&text[..end]), target, due: now + PACE }
+                        Paced::Pacing { shown: end, sig: sig(&text[..end]), target, at: now, due: now + cadence.guard }
                     }
                 }
             }
             (state, PacedEvent::Tick { .. }) => state,
-            (state, PacedEvent::Sync { text, live, now }) => {
+            (state, PacedEvent::Sync { text, live, now, cadence }) => {
                 let (shown, shown_sig) = match state {
                     Paced::Synced { shown, sig } | Paced::Pacing { shown, sig, .. } => (shown, sig),
                 };
@@ -151,8 +191,8 @@ impl Paced {
                     Paced::Pacing { target, .. } if live && text.len() == target => state,
                     // The length check runs first, so an ordinary delta never reads the whole text.
                     _ if !live || text.len().saturating_sub(shown) <= IMMEDIATE || !same(shown) || sig(&text[..shown]) != shown_sig => Paced::mount(text),
-                    Paced::Pacing { due, .. } => Paced::Pacing { shown, sig: shown_sig, target: text.len(), due },
-                    Paced::Synced { .. } => Paced::Pacing { shown, sig: shown_sig, target: text.len(), due: now + PACE },
+                    Paced::Pacing { at, due, .. } => Paced::Pacing { shown, sig: shown_sig, target: text.len(), at, due: due.min(now + cadence.guard) },
+                    Paced::Synced { .. } => Paced::Pacing { shown, sig: shown_sig, target: text.len(), at: now, due: now + cadence.guard },
                 }
             }
         };
@@ -163,11 +203,20 @@ impl Paced {
     }
 }
 
-/// `nextSliceEnd`: a quarter of what's left, at most 256 bytes, ended just past a space or
-/// punctuation within the next 8 when there is one.
-fn slice_end(text: &str, start: usize) -> usize {
-    let end = text.len().min(start + 256.min((text.len() - start).div_ceil(4)));
-    let end = text.ceil_char_boundary(end);
+/// `nextSliceEnd`: a quarter of what's left, at most 256 bytes per [`BASE_PACE`] (24 ms), scaled
+/// proportionally to `dt` so high-refresh displays advance smoothly each frame at the same overall
+/// throughput, ended just past a space or punctuation within the next 8 when there is one.
+fn slice_end(text: &str, start: usize, dt: f64) -> usize {
+    let remaining = text.len() - start;
+    let step = if dt >= BASE_PACE - 1e-9 {
+        256.min(remaining.div_ceil(4))
+    } else {
+        let ratio = (dt / BASE_PACE).clamp(0.0, 1.0);
+        let frac = ((remaining as f64) * (1.0 - BASE_KEEP.powf(ratio))).ceil() as usize;
+        let cap = (BASE_MAX_SLICE * ratio).round() as usize;
+        cap.max(1).min(frac.max(1))
+    };
+    let end = text.ceil_char_boundary(text.len().min(start + step));
     let snap = text[end..].char_indices().take(8).find(|(_, c)| c.is_whitespace() || ".,!?;:)]".contains(*c));
     snap.map_or(end, |(i, c)| end + i + c.len_utf8())
 }
@@ -195,6 +244,7 @@ pub fn poll<S: TimelineHost>(s: &mut S, now: f64, tx: &mut Tx) -> bool {
     if !live && s.line_hold().paced.is_empty() && s.line_hold().held.is_empty() {
         return false;
     }
+    let cadence = PaceCadence::for_display_hz(s.display_hz());
     let mut hold = s.line_hold().clone();
     let (mut changed, mut next) = (false, f64::INFINITY);
     let mut lens: Vec<(String, usize)> = Vec::new();
@@ -215,9 +265,9 @@ pub fn poll<S: TimelineHost>(s: &mut S, now: f64, tx: &mut Tx) -> bool {
                 let key = format!("{}:{i}", a.id);
                 let was = hold.paced(&a.id, i);
                 let paced = hold.paced.entry(key.clone()).or_insert_with(|| Paced::mount(text));
-                let mut due = paced.step(PacedEvent::Sync { text, live: true, now });
+                let mut due = paced.step(PacedEvent::Sync { text, live: true, now, cadence });
                 if due.is_some_and(|d| now + 1e-9 >= d) {
-                    due = paced.step(PacedEvent::Tick { text, now });
+                    due = paced.step(PacedEvent::Tick { text, now, cadence });
                 }
                 if let Some(d) = due {
                     next = next.min(d - now);

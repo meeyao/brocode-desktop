@@ -177,6 +177,145 @@ fn shell_link(s: &mut App) {
     s.timeline_fx.expanded.extend(["c-call_link_shell".to_owned(), "tool:call_link_shell".to_owned()]);
 }
 
+/// Headless verification scene for `full_codemode` (`opencode#66509`): an `execute` call with
+/// nested calls (one failed), a script file diff in `metadata.files`, and multi-line output.
+fn codemode_scene(s: &mut App, full_codemode: bool, separate: bool) {
+    crate::stories::scenes::open_scene(s);
+    s.finish_stream();
+    let session = crate::stories::sid(s);
+    let dir = s.session(&session).map(|i| i.directory.clone()).filter(|d| !d.is_empty());
+    crate::session::meta::flags::set_fixture(s, dir, "full_codemode", full_codemode);
+    if separate {
+        s.settings.timeline_detail = session_view::detail::PRESETS[0].2;
+    }
+    let patch = "@@ -1,2 +1,3 @@\n fn main() {\n+    println!(\"flat codemode\");\n }\n";
+    let call = Part::Tool {
+        id: "call_exec_cm".into(),
+        name: "execute".into(),
+        status: ToolStatus::Completed,
+        title: String::new(),
+        input: serde_json::json!({ "code": "await tools.read({ path: \"src/main.rs\" });\nreturn \"ok\";" }),
+        files: vec![],
+        metadata: serde_json::json!({
+            "toolCalls": [
+                { "tool": "read", "status": "completed", "input": { "path": "src/main.rs" } },
+                { "tool": "edit", "status": "completed", "input": { "path": "src/main.rs" } }
+            ],
+            "files": [
+                { "file": "src/main.rs", "status": "modified", "additions": 1, "deletions": 0, "patch": patch }
+            ],
+            "output": "updated src/main.rs\ndone"
+        }),
+    };
+    let reply = Assistant {
+        id: "msg_zzcodemode".into(),
+        completed: Some(1),
+        parts: vec![call],
+        ..Default::default()
+    };
+    if let Some(t) = s.transcripts.get_mut(&session)
+        && !t.messages.iter().any(|m| m.id() == reply.id)
+    {
+        t.messages.push(Message::Assistant(reply));
+    }
+    if !separate {
+        s.timeline_fx.expanded.insert("c-call_exec_cm".to_owned());
+    }
+}
+
+/// Headless verification scene for `opencode#66650`: a `full_codemode` script with `Bun.file`,
+/// `grep`, and an ignored `Bun.sleep` step renders its group header as "Explored 1 file, 1 search".
+fn codemode_bun_scene(s: &mut App) {
+    crate::stories::scenes::open_scene(s);
+    s.finish_stream();
+    let session = crate::stories::sid(s);
+    let dir = s.session(&session).map(|i| i.directory.clone()).filter(|d| !d.is_empty());
+    crate::session::meta::flags::set_fixture(s, dir, "full_codemode", true);
+    let call = Part::Tool {
+        id: "call_exec_bun".into(),
+        name: "execute".into(),
+        status: ToolStatus::Completed,
+        title: String::new(),
+        input: serde_json::json!({ "code": "await Bun.file(\"Cargo.toml\").text();" }),
+        files: vec![],
+        metadata: serde_json::json!({
+            "toolCalls": [
+                { "tool": "Bun", "status": "completed", "input": { "method": "file", "path": "Cargo.toml" } },
+                { "tool": "Bun", "status": "completed", "input": { "method": "sleep" } },
+                { "tool": "grep", "status": "completed", "input": { "pattern": "session-view" } }
+            ],
+            "output": "done"
+        }),
+    };
+    let reply = Assistant {
+        id: "msg_zzcodemode_bun".into(),
+        completed: Some(1),
+        parts: vec![call],
+        ..Default::default()
+    };
+    if let Some(t) = s.transcripts.get_mut(&session)
+        && !t.messages.iter().any(|m| m.id() == reply.id)
+    {
+        t.messages.push(Message::Assistant(reply));
+    }
+}
+
+/// Headless verification scene for collapsed activity summary truncation: a short baseline row,
+/// a row with a short main headline plus a long secondary list, and a row with two long edited
+/// filenames plus secondary commands.
+fn long_summary_scene(s: &mut App) {
+    crate::stories::scenes::open_scene(s);
+    s.finish_stream();
+    let session = crate::stories::sid(s);
+    let Some(t) = s.transcripts.get_mut(&session) else { return };
+    let edit_part = |id: &str, path: &str| Part::Tool {
+        id: id.into(),
+        name: "edit".into(),
+        status: ToolStatus::Completed,
+        title: String::new(),
+        input: serde_json::json!({ "filePath": path }),
+        files: vec![],
+        metadata: serde_json::Value::Null,
+    };
+    let tool_part = |id: &str, name: &str| Part::Tool {
+        id: id.into(),
+        name: name.into(),
+        status: ToolStatus::Completed,
+        title: String::new(),
+        input: serde_json::Value::Null,
+        files: vec![],
+        metadata: serde_json::Value::Null,
+    };
+    let mut short_parts: Vec<Part> = (0..3).map(|i| edit_part(&format!("call_ls_a_{i}"), &format!("src/a_{i}.rs"))).collect();
+    short_parts.extend((0..2).map(|i| tool_part(&format!("call_ls_ac_{i}"), "shell")));
+
+    let mut overflow_parts: Vec<Part> = (0..5).map(|i| edit_part(&format!("call_ls_b_{i}"), &format!("src/b_{i}.rs"))).collect();
+    overflow_parts.extend((0..55).map(|i| tool_part(&format!("call_ls_bc_{i}"), "shell")));
+    for (i, name) in ["browser.tabs.open", "browser.wait", "browser.console", "browser.evaluate", "browser.preview", "browser.click"].iter().enumerate() {
+        overflow_parts.push(tool_part(&format!("call_ls_bt_{i}"), name));
+    }
+
+    let mut long_main_parts = vec![
+        edit_part("call_ls_c_0", "crates/session-view/src/very_long_session_timeline_renderer.rs"),
+        edit_part("call_ls_c_1", "crates/session-view/src/very_long_activity_summary_header.rs"),
+        tool_part("call_ls_cc_0", "shell"),
+        tool_part("call_ls_cc_1", "shell"),
+    ];
+    long_main_parts.push(tool_part("call_ls_cc_2", "browser.tabs.open"));
+
+    t.messages = vec![
+        Message::User { id: "msg_ls_u1".into(), text: "Check collapsed summary headers.".into() },
+        Message::Assistant(Assistant { id: "msg_ls_a1".into(), completed: Some(1), parts: short_parts, ..Default::default() }),
+        Message::Assistant(Assistant { id: "msg_ls_a2".into(), completed: Some(2), parts: vec![Part::Text { text: "Short header baseline above.".into() }], ..Default::default() }),
+        Message::User { id: "msg_ls_u2".into(), text: "Run the full browser verification pass.".into() },
+        Message::Assistant(Assistant { id: "msg_ls_a3".into(), completed: Some(3), parts: overflow_parts, ..Default::default() }),
+        Message::Assistant(Assistant { id: "msg_ls_a4".into(), completed: Some(4), parts: vec![Part::Text { text: "Overflowing secondary tool list above.".into() }], ..Default::default() }),
+        Message::User { id: "msg_ls_u3".into(), text: "Update the long filenames too.".into() },
+        Message::Assistant(Assistant { id: "msg_ls_a5".into(), completed: Some(5), parts: long_main_parts, ..Default::default() }),
+        Message::Assistant(Assistant { id: "msg_ls_a6".into(), completed: Some(6), parts: vec![Part::Text { text: "Long main filenames plus secondary tools above.".into() }], ..Default::default() }),
+    ];
+}
+
 rune_register::register!(crate::stories::scenes::SCENE_LIST: crate::stories::scenes::Scene = [
     ("tools", |s| tour(s, None, &[])),
     ("tools-list", |s| tour(s, Some("c-call_list_tour"), &["tool:call_list_tour"])),
@@ -197,6 +336,11 @@ rune_register::register!(crate::stories::scenes::SCENE_LIST: crate::stories::sce
         long_command(s);
     }),
     ("tools-error", |s| tour(s, Some("c-call_shellerr_tour"), &["tool:call_shellerr_tour"])),
+    ("tools-execute-codemode-off", |s| codemode_scene(s, false, false)),
+    ("tools-execute-codemode-on", |s| codemode_scene(s, true, false)),
+    ("tools-execute-codemode-standalone", |s| codemode_scene(s, true, true)),
+    ("tools-execute-codemode-bun", |s| codemode_bun_scene(s)),
     ("tools-running", tour_running),
     ("tools-shell-link", shell_link),
+    ("tools-long-summary", long_summary_scene),
 ]);

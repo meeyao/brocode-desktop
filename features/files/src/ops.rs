@@ -201,13 +201,23 @@ pub fn ensure_file_loaded(host: &mut dyn FilesHost, session_id: &str, path: &str
     };
 
     // A video streams into its player where it lies: nothing is read first. One that
-    // can't play is read as any other file, and shows as the binary file it is.
+    // can't play is read as any other file, and shows as the binary file it is. When a stale
+    // reload arrives (e.g. a file changed while its session was off-screen), discard any prior
+    // failed player or auth failure so a repaired/completed video retries cleanly.
+    if video::is_video(path) && host.files().reads.stale(session_id, path) {
+        let pane = host.files_mut();
+        pane.forget_video_auth(session_id, path);
+        if let Some(ws) = pane.sessions.get_mut(session_id) {
+            ws.videos.remove(path);
+        }
+    }
     let failed = host
         .files()
         .sessions
         .get(session_id)
         .and_then(|w| w.videos.get(path))
-        .is_some_and(video::FileVideo::failed);
+        .is_some_and(video::FileVideo::failed)
+        || host.files().video_auth_failed(session_id, path);
     if video::is_video(path) && !failed {
         let video_dir = if server.is_local() {
             host.session_physical_directory(session_id)
@@ -216,6 +226,7 @@ pub fn ensure_file_loaded(host: &mut dyn FilesHost, session_id: &str, path: &str
         };
         if let Some(source) = video_dir.as_deref().and_then(|d| video::source(Some(&server), d, path)) {
             let pane = host.files_mut();
+            pane.reads.clear(session_id, path);
             let wrap = pane.wrap;
             let clip = video::FileVideo::new(&source, pane.waker.clone());
             let ws = pane.sessions.entry(session_id.to_owned()).or_default();
@@ -225,9 +236,21 @@ pub fn ensure_file_loaded(host: &mut dyn FilesHost, session_id: &str, path: &str
             ws.videos.insert(path.to_owned(), clip);
             return;
         }
-        // On a local server, `source() == None` means confinement refused a symlink/junction or
-        // missing file: never fall back to `/api/fs/read/...`.
+        // On a native local server, `source() == None` means confinement refused a symlink/junction
+        // or missing file: never fall back to `/api/fs/read/...`. Remove any stale player and
+        // insert a terminal Missing doc so OpenDocument stops re-requesting on every render.
+        // On wasm32, `video::source` returns `None` for any authenticated server (local or remote),
+        // which intentionally falls through to `read_file` below.
+        #[cfg(not(target_arch = "wasm32"))]
         if server.is_local() {
+            let pane = host.files_mut();
+            pane.reads.clear(session_id, path);
+            let wrap = pane.wrap;
+            let ws = pane.sessions.entry(session_id.to_owned()).or_default();
+            ws.videos.remove(path);
+            let mut doc = wrap.doc(path, "");
+            doc.set_missing();
+            ws.docs.insert(path.to_owned(), doc);
             return;
         }
         // Password-protected remote server: never put `auth_token` in a URL; download via
@@ -237,12 +260,14 @@ pub fn ensure_file_loaded(host: &mut dyn FilesHost, session_id: &str, path: &str
             && let Some(dir) = video_dir
         {
             let pane = host.files_mut();
+            pane.reads.clear(session_id, path);
             let wrap = pane.wrap;
             let waker = pane.waker.clone();
-            let ws = pane.sessions.entry(session_id.to_owned()).or_default();
-            ws.docs.entry(path.to_owned()).or_insert_with(|| wrap.doc(path, ""));
-            pane.auth_videos.start(&server, &dir, session_id, path, waker);
-            return;
+            if pane.auth_videos.start(&server, &dir, session_id, path, waker) {
+                let ws = pane.sessions.entry(session_id.to_owned()).or_default();
+                ws.docs.entry(path.to_owned()).or_insert_with(|| wrap.doc(path, ""));
+                return;
+            }
         }
     }
 

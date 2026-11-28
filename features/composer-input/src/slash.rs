@@ -69,6 +69,15 @@ impl Slash {
     pub fn set_waker(&mut self, waker: Waker) {
         self.fetch = Latest::new(waker);
     }
+
+    /// Drops the cached directory mark when `command.updated` arrives for this directory or with
+    /// no location (`packages/client/src/solid/data.ts:1522-1540`, `opencode#66813`), so
+    /// `poll_commands` re-fetches `/api/command` immediately if open or on the next `/` open.
+    pub fn invalidate(&mut self, dir: Option<&str>) {
+        if dir.is_none() || self.dir.as_deref() == dir {
+            self.dir = None;
+        }
+    }
 }
 
 /// Object-safe host boundary for `/` slash commands: catalog lookup, fuzzy ranking, server command

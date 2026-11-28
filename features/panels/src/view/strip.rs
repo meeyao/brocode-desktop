@@ -13,8 +13,9 @@ use opencode_ui::tab::TabExt;
 use crate::drag::{choose_side_new_tab, side_new_tab_gesture, side_tab_gesture};
 use crate::host::PanelsHost;
 use crate::state::{
-    FocusMode, NewTabEntry, ResolvedEntry, SideMenu, StripScroll, close_side_tab, dismiss_side_new_tab,
-    open_side_new_tab, promote_preview_tab, select_side_tab, toggle_bottom_region,
+    FocusMode, MouseClose, NewTabEntry, ResolvedEntry, SideMenu, StripScroll, WidthHoldEvent, close_side_tab,
+    dismiss_side_new_tab, open_side_new_tab, promote_preview_tab, release_pane_width_hold, select_side_tab,
+    toggle_bottom_region,
 };
 use crate::{CloseButtonMode, SessionPane, TERMINAL_PLUGIN};
 
@@ -103,14 +104,20 @@ pub(super) fn tab_bar<H: PanelsHost + 'static>(
         .map(|(e, l)| tab_natural(e, l.is_some()) + host.panel_tab_extra_w(e.plugin, &e.tab))
         .chain(live_new.iter().map(|_| new_natural))
         .collect();
-    let gaps = 8.0 * naturals.len().saturating_sub(1) as f32;
-    let mut widths = strip_widths(&naturals, room - gaps).into_iter();
+    let total_tabs = naturals.len();
+    let slot = pane as usize;
+    let hold = host.side().width_holds[slot].active(session_id, pane_w, total_tabs);
+    let gaps = 8.0 * total_tabs.saturating_sub(1) as f32;
+    let computed = strip_widths(&naturals, (room - hold).max(0.0) - gaps);
+    let total_drawn_w: f32 = computed.iter().sum::<f32>() + gaps;
+    let overflowing = total_drawn_w > room + 0.5;
+    let mut widths = computed.into_iter();
     let lead = entries.iter().find(|e| !e.tab.pinned).is_some_and(|e| e.tab.first);
     let scroll_key = format!("side-tab-scroll-{slug}");
     let at = host.side().strips.clone();
     let (wheel_at, laid_at) = (at.clone(), at.clone());
     let (wheel_key, laid_key) = (scroll_key.clone(), scroll_key.clone());
-    let (slot, sid) = (pane as usize, session_id.to_owned());
+    let sid = session_id.to_owned();
     let mut list = row()
         .key(format!("side-tab-list-{slug}"))
         .gap(8.0)
@@ -122,16 +129,37 @@ pub(super) fn tab_bar<H: PanelsHost + 'static>(
             on_strip_layout(&laid_at, slot, &sid, lead, &laid_key, w, tx);
         });
 
+    let mut tab_idx = 0usize;
     for (entry, lead_el) in entries.iter().zip(leads) {
         let dragging = host.side().pane_drag.dragging() == Some(entry.key.as_str());
         let width = widths.next().unwrap_or(TAB_MIN_W);
-        list = list.child(tab_trigger::<H>(p, entry, lead_el, width, active_of(entry), focused, dragging));
+        let close_meta = MouseClose {
+            session_id: session_id.to_owned(),
+            pane_w,
+            closed_w: width,
+            is_last: tab_idx + 1 == total_tabs,
+            overflowing,
+            remaining: total_tabs.saturating_sub(1),
+            gap: 8.0,
+        };
+        list = list.child(tab_trigger::<H>(p, pane, entry, lead_el, width, active_of(entry), focused, dragging, close_meta));
+        tab_idx += 1;
     }
 
     for nt in live_new {
         let width = widths.next().unwrap_or(TAB_MIN_W);
         let active = shown_new_id == Some(nt.id.as_str());
-        list = list.child(new_tab_trigger::<H>(p, pane, &nt.id, width, active, focused));
+        let close_meta = MouseClose {
+            session_id: session_id.to_owned(),
+            pane_w,
+            closed_w: width,
+            is_last: tab_idx + 1 == total_tabs,
+            overflowing,
+            remaining: total_tabs.saturating_sub(1),
+            gap: 8.0,
+        };
+        list = list.child(new_tab_trigger::<H>(p, pane, &nt.id, width, active, focused, close_meta));
+        tab_idx += 1;
     }
 
     let viewport = row()
@@ -155,6 +183,14 @@ pub(super) fn tab_bar<H: PanelsHost + 'static>(
         .center_y()
         .grow(1.0)
         .min_w(0.0)
+        // Leaving the strip releases any mouse-close tab width hold (`tab-strip-widths.ts:74`).
+        .on_hover_change(move |s: &mut H, inside: bool, tx: &mut Tx| {
+            if !inside && release_pane_width_hold(s, pane) {
+                tx.instant();
+            } else {
+                tx.live_only();
+            }
+        })
         .child(viewport)
         .child(
             el().key(format!("side-add-{slug}"))
@@ -213,7 +249,9 @@ fn new_tab_trigger<H: PanelsHost + 'static>(
     width: f32,
     active: bool,
     focused: bool,
+    close_meta: MouseClose,
 ) -> El {
+    let middle_meta = close_meta.clone();
     let drag_nid = nid.to_owned();
     let press_nid = nid.to_owned();
     let close_nid = nid.to_owned();
@@ -250,10 +288,10 @@ fn new_tab_trigger<H: PanelsHost + 'static>(
             p,
             format!("side-new-close-{close_nid}"),
             active,
-            move |s: &mut H, tx: &mut Tx| on_dismiss_new_tab(s, &close_nid, tx),
+            move |s: &mut H, tx: &mut Tx| on_mouse_dismiss_new_tab(s, pane, &close_nid, &close_meta, !tx.focus_visible(), tx),
         ))
         // A middle click closes it, as its × does (`side-region.tsx`'s `onMiddleClick`).
-        .closable_tab(move |s: &mut H, tx: &mut Tx| on_dismiss_new_tab(s, &middle_nid, tx))
+        .closable_tab(move |s: &mut H, tx: &mut Tx| on_mouse_dismiss_new_tab(s, pane, &middle_nid, &middle_meta, true, tx))
 }
 
 /// How wide a strip's tabs are, given each one's content width and the room they share (the
@@ -314,13 +352,16 @@ fn tab_icon_size(_entry: &ResolvedEntry, _glyph: &Icon) -> f32 {
 #[allow(clippy::too_many_arguments)]
 fn tab_trigger<H: PanelsHost + 'static>(
     p: &Pal,
+    pane: SessionPane,
     entry: &ResolvedEntry,
     lead: Option<El>,
     width: f32,
     active: bool,
     focused: bool,
     dragging: bool,
+    close_meta: MouseClose,
 ) -> El {
+    let middle_meta = close_meta.clone();
     let select_key = entry.key.clone();
     let promote_key = entry.key.clone();
     let menu_key = entry.key.clone();
@@ -362,7 +403,7 @@ fn tab_trigger<H: PanelsHost + 'static>(
     // A middle click closes a tab that can close, on its release over the tab
     // (`panel-trigger.tsx`'s `onMiddleClick`, Desktop's `auxclick`).
     if entry.tab.can_close() {
-        pill = pill.closable_tab(move |s: &mut H, tx: &mut Tx| close_side_tab(s, &middle_key, tx));
+        pill = pill.closable_tab(move |s: &mut H, tx: &mut Tx| on_mouse_close_tab(s, pane, &middle_key, &middle_meta, true, tx));
     }
     let (draggable, shown) = (!entry.tab.pinned && entry.tab.draggable, active && focused);
     pill = pill.on_drag(move |s: &mut H, d: &mut Drag, tx: &mut Tx| {
@@ -424,7 +465,7 @@ fn tab_trigger<H: PanelsHost + 'static>(
             p,
             format!("side-tab-close-{id}"),
             always_visible,
-            move |s: &mut H, tx: &mut Tx| close_side_tab(s, &close_key, tx),
+            move |s: &mut H, tx: &mut Tx| on_mouse_close_tab(s, pane, &close_key, &close_meta, !tx.focus_visible(), tx),
         ));
     }
 
@@ -495,13 +536,36 @@ fn on_new_tab_press(host: &mut dyn PanelsHost, pane: SessionPane, nid: &str, tx:
     choose_side_new_tab(host, pane, nid, tx);
 }
 
-fn on_dismiss_new_tab(host: &mut dyn PanelsHost, nid: &str, tx: &mut Tx) {
+fn on_mouse_close_tab(
+    host: &mut dyn PanelsHost,
+    pane: SessionPane,
+    key: &str,
+    meta: &MouseClose,
+    pointer: bool,
+    tx: &mut Tx,
+) {
+    let event = if pointer { WidthHoldEvent::MouseClose(meta.clone()) } else { WidthHoldEvent::Release };
+    host.side_mut().width_holds[pane as usize].step(event);
+    close_side_tab(host, key, tx);
+}
+
+fn on_mouse_dismiss_new_tab(
+    host: &mut dyn PanelsHost,
+    pane: SessionPane,
+    nid: &str,
+    meta: &MouseClose,
+    pointer: bool,
+    tx: &mut Tx,
+) {
     tx.instant();
+    let event = if pointer { WidthHoldEvent::MouseClose(meta.clone()) } else { WidthHoldEvent::Release };
+    host.side_mut().width_holds[pane as usize].step(event);
     dismiss_side_new_tab(host, nid);
 }
 
 fn on_open_new_tab(host: &mut dyn PanelsHost, pane: SessionPane, tx: &mut Tx) {
     tx.instant();
+    release_pane_width_hold(host, pane);
     open_side_new_tab(host, pane);
     // A press on `+` is a press inside the region: in Desktop the button takes the focus, so the
     // region is `data-focused` and its new tab shows in the selected ink (`tabs.css:578-584`).

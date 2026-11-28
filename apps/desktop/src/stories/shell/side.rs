@@ -299,3 +299,39 @@ rune_register::register!(crate::stories::STORY_LIST: Story = [
         variants: INSTALL_VARIANTS,
     },
 ]);
+
+/// Side panel New tab with browser address bar, recent pages, launchers, and recently closed
+/// (`opencode#66818`, UP-270).
+fn scene_side_new_tab(s: &mut App) {
+    crate::stories::scenes::open_scene(s);
+    s.finish_stream();
+    *s.kernel.slots.get_mut(&crate::panels::SIDE) = Default::default();
+    s.workspace_panes.browser = Default::default();
+    s.workspace_panes.browser.host.set_mock_status(EngineStatus::Ready);
+    crate::plugin_host::stores::set(
+        "plugin.browser",
+        "history",
+        r#"{"visits":[{"url":"https://github.com/anomalyco/rune","title":"anomalyco/rune"},{"url":"http://localhost:3000/dashboard","title":"Local Dashboard"}]}"#.into(),
+    );
+    crate::plugin_host::services::store::store_changed("browser", "history");
+    if let Some(sid) = s.active_session_id().map(str::to_owned) {
+        let now = *s.now_ms;
+        push_closed_tab(
+            &mut s.session_side_mut(&sid).closed,
+            ClosedSideTab {
+                key: "browser:99".into(),
+                title: "localhost:5173/settings".into(),
+                icon_name: Some("globe".into()),
+                file: None,
+                detail: Some("localhost:5173".into()),
+                data: Some("http://localhost:5173/settings".into()),
+                closed_ms: now,
+            },
+        );
+    }
+    s.open_side_new_tab(SessionPane::Side);
+}
+
+rune_register::register!(crate::scenes::SCENE_LIST: crate::scenes::Scene = [
+    ("side-new-tab", scene_side_new_tab),
+]);

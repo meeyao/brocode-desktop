@@ -251,6 +251,9 @@ pub enum CatalogEvent<'a> {
     /// The list is open over `directory`; `opened`: it just opened.
     Wanted { directory: &'a str, opened: bool },
     Answered { attempt: Attempt, failed: bool },
+    /// `agent.updated` or `skill.updated` arrived for `directory` (`None` = locationless
+    /// deferred plugin registration, `packages/client/src/solid/data.ts:1522-1540`, `opencode#66813`).
+    Invalidated { directory: Option<&'a str> },
 }
 
 pub fn step_catalog(seq: &mut Seq, state: &mut Catalog, event: CatalogEvent<'_>) -> Option<(Attempt, String)> {
@@ -274,6 +277,19 @@ pub fn step_catalog(seq: &mut Seq, state: &mut Catalog, event: CatalogEvent<'_>)
             {
                 let directory = std::mem::take(directory);
                 *state = if failed { Catalog::Failed { directory } } else { Catalog::Read { directory } };
+            }
+            None
+        }
+        CatalogEvent::Invalidated { directory } => {
+            let stale = match state {
+                Catalog::Unread => false,
+                Catalog::Reading { directory: d, .. } | Catalog::Read { directory: d } | Catalog::Failed { directory: d } => {
+                    directory.is_none() || directory == Some(d.as_str())
+                }
+            };
+            if stale {
+                let _ = seq.next();
+                *state = Catalog::Unread;
             }
             None
         }

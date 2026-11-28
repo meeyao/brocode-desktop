@@ -95,6 +95,7 @@ impl EngineManager {
         url: Option<String>,
         title: Option<String>,
         loading: Option<bool>,
+        audible: Option<bool>,
     ) {
         let is_eligible = self.tabs.get(&tab_id).is_some_and(|t| !t.isolated && !t.is_popup);
         if !is_eligible {
@@ -109,6 +110,9 @@ impl EngineManager {
         }
         if let Some(l) = loading {
             ext.on_tab_loading_changed(tab_id, l);
+        }
+        if let Some(a) = audible {
+            ext.on_tab_audible_changed(tab_id, a);
         }
     }
 
@@ -239,28 +243,41 @@ impl EngineManager {
                     }
                 }
                 ExtEffect::NavigateTab { engine_tab_id, url } => {
-                    if let Some(t) = self.tabs.get(&engine_tab_id) {
-                        if t.prompts.agent_driven.load(Ordering::Relaxed) {
+                    if self.tabs.contains_key(&engine_tab_id) {
+                        if self.tabs.get(&engine_tab_id).is_some_and(|t| t.prompts.agent_driven.load(Ordering::Relaxed)) {
                             continue;
                         }
-                        if let Some(frame) = t.browser.main_frame() {
+                        self.ensure_tab_unfrozen(engine_tab_id);
+                        if let Some(t) = self.tabs.get(&engine_tab_id)
+                            && let Some(frame) = t.browser.main_frame()
+                        {
                             t.prompts.set_pending_top_url(Some(url.clone()));
                             frame.load_url(Some(&CefString::from(url.as_str())));
                         }
+                    } else if self.extensions.as_ref().is_some_and(|e| e.is_discarded_tab(engine_tab_id)) {
+                        let _ = self.out_tx.send(EngineMsg::ExtensionWakeTab {
+                            tab_id: engine_tab_id,
+                            focus: false,
+                            url: Some(url),
+                            reload: false,
+                        });
                     }
                 }
                 ExtEffect::FocusTab { engine_tab_id } => {
-                    for (&id, t) in &self.tabs {
-                        let active = id == engine_tab_id;
-                        if !t.is_popup {
-                            t.host.was_hidden(i32::from(!active));
+                    if self.tabs.contains_key(&engine_tab_id) {
+                        self.handle_ext_focus_tab(engine_tab_id);
+                        if let Some(ext) = &mut self.extensions {
+                            ext.on_tab_focused(engine_tab_id);
                         }
-                        t.host.set_focus(i32::from(active));
+                        let _ = self.out_tx.send(EngineMsg::ExtensionFocusTab { tab_id: engine_tab_id });
+                    } else if self.extensions.as_ref().is_some_and(|e| e.is_discarded_tab(engine_tab_id)) {
+                        let _ = self.out_tx.send(EngineMsg::ExtensionWakeTab {
+                            tab_id: engine_tab_id,
+                            focus: true,
+                            url: None,
+                            reload: false,
+                        });
                     }
-                    if let Some(ext) = &mut self.extensions {
-                        ext.on_tab_focused(engine_tab_id);
-                    }
-                    let _ = self.out_tx.send(EngineMsg::ExtensionFocusTab { tab_id: engine_tab_id });
                 }
                 ExtEffect::CloseTab { engine_tab_id } => {
                     if self
@@ -271,12 +288,22 @@ impl EngineManager {
                         continue;
                     }
                     if let Some(tab) = self.tabs.remove(&engine_tab_id) {
+                        self.on_tab_closed_lifecycle(engine_tab_id);
                         self.permissions.on_tab_closed(engine_tab_id);
                         tab.menu.cancel_all();
                         tab.prompts.dismiss_all();
                         tab.download_alive.store(false, Ordering::Release);
                         tab.host.close_browser(1);
                         self.downloads.close_tab(engine_tab_id, tab.download_gen);
+                        for old_gen in tab.prior_download_gens {
+                            self.downloads.close_tab(engine_tab_id, old_gen);
+                        }
+                        if let Some(gens) = self.hibernated_downloads.remove(&engine_tab_id) {
+                            for old_gen in gens {
+                                self.downloads.close_tab(engine_tab_id, old_gen);
+                            }
+                        }
+                        crate::agent::remove_tab_uploads(&self.profile_dir, engine_tab_id);
                         self.release_tab_context(engine_tab_id);
                         if engine_tab_id >= 1_000_000 {
                             self.unmanaged_ext_tabs = self.unmanaged_ext_tabs.saturating_sub(1);
@@ -288,18 +315,30 @@ impl EngineManager {
                             ext.on_tab_closed(engine_tab_id);
                         }
                         let _ = self.out_tx.send(EngineMsg::TabClosed { tab_id: engine_tab_id });
+                    } else {
+                        self.close_hibernated_tab_from_ext(engine_tab_id);
                     }
                 }
                 ExtEffect::ReloadTab { engine_tab_id, ignore_cache } => {
-                    if let Some(t) = self.tabs.get(&engine_tab_id) {
-                        if t.prompts.agent_driven.load(Ordering::Relaxed) {
+                    if self.tabs.contains_key(&engine_tab_id) {
+                        if self.tabs.get(&engine_tab_id).is_some_and(|t| t.prompts.agent_driven.load(Ordering::Relaxed)) {
                             continue;
                         }
-                        if ignore_cache {
-                            t.browser.reload_ignore_cache();
-                        } else {
-                            t.browser.reload();
+                        self.ensure_tab_unfrozen(engine_tab_id);
+                        if let Some(t) = self.tabs.get(&engine_tab_id) {
+                            if ignore_cache {
+                                t.browser.reload_ignore_cache();
+                            } else {
+                                t.browser.reload();
+                            }
                         }
+                    } else if self.extensions.as_ref().is_some_and(|e| e.is_discarded_tab(engine_tab_id)) {
+                        let _ = self.out_tx.send(EngineMsg::ExtensionWakeTab {
+                            tab_id: engine_tab_id,
+                            focus: false,
+                            url: None,
+                            reload: true,
+                        });
                     }
                 }
                 ExtEffect::OpenSeedProbe { url } => self.open_seed_probe(&url),
@@ -447,6 +486,7 @@ impl EngineManager {
             preview: None,
             agent_driven: false,
             document: 0,
+            audible: false,
         }));
         let allowed_ext = vec![ext_id.clone()];
         let file_roots = Arc::new(Mutex::new(Vec::new()));
@@ -457,6 +497,7 @@ impl EngineManager {
             self.mach_port.clone(),
             null_out.clone(),
             Arc::new(AtomicU64::new(0)),
+            Arc::new(AtomicBool::new(true)),
             #[cfg(windows)]
             None,
             #[cfg(target_os = "linux")]
@@ -468,11 +509,13 @@ impl EngineManager {
             #[cfg(not(target_os = "linux"))]
             (),
         );
+        let media_gate = Arc::new(crate::media_gate::TabMediaGate::new());
         let display = TabDisplayHandler::new(
             u64::MAX,
             None,
             snap.clone(),
             prompts.clone(),
+            media_gate.clone(),
             self.permissions.clone(),
             None,
             favicon,
@@ -485,6 +528,7 @@ impl EngineManager {
             None,
             snap.clone(),
             prompts.clone(),
+            media_gate.clone(),
             diagnostics.clone(),
             Arc::new(AtomicBool::new(false)),
             null_out.clone(),
@@ -503,6 +547,7 @@ impl EngineManager {
             snap.clone(),
             prompt_shared.clone(),
             prompts.clone(),
+            media_gate,
             Arc::new(Mutex::new(crate::input_guard::InputGuard::default())),
             Arc::new(std::sync::atomic::AtomicU32::new(1.0f32.to_bits())),
             self.next_cdp_id.clone(),
@@ -883,6 +928,8 @@ impl EngineManager {
             | M::CancelExtensionOpenTab { .. }
             | M::ExtensionMetrics { .. }
             | M::SetColorScheme { .. }
+            | M::SetFrameRate { .. }
+            | M::SetVisibleTabs { .. }
             | M::SetPartitionProxy { .. }
             | M::DropContext { .. }
             | M::DmabufFailed { .. }
@@ -910,6 +957,9 @@ impl EngineManager {
             | M::Forward { .. }
             | M::CloseTab { .. }
             | M::FocusTab { .. }
+            | M::SetTabUnthrottled { .. }
+            | M::FreezeTab { .. }
+            | M::HibernateTab { .. }
             | M::Stop { .. }
             | M::StopFind { .. }
             | M::SetTabPolicy { .. }
@@ -922,6 +972,8 @@ impl EngineManager {
             | M::Wheel { .. }
             | M::Key { .. }
             | M::EditCmd { .. }
+            | M::CopySelection { .. }
+            | M::PasteText { .. }
             | M::Ime { .. }
             | M::FrameRead { .. }
             | M::AnswerDialog { .. }

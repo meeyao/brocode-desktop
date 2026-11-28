@@ -58,12 +58,22 @@ impl App {
 
     /// ⇧⌘W and Close Window.
     pub(crate) fn close_window(&mut self, tx: &mut Tx) {
-        match close_window(self.other_windows(), cfg!(target_os = "macos")) {
-            CloseWindow::Close => tx.close_window(),
+        let others = self.other_windows();
+        match close_window(others, cfg!(target_os = "macos")) {
+            CloseWindow::Close => {
+                #[cfg(not(target_arch = "wasm32"))]
+                if !cfg!(target_os = "macos") && !others && crate::background_notice::holds_quit(self, tx) {
+                    return;
+                }
+                tx.close_window();
+            }
             // A run without the window list (headless) has nothing to hide with.
             CloseWindow::Hide => match self.app_handle() {
                 Some(app) => {
                     self.window.hidden = true;
+                    self.window.focused = false;
+                    super::set_focused(&self.window.id, false);
+                    self.sync_visible_browser_tabs();
                     app.hide();
                 }
                 None => tx.close_window(),
@@ -82,6 +92,9 @@ impl App {
         match self.app_handle() {
             Some(app) if cfg!(target_os = "macos") && !rune::quitting() => {
                 self.window.hidden = true;
+                self.window.focused = false;
+                super::set_focused(&self.window.id, false);
+                self.sync_visible_browser_tabs();
                 app.hide();
             }
             _ => tx.close_window(),

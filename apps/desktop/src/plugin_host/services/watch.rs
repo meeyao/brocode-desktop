@@ -57,18 +57,41 @@ pub fn fire_watched(app: &App, i: usize, vm: u64) -> bool {
             }
             let only = previous.filter(|p| p.server == inputs.server && p.shared == inputs.shared && p.transcript.0 == inputs.transcript.0)
                 .and_then(|p| app.transcript_edits.only(inputs.transcript.0, p.transcript.1, inputs.transcript.1));
+            let mut key_buf = String::with_capacity(64);
             let mut compare = |id: &str, v| {
-                let key = format!("Sessions.Changed:{id}");
-                let was = half.seen.borrow_mut().insert(key, v);
-                if was.is_some_and(|w| w != v) {
+                key_buf.clear();
+                key_buf.push_str("Sessions.Changed:");
+                key_buf.push_str(id);
+                let changed = {
+                    let mut seen = half.seen.borrow_mut();
+                    match seen.get_mut(&key_buf) {
+                        Some(prev) if *prev == v => false,
+                        Some(prev) => {
+                            *prev = v;
+                            true
+                        }
+                        None => {
+                            seen.insert(key_buf.clone(), v);
+                            false
+                        }
+                    }
+                };
+                if changed {
                     fired |= super::super::fire_named(app, i, &name, session_data(app, id));
                 }
             };
             if let Some(id) = only {
-                if app.session(id).is_some() { compare(id, session_version(app, id)); }
+                if let Some(info) = app.session(id) {
+                    compare(id, super::session::session_version_for(app, info, app.subtree_running(id)));
+                }
             } else {
+                let running_ancestors = running_ancestors(app);
                 // Snapshot every version before dispatching the first change.
-                let versions: Vec<_> = app.sessions.iter().map(|s| (&s.id, session_version(app, &s.id))).collect();
+                let versions: Vec<_> = app
+                    .sessions
+                    .iter()
+                    .map(|s| (s.id.as_str(), super::session::session_version_for(app, s, running_ancestors.contains(s.id.as_str()))))
+                    .collect();
                 for (id, v) in versions { compare(id, v); }
             }
             continue;
@@ -185,14 +208,28 @@ pub fn sync_editor_watches(app: &App, p: &crate::plugin_host::Plugin, index: usi
     }
 }
 
+/// Running sessions and their ancestors (up to 32 levels), precomputed once per bulk
+/// `Sessions.Changed` sweep so each catalog session checks a set instead of walking parents.
+pub(super) fn running_ancestors(app: &App) -> std::collections::HashSet<&str> {
+    let mut out = std::collections::HashSet::new();
+    for r in app.running.iter() {
+        for cur in std::iter::successors(Some(r.as_str()), |cur| app.session(cur)?.parent.as_deref()).take(32) {
+            out.insert(cur);
+        }
+    }
+    out
+}
+
 /// Takes what signal `name` of plugin half `half` follows as it is when the plugin connects to
 /// it, so a change between its setup and the next poll (a launch's routed session loading)
 /// fires it rather than becoming its first value.
 pub fn baseline(app: &App, half: &crate::plugin_host::Half, name: &str) {
     let mut seen = half.seen.borrow_mut();
     if name == "Sessions.Changed" {
+        let running = running_ancestors(app);
         for s in &app.sessions {
-            seen.entry(format!("Sessions.Changed:{}", s.id)).or_insert_with(|| session_version(app, &s.id));
+            seen.entry(format!("Sessions.Changed:{}", s.id))
+                .or_insert_with(|| super::session::session_version_for(app, s, running.contains(s.id.as_str())));
         }
         return;
     }

@@ -22,6 +22,9 @@ impl session_view::TimelineHost for App {
     fn clock(&self) -> f64 {
         *self.clock
     }
+    fn display_hz(&self) -> Option<f64> {
+        self.kernel.slots.untracked(&crate::app::DISPLAY_HZ).0.get()
+    }
     fn now_ms(&self) -> i64 {
         *self.now_ms
     }
@@ -57,6 +60,9 @@ impl session_view::TimelineHost for App {
     }
     fn turn_diffs(&self) -> bool {
         self.settings.turn_diffs
+    }
+    fn full_codemode(&self, session: &str) -> bool {
+        crate::session::meta::flags::full_codemode(self, session)
     }
     fn wrap_code_blocks(&self) -> bool {
         self.settings.wrap_code_blocks
@@ -136,6 +142,10 @@ impl session_view::TimelineHost for App {
             return Some(session_view::working::Waiting::Answer);
         }
         None
+    }
+    fn subagents_awaited(&self, session: &str) -> usize {
+        // The capsule's count (`subagents::capsule`), once the session's own run is over.
+        if self.session_busy(session) { 0 } else { self.running_subagents(session).len() }
     }
     fn session_revert(&self, session: &str) -> Option<&str> {
         self.session(session).and_then(|i| i.revert.as_deref())
@@ -339,8 +349,8 @@ impl session_view::TimelineHost for App {
         self.kernel.slots.get(&crate::rewind::REWIND).menu_open_on(id)
     }
     fn inline_quotes(&self) -> bool {
-        // Local and dev builds first, as Desktop (`inline-quotes.ts`).
-        !matches!(crate::updater::build_channel(), "stable" | "prod" | "latest" | "beta")
+        // Enabled in every build channel (`opencode#66823`).
+        true
     }
     fn quote_more_open(&self, id: &str) -> bool {
         self.kernel.slots.get(&crate::quote::QUOTE).more.contains(id)

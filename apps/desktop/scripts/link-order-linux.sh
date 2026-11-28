@@ -3,9 +3,10 @@
 # so a launch whose exe is not in memory reads few pages of it. Cargo calls this as the linker for
 # the Linux targets (`.cargo/config.toml`); every link but the app's exe goes to cc untouched.
 #
-# It is link-order.sh's method (the macOS link) for lld: apps/desktop/pgo/startup-order.txt lists
-# those functions in the order a training launch ran them, with the crate hashes taken out of the
-# names (a hash changes with every Rune pin, the name without it does not). Here the list is
+# It is link-order.sh's method (the macOS link) for lld: apps/desktop/pgo/startup-order-linux.txt
+# (falling back to startup-order.txt) lists those functions in the order Linux training launches
+# ran them, with crate hashes taken out of the names (a hash changes with every Rune pin, the name
+# without it does not). Here the list is
 # matched against the names in the objects being linked, and the linker gets the real names
 # (--symbol-ordering-file). A function the list names and this build lacks is skipped.
 #
@@ -43,7 +44,14 @@ note() {
   echo "link order: $1" >> "$out.link-order.txt" 2>/dev/null || true
 }
 rm -f "$out.link-order.txt"
-list=${OPENCODE_RUNE_ORDER_LIST:-$(cd "$(dirname "$0")" && pwd)/../pgo/startup-order.txt}
+pgo_dir=$(CDPATH= cd -- "$(dirname "$0")" >/dev/null && pwd)/../pgo
+if [ -n "${OPENCODE_RUNE_ORDER_LIST:-}" ]; then
+  list=$OPENCODE_RUNE_ORDER_LIST
+elif [ -s "$pgo_dir/startup-order-linux.txt" ]; then
+  list=$pgo_dir/startup-order-linux.txt
+else
+  list=$pgo_dir/startup-order.txt
+fi
 
 args=()
 for arg in "$@"; do
@@ -82,8 +90,9 @@ fi
 
 order=$(mktemp "${TMPDIR:-/tmp}/opencode-order.XXXXXX") || exec cc "$@"
 trap 'rm -f "$order" "$order.ranked"' EXIT
-# nm prints an archive's member names and its complaints about members that are not objects: only
-# lines that are Rust names (or main) pass. The two patterns are the list's own (startup-order.sh).
+# nm prints archive member headers (ending in ':') and complaints about non-object members: skip
+# headers and whitespace, and match any listed symbol (Rust, C, or main). The two regexes in plain()
+# are the list's own (startup-order.sh).
 { nm --defined-only --format=just-symbols "${objects[@]}" 2>/dev/null || true; } | awk -v list="$list" '
   function plain(name) {
     sub(/\.llvm\.[0-9]+$/, "", name)
@@ -94,7 +103,7 @@ trap 'rm -f "$order" "$order.ranked"' EXIT
   BEGIN {
     while ((getline line < list) > 0) if (line != "" && line !~ /^#/ && !(line in rank)) rank[line] = ++count
   }
-  /^_R/ || $0 == "main" { key = plain($0); if (key in rank && !($0 in seen)) { seen[$0] = 1; print rank[key] "\t" $0 } }
+  $0 != "" && $0 !~ /[: \t]/ { key = plain($0); if (key in rank && !($0 in seen)) { seen[$0] = 1; print rank[key] "\t" $0 } }
 ' | sort -n -s -k1,1 > "$order.ranked"
 cut -f2 "$order.ranked" > "$order"
 found=$(cut -f1 "$order.ranked" | uniq | wc -l | tr -d ' ')

@@ -132,8 +132,12 @@ fn synthetic_project_id(dir: &str) -> String {
     format!("local_{:016x}", h.finish())
 }
 
-/// Computes Desktop's `server.usedProjectIDs` scope key for a server base URL.
+/// Computes Desktop's `server.usedProjectIDs` scope key (`packages/app/src/runtime/server/scope.ts:25-30`).
 fn used_projects_scope(host: &dyn ProjectsHost, server_base: &str) -> String {
+    let active = host.active_server();
+    if !active.is_sidecar() {
+        return active.scope().to_string();
+    }
     let own = host.own_server_base();
     let key = if own.as_deref() == Some(server_base) || server_base == DEFAULT_SERVER {
         ServerKey::sidecar()
@@ -238,7 +242,7 @@ pub fn used_projects(host: &dyn ProjectsHost) -> Vec<&Project> {
         .used
         .iter()
         .filter_map(|id| projects.iter().find(|p| &p.id == id))
-        .map(|p| clean_dir(&p.directory))
+        .map(|p| opencode_servers::home::same_directory_key(&p.directory))
         .collect();
     let mut by_activity: Vec<&Project> = projects.iter().collect();
     by_activity.sort_by_key(|p| std::cmp::Reverse(p.active));
@@ -246,7 +250,7 @@ pub fn used_projects(host: &dyn ProjectsHost) -> Vec<&Project> {
     by_activity
         .into_iter()
         .filter(|p| {
-            let dir = clean_dir(&p.directory);
+            let dir = opencode_servers::home::same_directory_key(&p.directory);
             used_dirs.contains(&dir) && seen_dirs.insert(dir)
         })
         .collect()
@@ -272,12 +276,12 @@ pub fn organized_projects(host: &dyn ProjectsHost) -> Vec<&Project> {
 
 /// Server projects this client hasn't added or has hidden from its used list.
 pub fn other_projects(host: &dyn ProjectsHost) -> Vec<&Project> {
-    let used_dirs: HashSet<String> = used_projects(host).into_iter().map(|p| clean_dir(&p.directory)).collect();
+    let used_dirs: HashSet<String> = used_projects(host).into_iter().map(|p| opencode_servers::home::same_directory_key(&p.directory)).collect();
     let mut seen = HashSet::new();
     host.projects()
         .iter()
         .filter(|p| {
-            let d = clean_dir(&p.directory);
+            let d = opencode_servers::home::same_directory_key(&p.directory);
             !used_dirs.contains(&d) && seen.insert(d)
         })
         .collect()
@@ -286,11 +290,11 @@ pub fn other_projects(host: &dyn ProjectsHost) -> Vec<&Project> {
 /// Removes project `id` from this client's used list (`HomeProjects` Close); the server keeps it.
 pub fn hide_project(host: &mut dyn ProjectsHost, id: &str, tx: &mut Tx) {
     tx.instant();
-    let dir = host.project(id).map(|p| clean_dir(&p.directory));
+    let dir = host.project(id).map(|p| opencode_servers::home::same_directory_key(&p.directory));
     let drop_ids: HashSet<String> = host
         .projects()
         .iter()
-        .filter(|p| p.id == id || dir.as_deref().is_some_and(|d| clean_dir(&p.directory) == d))
+        .filter(|p| p.id == id || dir.as_deref().is_some_and(|d| opencode_servers::home::same_directory_key(&p.directory) == d))
         .map(|p| p.id.clone())
         .collect();
     {
@@ -345,7 +349,7 @@ fn project_exactly_at<'a>(host: &'a dyn ProjectsHost, dir: &str, id: &str) -> Op
         return None;
     }
     // Its checkout, or one of its worktrees: a sandbox, or one the server's inventory lists.
-    let at = |p: &&Project| p.directory == dir || host.has_worktree_at(p, dir);
+    let at = |p: &&Project| path::same(path::trim(&p.directory), dir) || host.has_worktree_at(p, dir);
     host.project(id).filter(at).or_else(|| host.projects().iter().find(at))
 }
 

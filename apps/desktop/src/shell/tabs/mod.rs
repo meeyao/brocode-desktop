@@ -308,6 +308,27 @@ pub fn load_projects(server: &str) -> Option<Vec<String>> {
     Some(list.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
 }
 
+/// Project IDs used on `key` (`ServerScope.fromServerKey`, `runtime/server/scope.ts:25-30`),
+/// falling back to `server_base` for legacy address-keyed entries.
+pub fn load_projects_for_key(key: &ServerKey, server_base: &str) -> Option<Vec<String>> {
+    let v = crate::storage::json(GLOBAL, "server")?;
+    let primary = key.scope();
+    let list = v["usedProjectIDs"]
+        .get(primary.as_str())
+        .or_else(|| {
+            if key.is_sidecar() {
+                return None;
+            }
+            // Legacy address-keyed fallback for non-sidecar servers: never read sidecar's "local".
+            let fallback = ServerKey::new(server_base).scope();
+            (fallback.as_str() != opencode_kit::servers::ServerScope::LOCAL && fallback != primary)
+                .then(|| v["usedProjectIDs"].get(fallback.as_str()))
+                .flatten()
+        })?
+        .as_array()?;
+    Some(list.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
+}
+
 /// The scope Desktop keys a server's projects by (`ServerKey::scope`): the app's own server's
 /// is `local`.
 fn scope(server: &str) -> String {

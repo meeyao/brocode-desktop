@@ -4,8 +4,6 @@
 //! models to start with once connected. `session` changes whenever the provider does, so a
 //! result for a provider the dialog left is stale.
 
-use std::collections::HashSet;
-
 use opencode_kit::integration::MethodKind;
 
 use crate::machine::{self as conn, Effect as ConnEffect, Event as ConnEvent, Screen, State as Conn};
@@ -49,14 +47,14 @@ pub enum Step {
     Claude { back: ReturnTo, phase: ClaudePhase, connect: Conn },
     /// A Console workspace with no models yet; `pending` when its providers hadn't loaded.
     NoModels { back: ReturnTo, pending: bool, connect: Conn },
-    Models { selected: String, collapsed: HashSet<String> },
+    Models,
 }
 
 impl Step {
     pub fn connect(&self) -> Option<&Conn> {
         match self {
             Self::Accounts { connect, .. } | Self::Connect { connect, .. } | Self::Claude { connect, .. } | Self::NoModels { connect, .. } => Some(connect),
-            Self::Models { .. } => None,
+            Self::Models => None,
         }
     }
 
@@ -66,7 +64,7 @@ impl Step {
             Self::Connect { back, copied, .. } => Self::Connect { back, copied, connect: c },
             Self::Claude { back, phase, .. } => Self::Claude { back, phase, connect: c },
             Self::NoModels { back, pending, .. } => Self::NoModels { back, pending, connect: c },
-            m @ Self::Models { .. } => m,
+            Self::Models => Self::Models,
         }
     }
 
@@ -126,21 +124,19 @@ pub enum Event {
     ClaudeCheck { replacing: Vec<String> },
     ClaudeStatus { problem: bool, models: bool },
     ClaudeTimedOut { session: u32, check: u32 },
-    ClaudeConfirmed { session: u32, check: u32, problem: bool, first: Option<String> },
+    ClaudeConfirmed { session: u32, check: u32, problem: bool, has_models: bool },
     LinkCopied { session: u32, attempt_id: String, copied: bool },
-    ModelSelected(String),
-    GroupCollapsed { provider: String, collapsed: bool },
     ModelConfirmed(String),
     Navigate(BackTarget),
     Disposed,
 }
 
 /// The catalogs after a refresh: whether the Console's workspace providers were still loading,
-/// and the first model the connection offers.
+/// and whether the connection offers any models.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Snapshot {
     pub pending: bool,
-    pub first: Option<String>,
+    pub has_models: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -225,7 +221,7 @@ pub fn transition(d: &Dialog, event: Event) -> Transition {
         e => match &p.step {
             Step::Accounts { action, connect } => account(d, p, action, connect, e),
             Step::Claude { back, phase, connect } => claude(d, p, *back, phase, connect, e),
-            Step::Models { selected, collapsed } => models(d, p, selected, collapsed, e),
+            Step::Models => models(d, p, e),
             Step::Connect { back, connect, .. } => match e {
                 Event::LinkCopied { session, attempt_id, copied }
                     if session == d.session && conn::authorization(connect).is_some_and(|a| a.attempt == attempt_id) =>
@@ -276,7 +272,7 @@ pub fn back_target(d: &Dialog) -> Option<BackTarget> {
     let p = d.provider.as_ref()?;
     let picker = (!d.standalone).then_some(BackTarget::Picker);
     match &p.step {
-        Step::Models { .. } => None,
+        Step::Models => None,
         Step::Accounts { .. } => picker,
         Step::NoModels { .. } => Some(BackTarget::Methods),
         Step::Claude { back, .. } => {
@@ -443,11 +439,11 @@ fn claude(d: &Dialog, p: &Provider, back: ReturnTo, phase: &ClaudePhase, connect
         Event::ClaudeTimedOut { session, check } if session == d.session && *phase == (ClaudePhase::Checking { check }) => {
             set(ClaudePhase::TimedOut { check }, vec![])
         }
-        Event::ClaudeConfirmed { session, check, problem, first } if session == d.session && *phase == (ClaudePhase::Confirming { check }) => {
+        Event::ClaudeConfirmed { session, check, problem, has_models } if session == d.session && *phase == (ClaudePhase::Confirming { check }) => {
             if problem {
                 return set(ClaudePhase::Idle, vec![]);
             }
-            let (next, effects) = finish(d, p, first, None, ReturnTo::Picker);
+            let (next, effects) = finish(d, p, has_models, None, ReturnTo::Picker);
             (next, [vec![Effect::Reveal(p.id.clone())], effects].concat())
         }
         _ => same,
@@ -458,18 +454,8 @@ pub fn claude_checking(phase: &ClaudePhase, connect: &Conn) -> bool {
     matches!(phase, ClaudePhase::Checking { .. } | ClaudePhase::Confirming { .. }) || matches!(connect, Conn::Starting(_) | Conn::Refreshing(..))
 }
 
-fn models(d: &Dialog, p: &Provider, selected: &str, collapsed: &HashSet<String>, e: Event) -> Transition {
+fn models(d: &Dialog, p: &Provider, e: Event) -> Transition {
     match e {
-        Event::ModelSelected(key) => (with_step(d, p, Step::Models { selected: key, collapsed: collapsed.clone() }), vec![]),
-        Event::GroupCollapsed { provider, collapsed: shut } => {
-            let mut c = collapsed.clone();
-            if shut {
-                c.insert(provider);
-            } else {
-                c.remove(&provider);
-            }
-            (with_step(d, p, Step::Models { selected: selected.to_owned(), collapsed: c }), vec![])
-        }
         Event::ModelConfirmed(key) => {
             let next = Dialog { completed: true, provider: Some(Provider { closed: true, ..p.clone() }), ..d.clone() };
             (next, vec![Effect::Close, Effect::Apply(key)])
@@ -515,16 +501,16 @@ fn connect_transition(d: &Dialog, p: &Provider, step: &Step, (next, effects): co
         let step = Step::NoModels { back, pending: true, connect: next };
         return (with_step(&moved, &moved_p, step), reveal);
     }
-    let (dialog, effects) = finish(&moved, &moved_p, catalog.and_then(|c| c.first), Some(next), back);
+    let (dialog, effects) = finish(&moved, &moved_p, catalog.is_some_and(|c| c.has_models), Some(next), back);
     (dialog, [reveal, effects].concat())
 }
 
 /// As the TUI: every connection goes on to its models; a Console connection with none stays so
 /// the workspace can be fixed.
-fn finish(d: &Dialog, p: &Provider, first: Option<String>, connect: Option<Conn>, back: ReturnTo) -> Transition {
+fn finish(d: &Dialog, p: &Provider, has_models: bool, connect: Option<Conn>, back: ReturnTo) -> Transition {
     let toast = vec![Effect::Toast(p.id.clone())];
-    if let Some(first) = first {
-        return (with_step(d, p, Step::Models { selected: first, collapsed: HashSet::new() }), toast);
+    if has_models {
+        return (with_step(d, p, Step::Models), toast);
     }
     if p.id == CONSOLE
         && let Some(connect) = connect
@@ -546,7 +532,7 @@ pub enum Frame {
 pub fn frame(d: &Dialog) -> Frame {
     match d.provider.as_ref().map(|p| &p.step) {
         None => Frame::Picker,
-        Some(Step::Models { .. }) => Frame::Models,
+        Some(Step::Models) => Frame::Models,
         Some(Step::Accounts { .. }) => Frame::Accounts,
         Some(_) => Frame::Provider,
     }
@@ -567,7 +553,7 @@ pub enum Body {
 pub fn body(d: &Dialog) -> Body {
     let Some(p) = &d.provider else { return Body::Picker };
     match &p.step {
-        Step::Models { .. } => Body::Models,
+        Step::Models => Body::Models,
         Step::Accounts { .. } => Body::Accounts,
         _ if matches!(p.step.connect(), Some(Conn::Failed(..))) => Body::Screen(Screen::Failed),
         Step::Claude { phase, connect, .. } => Body::Claude {

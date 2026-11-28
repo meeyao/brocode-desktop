@@ -294,9 +294,18 @@ fn install_on_quit(platform: std::sync::Arc<dyn platform::Platform>) {
     }
 }
 
+/// Set when an explicit update handoff initiates a quit or relaunch (so the background service
+/// stays alive for the replacement app, matching `endsApp` in `lifecycle/machine.ts:107`).
+static HANDOFF_QUIT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Whether this quit installs an update (its helper replaces the app once this process exits).
 pub fn installs_on_quit() -> bool {
     QUIT_INSTALL.lock().unwrap_or_else(|e| e.into_inner()).is_some()
+}
+
+/// Whether an updater handoff triggered this quit or relaunch.
+pub fn handoff_quit() -> bool {
+    HANDOFF_QUIT.load(std::sync::atomic::Ordering::Acquire)
 }
 
 /// Waits for an install-on-quit hand-off to finish starting its helper, which must exist before
@@ -467,8 +476,14 @@ pub fn poll(s: &mut dyn UpdaterHost, tx: &mut Tx) -> bool {
         s.toast_fail(opencode_i18n::t!("common.requestFailed").into(), err);
     }
     match (quit, relaunch) {
-        (true, true) => tx.relaunch(),
-        (true, false) => tx.quit(),
+        (true, true) => {
+            HANDOFF_QUIT.store(true, std::sync::atomic::Ordering::Release);
+            tx.relaunch();
+        }
+        (true, false) => {
+            HANDOFF_QUIT.store(true, std::sync::atomic::Ordering::Release);
+            tx.quit();
+        }
         (false, _) => {}
     }
     tx.instant();

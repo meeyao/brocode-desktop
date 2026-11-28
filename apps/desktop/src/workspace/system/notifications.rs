@@ -69,6 +69,10 @@ impl NotificationsHost for App {
         }
     }
 
+    fn is_window_focused(&self) -> bool {
+        crate::windows::app_focused(self)
+    }
+
     fn window_id(&self) -> &str {
         &self.window.id
     }
@@ -97,12 +101,6 @@ impl NotificationsHost for App {
         self.session(session_id).is_none_or(|s| s.parent.is_none())
     }
 
-    fn has_running_child(&self, session_id: &str) -> bool {
-        self.running
-            .iter()
-            .any(|c| c != session_id && self.session(c).and_then(|s| s.parent.as_deref()) == Some(session_id))
-    }
-
     fn is_session_silenced(&self, session_id: &str) -> bool {
         crate::session_menu::preferences::silenced(self, crate::servers::runtime::active(self), session_id)
     }
@@ -113,18 +111,18 @@ impl NotificationsHost for App {
 
     fn is_tab_open(&self, session_id: &str) -> bool {
         let server = crate::servers::runtime::active(self);
-        self.tabs.iter().any(|t| t.id == session_id && t.server == *server)
+        self.tabs.iter().any(|t| !t.is_draft() && t.id == session_id && t.server == *server)
     }
 
     fn tab_title(&self, session_id: &str) -> Option<String> {
         let server = crate::servers::runtime::active(self);
-        let tab = self.tabs.iter().find(|t| t.id == session_id && t.server == *server)?;
+        let tab = self.tabs.iter().find(|t| !t.is_draft() && t.id == session_id && t.server == *server)?;
         let title = self.session(session_id).map_or(tab.title.as_str(), |s| s.title.as_str());
         Some(title.to_owned())
     }
 
     fn has_tab_for_root(&self, root_session_id: &str) -> bool {
-        self.tabs.iter().any(|t| t.id == root_session_id)
+        self.tabs.iter().any(|t| !t.is_draft() && t.id == root_session_id)
     }
 
     fn has_pending_request(&self, request_id: &str) -> bool {
@@ -133,6 +131,23 @@ impl NotificationsHost for App {
 
     fn read_requests(&mut self, session_id: &str) {
         App::read_requests(self, session_id);
+    }
+
+    fn activate_window(&mut self, token: Option<&str>) {
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(handle) = crate::windows::handle(&self.window.id) {
+                match token.filter(|t| !t.is_empty()) {
+                    Some(token) => handle.activate(token),
+                    None => handle.focus(),
+                }
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = token;
+            rune_notify::bring_to_front();
+        }
     }
 
     fn open_session_from_notification(&mut self, server: &ServerKey, session_id: &str, tx: &mut Tx) {
@@ -172,7 +187,7 @@ impl NotificationsHost for App {
 /// Posts the notification event `e` calls for, if any (from `App::react`).
 pub fn event(app: &mut App, e: &crate::events::StreamEvent, sid: &str) {
     #[cfg(not(target_arch = "wasm32"))]
-    notify_event(app, &e.ty, &e.data, sid, &mut |want| crate::events::StreamEvent::take(&e.notice, want));
+    notify_event(app, &e.ty, &e.data, sid, e.done.running_child, &mut |want| crate::events::StreamEvent::take(&e.notice, want));
     #[cfg(target_arch = "wasm32")]
     let _ = (app, e, sid);
 }

@@ -26,7 +26,9 @@ pub mod pipe;
 mod png;
 mod rpc;
 pub mod sw_wake;
+mod tab_lifecycle;
 pub mod web_nav;
+use tab_lifecycle::ExtTabLifecycle;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
@@ -143,6 +145,7 @@ pub(super) struct ExtTab {
     pub height: i32,
     pub muted: bool,
     pub audible: bool,
+    pub lifecycle: ExtTabLifecycle,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -811,18 +814,42 @@ impl ExtensionHost {
                 t.active = false;
             }
         }
-        self.tabs.push(ExtTab {
-            engine_tab_id,
-            url: url.to_owned(),
-            title: String::new(),
-            loading: true,
-            active: visible_active,
-            agent_driven,
-            width,
-            height,
-            muted: false,
-            audible: false,
-        });
+        let woke_tab = if let Some(existing) = self.tabs.iter_mut().find(|t| t.engine_tab_id == engine_tab_id) {
+            let was_discarded = existing.lifecycle.is_discarded();
+            existing.url = url.to_owned();
+            existing.loading = true;
+            existing.active = visible_active;
+            existing.agent_driven = agent_driven;
+            existing.width = width;
+            existing.height = height;
+            existing.audible = false;
+            existing.lifecycle = ExtTabLifecycle::Live;
+            was_discarded.then(|| existing.clone())
+        } else {
+            self.tabs.push(ExtTab {
+                engine_tab_id,
+                url: url.to_owned(),
+                title: String::new(),
+                loading: true,
+                active: visible_active,
+                agent_driven,
+                width,
+                height,
+                muted: false,
+                audible: false,
+                lifecycle: ExtTabLifecycle::Live,
+            });
+            None
+        };
+        if let Some(tab) = woke_tab {
+            if !tab.agent_driven {
+                self.emit_tab_updated(&tab, json!({ "discarded": false }), false);
+            }
+            // Clear stale Chromium tab ID now that a new browser was spawned so probing binds the fresh ID.
+            for map in self.ext_tab_ids.values_mut() {
+                map.remove(&engine_tab_id);
+            }
+        }
         if !agent_driven {
             if !self.window_created {
                 if width > 0 && height > 0 {
@@ -1089,7 +1116,7 @@ impl ExtensionHost {
         self.reply_err(sid, req_id, error);
     }
 
-    fn emit_tab_updated(&mut self, tab: &ExtTab, change: Value, needs_access: bool) {
+    pub(super) fn emit_tab_updated(&mut self, tab: &ExtTab, change: Value, needs_access: bool) {
         if tab.agent_driven {
             return;
         }
@@ -1222,6 +1249,7 @@ impl ExtensionHost {
     pub(super) fn has_unbound_visible_tab_for(&self, ext_id: &str) -> bool {
         let map = self.ext_tab_ids.get(ext_id);
         self.visible_tabs()
+            .filter(|t| !t.lifecycle.is_discarded())
             .any(|t| map.is_none_or(|m| !m.contains_key(&t.engine_tab_id)))
     }
 

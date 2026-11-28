@@ -318,9 +318,6 @@ pub struct Ready {
     pub server: Option<Server>,
     pub beta_tabs: Option<Vec<crate::tabs::Tab>>,
     pub first: Option<Result<First, String>>,
-    /// Nothing accepted a connection at the address, and the reach watcher tries it from now on
-    /// (`Server::watch_reach`): the launch waits for it rather than trying on a timer.
-    pub refused: bool,
     /// The restored session's newest page, asked for beside the first reads, for the session's
     /// reader to take up when the window connects (`Pages::live`).
     pub page: Option<session_pages::Early>,
@@ -500,7 +497,7 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
                 let early = ask_page(&candidate, page.clone());
                 if let Ok(first @ Ok(_)) = head.first.recv() {
                     let beta_tabs = beta_tabs.then(crate::tabs::from_beta).flatten();
-                    out.send(Ready { server: Some(candidate), beta_tabs, first: Some(first), refused: false, page: early }).ok();
+                    out.send(Ready { server: Some(candidate), beta_tabs, first: Some(first), page: early }).ok();
                     if let Some(w) = wake {
                         w();
                     }
@@ -527,6 +524,7 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
                 let (actual, reached) = probe(&server, discover_local, Duration::ZERO, registered_up);
                 (actual, reached, Some(err))
             }
+            None if !discover_local => (server.clone(), true, None),
             None => {
                 let (actual, reached) = probe(&server, discover_local, grace, registered_up);
                 (actual, reached, None)
@@ -534,28 +532,25 @@ pub(super) fn spawn_probe_waking(s: &App, beta_tabs: bool, fallback_fixture: boo
         };
         let ready = if !reached {
             if fallback {
-                Ready { server: None, beta_tabs: None, first: None, refused: false, page: None }
+                Ready { server: None, beta_tabs: None, first: None, page: None }
             } else {
                 let msg = start_err.unwrap_or_else(|| format!("No brocode server responded at {}", actual.base));
-                // `service.json` may name another port next time, so a discovered server keeps
-                // its timer.
-                let refused = !discover_local;
-                if refused {
-                    actual.watch_reach(wake.clone());
-                }
-                Ready { server: Some(actual), beta_tabs: None, first: Some(Err(msg)), refused, page: None }
+                Ready { server: Some(actual), beta_tabs: None, first: Some(Err(msg)), page: None }
             }
         } else {
-            // The window counts its patience from here (`poll`).
-            REACHED.store(true, Ordering::Relaxed);
-            took.set(Instant::now()).ok();
-            if let Some(w) = &wake {
-                w();
+            if discover_local {
+                // Only set `REACHED` / `took` after a verified local reach so remote timeouts
+                // never stand in sidecar's saved list or falsely report `Link::Slow`.
+                REACHED.store(true, Ordering::Relaxed);
+                took.set(Instant::now()).ok();
+                if let Some(w) = &wake {
+                    w();
+                }
             }
             let beta_tabs = beta_tabs.then(crate::tabs::from_beta).flatten();
             let page = ask_page(&actual, page);
             let first = First::fetch(&actual);
-            Ready { server: Some(actual), beta_tabs, first: Some(first), refused: false, page }
+            Ready { server: Some(actual), beta_tabs, first: Some(first), page }
         };
         out.send(ready).ok();
         if let Some(w) = wake {
@@ -647,7 +642,7 @@ impl App {
         // A fresh profile has used no projects yet: Home lists none, as Desktop's
         // `usedProjectIDs` starts empty.
         let saved_projects = match &*self.source {
-            Source::Live { server, .. } => Some(crate::tabs::load_projects(&server.base).unwrap_or_default()),
+            Source::Live { server, .. } => Some(crate::tabs::load_projects_for_key(crate::servers::runtime::active(self), &server.base).unwrap_or_default()),
             Source::Fixture => None,
         };
         self.init_used_projects(saved_projects);
@@ -672,7 +667,7 @@ pub(super) fn connect(s: &mut App, tx: &mut Tx) {
     missing.dedup();
     s.set_media_fetch();
     if let (Source::Live { server, requests, writes, .. }, Some(waker)) = (&mut *s.source, (*s.waker).clone()) {
-        s.pages.set(session_pages::Pages::live(server.clone(), waker.clone(), s.launch.early_page.take()));
+        s.pages.set(session_pages::Pages::live(server.clone(), waker.clone(), s.launch.early_page.take(), s.composer_ext.attach.store.image_cache()));
         let inbox_wake = s.launch.inbox_wake.clone().unwrap_or(waker);
         let (r, w, inbox) = crate::windows::connect(server, inbox_wake.clone());
         *writes = Some(w);

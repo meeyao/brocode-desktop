@@ -14,6 +14,9 @@ pub fn words(error: &WireError) -> &'static str {
         WireKind::NotOpenCode { .. } => return "the answer didn't come from Brocode",
         _ => {}
     }
+    if error.is_skill_load_error() {
+        return "couldn't load a skill";
+    }
     match error.status() {
         Some(401) => "sign in to Brocode",
         Some(403) => "permission denied",

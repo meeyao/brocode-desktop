@@ -1293,7 +1293,7 @@ impl ExtensionHost {
         let map = self.ext_tab_ids.entry(ext_id.to_owned()).or_default();
         let last_known = self.ext_last_known_session_id.entry(ext_id.to_owned()).or_insert(0);
         for tab in &self.tabs {
-            if tab.agent_driven || map.contains_key(&tab.engine_tab_id) {
+            if tab.agent_driven || tab.lifecycle.is_discarded() || map.contains_key(&tab.engine_tab_id) {
                 continue;
             }
             if let Some(pos) = available.iter().position(|(_, u)| !u.is_empty() && u == &tab.url) {
@@ -1307,7 +1307,7 @@ impl ExtensionHost {
         let remaining_unbound: Vec<u64> = self
             .tabs
             .iter()
-            .filter(|t| !t.agent_driven && !map.contains_key(&t.engine_tab_id))
+            .filter(|t| !t.agent_driven && !t.lifecycle.is_discarded() && !map.contains_key(&t.engine_tab_id))
             .map(|t| t.engine_tab_id)
             .collect();
         if remaining_unbound.len() == 1 && available.len() == 1 {
@@ -1337,6 +1337,7 @@ impl ExtensionHost {
         }
         if let Some(tab) = self.tabs.iter().find(|t| {
             !t.agent_driven
+                && !t.lifecycle.is_discarded()
                 && !map.contains_key(&t.engine_tab_id)
                 && (t.url == url || t.url == "about:blank")
         }) {

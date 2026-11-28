@@ -57,6 +57,10 @@ impl UserError {
                 Some(m) => (format!("{server} doesn't allow this. It says:"), Some(m), None),
                 None => (format!("{server} doesn't allow this."), None, None),
             },
+            WireKind::Status { tag: Some(tag), message, .. } if tag == "SkillLoadError" => match theirs(message) {
+                Some(m) => (format!("{server} couldn't load a skill. It says:"), Some(m), None),
+                None => (format!("{server} couldn't load a skill."), None, None),
+            },
             WireKind::Status { status, message, .. } if *status >= 500 => match theirs(message) {
                 Some(m) => (format!("{server} hit an error. It says:"), Some(m), Some(RETRY_LOGS)),
                 None => (format!("{server} hit an error (HTTP {status})."), None, Some(RETRY_LOGS)),

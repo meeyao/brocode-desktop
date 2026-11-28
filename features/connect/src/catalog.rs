@@ -29,18 +29,18 @@ pub struct Catalogs {
 }
 
 impl Catalogs {
-    /// The integrations at `dir` (the server's default when none), once read.
+    /// The integrations at `dir` (falling back to the server's default slot when `dir` is not yet cached).
     pub fn integrations(&self, dir: Option<&str>) -> Option<&[Integration]> {
-        self.integrations.get(&slot(dir)).map(Vec::as_slice)
+        self.integrations.get(&slot(dir)).or_else(|| self.integrations.get("")).map(Vec::as_slice)
     }
 
     pub fn integration_of(&self, dir: Option<&str>, id: &str) -> Option<&Integration> {
         self.integrations(dir)?.iter().find(|i| i.id == id)
     }
 
-    /// The providers the server runs at `dir`, once read.
+    /// The providers the server runs at `dir` (falling back to the default slot when `dir` is not yet cached).
     pub fn provider_infos(&self, dir: Option<&str>) -> Option<&[ProviderInfo]> {
-        self.providers.get(&slot(dir)).map(Vec::as_slice)
+        self.providers.get(&slot(dir)).or_else(|| self.providers.get("")).map(Vec::as_slice)
     }
 
     /// Puts a scene's integrations and providers in the server's default slot, as a sync would.

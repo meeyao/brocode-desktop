@@ -258,10 +258,15 @@ fn open(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Result<()> {
             let url = if spec.url.trim().is_empty() { "about:blank" } else { spec.url.as_str() };
             let candidate = browser_pane::with_scheme(url);
             let driver = scope.driver(s);
-            // The person opens a blank tab from the browser's own chrome (the Browser launcher, New
-            // tab): opening the browser here takes it back from another window that holds the
-            // session (`packages/gui-plugins/src/browser/model.ts` `open`).
-            if driver.is_none() && url == "about:blank" && let Some(sid) = &sid {
+            let target_pane = match spec.pane.as_deref() {
+                Some("side") => Some(crate::panels::SessionPane::Side),
+                Some("split") => Some(crate::panels::SessionPane::Split),
+                Some("bottom") => Some(crate::panels::SessionPane::Bottom),
+                _ => None,
+            };
+            // Opening a page from the browser's own chrome (New tab bar, Recent pages, shortcut)
+            // takes the session's browser back from another window (`model.ts:868`, opencode#66818).
+            if driver.is_none() && scope.is_builtin_browser && let Some(sid) = &sid {
                 crate::surfaces::browser::rpc::person_came(s, sid);
             }
             // Third-party plugins may never mint preview/artifact grants (`notes/review-rd281.md` §9).
@@ -274,7 +279,7 @@ fn open(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Result<()> {
                 let refused_id = s.open_refused_browser_tab(
                     sid.as_deref(),
                     "browser.address.web",
-                    None,
+                    target_pane,
                     spec.background != Some(true),
                 );
                 if let Some(driver) = driver {
@@ -285,12 +290,12 @@ fn open(lua: &Lua, a: MultiValue, done: Completer) -> mlua::Result<()> {
                 s.open_new_controlled_browser_tab_for_session(
                     sid.as_deref(),
                     url,
-                    None,
+                    target_pane,
                     spec.background != Some(true),
                     driver,
                 )
             } else {
-                s.open_new_browser_tab_for_session(sid.as_deref(), url, None, spec.background != Some(true))
+                s.open_new_browser_tab_for_session(sid.as_deref(), url, target_pane, spec.background != Some(true))
             };
             done.complete(Data::String(id.to_string()));
         }));
@@ -483,6 +488,14 @@ fn tab_methods(lua: &Lua) -> mlua::Result<Table> {
             lua.create_function(move |lua, this: Table| {
                 later(lua, &this, "BrowserTab", move |s, id, _| {
                     if name != "Stop" { s.workspace_panes.browser.host.clear_refusal(id); }
+                    if name == "Reload" {
+                        s.workspace_panes.browser.proxy_wake_tried.remove(&id);
+                        if s.workspace_panes.browser.host.tab(id).is_some_and(|t| t.residency().is_hibernated()) {
+                            s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id));
+                            return;
+                        }
+                        s.ensure_preview_binding(id);
+                    }
                     let host = &mut s.workspace_panes.browser.host;
                     match name {
                         "Back" => host.back(id),
@@ -599,6 +612,7 @@ pub fn version(app: &App) -> u64 {
     for t in app.workspace_panes.browser.host.tabs() {
         if let Some(d) = &t.device { (&d.preset, d.width, d.height, d.scale.map(f32::to_bits)).hash(&mut h); }
         (t.id, &t.url, &t.title, t.loading, t.can_go_back, t.can_go_forward, t.zoom.to_bits(), t.inspecting, &t.load_error, &t.favicon, &t.refusal, t.rejected).hash(&mut h);
+        (t.cursor as u8).hash(&mut h);
         t.preview.map(|p| p as u8).hash(&mut h);
         t.prompts.hash_state(&mut h);
         t.find.hash_state(&mut h);
@@ -694,6 +708,7 @@ pub fn poll(app: &mut App, tx: &mut Tx) -> bool {
     if let Some(next) = app.workspace_panes.browser.devtools.values().map(|p| p.deadline).min() { tx.wake_after(next.saturating_duration_since(now).max(Duration::from_millis(25))); }
     // A cookie import or Clear browsing data fails at its deadline even when nothing else wakes the app.
     if let Some(next) = app.cookie_jobs_deadline() { tx.wake_after(next.saturating_duration_since(now).max(Duration::from_millis(25))); }
+    if let Some(next) = app.browser_visibility_wake() { tx.wake_after(next.saturating_duration_since(now).max(Duration::from_millis(25))); }
     let picks: Vec<_> = if app.workspace_panes.browser.host.has_picked() { app.workspace_panes.browser.host.drain_picked_elements().collect() } else { Vec::new() };
     for pick in picks {
         app.open_browser_element_comment(pick.clone());

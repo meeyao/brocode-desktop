@@ -117,7 +117,9 @@ pub(crate) fn handle_typed_cdp_call(
             return reply(false, json!({ "message": e }));
         }
         t.cdp_ledger.lock().unwrap().app_attached = true;
-        crate::input_fps::boost(tab_id, &t.host);
+        if t.render_mode.is_awake() {
+            crate::input_fps::boost(tab_id, &t.host);
+        }
         if let Err(msg) = t
             .input_guard
             .lock()
@@ -424,6 +426,9 @@ pub enum CdpPending {
     CopyImageContent { frame_id: String },
     CopyImageWorld { b64: String },
     CopyImageEncode,
+    /// Host-bridged text Copy/Cut (`menu_extras.rs`): isolated world then DOM selection read.
+    CopySelectionWorld { cut: bool, session_id: Option<String> },
+    CopySelectionRead { cut: bool },
 }
 
 pub struct PendingClear {
@@ -553,6 +558,14 @@ wrap_dev_tools_message_observer! {
                 }
                 return;
             }
+            if let CdpPending::CopySelectionWorld { .. } | CdpPending::CopySelectionRead { .. } = pending {
+                let fits = result.is_some_and(|b| b.len() <= crate::menu_extras::MAX_COPIED_TEXT_BYTES + 65_536);
+                if success != 0 && fits {
+                    let val = result.and_then(|b| serde_json::from_slice::<Value>(b).ok()).unwrap_or(Value::Null);
+                    self.copy_selection_step(browser.as_deref(), pending, &val);
+                }
+                return;
+            }
             // Guard 1b (reply-side choke point): re-check committed origin uniformly before ANY
             // `CdpPending` variant (`Raw`, `CookieCount`, `ClearSite`) leaves the engine.
             let (CdpPending::Raw { request_id, .. }
@@ -593,7 +606,9 @@ wrap_dev_tools_message_observer! {
                 | CdpPending::InputGuard
                 | CdpPending::CopyImageContent { .. }
                 | CdpPending::CopyImageWorld { .. }
-                | CdpPending::CopyImageEncode => unreachable!(),
+                | CdpPending::CopyImageEncode
+                | CdpPending::CopySelectionWorld { .. }
+                | CdpPending::CopySelectionRead { .. } => unreachable!(),
                 CdpPending::CookieCount(req_id) => {
                     let count = val.get("cookies").and_then(Value::as_array).map_or(0, Vec::len);
                     let _ = self.out_tx.send(EngineMsg::CdpResponse {
@@ -770,6 +785,12 @@ wrap_dev_tools_message_observer! {
                     }
                     return 1;
                 }
+                if let Some(step @ (CdpPending::CopySelectionWorld { .. } | CdpPending::CopySelectionRead { .. })) = pending {
+                    if ok && raw.len() <= crate::menu_extras::MAX_COPIED_TEXT_BYTES + 65_536 {
+                        self.copy_selection_step(browser.as_deref(), step, &payload);
+                    }
+                    return 1;
+                }
                 let Some(CdpPending::Raw { request_id, max_bytes, typed, reach, .. }) = pending else {
                     return 0;
                 };
@@ -847,11 +868,28 @@ wrap_dev_tools_message_observer! {
                 &self.out_tx,
             );
             obs.send.extend(pk_send);
-            let (mg_consumed, mg_ask) = self.media_gate.observe_event(&method, &params, session_id.as_deref());
-            if let Some(ask) = mg_ask {
-                if let Some(deny) = self.hold_media_ask(browser.as_deref(), ask) {
-                    obs.send.push(deny);
+            let mg = self.media_gate.observe_event(&method, &params, session_id.as_deref());
+            let mg_consumed = mg.consumed;
+            if let Some(audible) = mg.snap_audible_changed {
+                let mut s = self.snap.lock().unwrap();
+                if s.audible != audible {
+                    s.audible = audible;
+                    let _ = self.out_tx.send(EngineMsg::TabUpdate { tab: s.clone() });
                 }
+            }
+            if let Some(audible) = mg.playback_audible_changed {
+                let _ = self.events.send(crate::Event::TabMeta {
+                    tab_id: self.tab_id,
+                    url: None,
+                    title: None,
+                    loading: None,
+                    audible: Some(audible),
+                });
+            }
+            if let Some(ask) = mg.ask
+                && let Some(deny) = self.hold_media_ask(browser.as_deref(), ask)
+            {
+                obs.send.push(deny);
             }
             let (ng_consumed, ng_effect) = self.notification_gate.observe_event(&method, &params, session_id.as_deref());
             match ng_effect {
@@ -1068,6 +1106,35 @@ impl TabCdpObserver {
         if let Some((id, pending, msg)) = next {
             self.id_map.lock().unwrap().insert(id, pending);
             self.send_all(browser, vec![msg]);
+        }
+    }
+
+    /// Advances host-bridged text Copy/Cut (`menu_extras.rs`) without touching CEF's OS clipboard.
+    fn copy_selection_step(&self, browser: Option<&Browser>, step: CdpPending, reply: &Value) {
+        match step {
+            CdpPending::CopySelectionWorld { cut, session_id } => {
+                let id = self.next_cdp_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if let Some(msg) = crate::menu_extras::copy_selection_eval_request(id, reply, session_id.as_deref()) {
+                    self.id_map.lock().unwrap().insert(id, CdpPending::CopySelectionRead { cut });
+                    self.send_all(browser, vec![msg]);
+                }
+            }
+            CdpPending::CopySelectionRead { cut } => {
+                if let Some((text, can_cut)) = crate::menu_extras::copy_selection_result(reply)
+                    && !text.is_empty()
+                    && (!cut || can_cut)
+                {
+                    let _ = self.out_tx.send(EngineMsg::CopiedText { tab_id: self.tab_id, text });
+                    if cut
+                        && let Some(frame) = browser.and_then(|b| {
+                            cef::ImplBrowser::focused_frame(b).or_else(|| cef::ImplBrowser::main_frame(b))
+                        })
+                    {
+                        cef::ImplFrame::del(&frame);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 

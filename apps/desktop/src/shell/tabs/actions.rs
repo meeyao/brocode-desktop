@@ -206,6 +206,10 @@ impl App {
     /// page.
     pub fn select_tab(&mut self, key: &str, tx: &mut Tx) {
         let Some(tab) = self.tab(key).cloned() else { return self.open(key, tx) };
+        let changing = self.current_tab().as_deref() != Some(tab.uid().as_str());
+        if changing && (tab.is_draft() || tab.server != *crate::servers::runtime::active(self)) {
+            crate::shell::memory_reclaim::on_tab_switched(self);
+        }
         // The window works against the tab's server from here on (`servers::runtime`).
         crate::servers::runtime::switch(self, &tab.server);
         if !tab.is_draft() {
@@ -259,9 +263,14 @@ impl App {
         crate::tabs::groups::remember_auto(self);
         let uid = self.tabs[i].uid();
         let shown = self.current_tab().as_deref() == Some(uid.as_str());
-        let next_visible = if shown { crate::tabs::groups::next_visible_after_closing(self, &uid) } else { None };
+        let next_visible = if shown {
+            crate::tabs::groups::next_visible_after_closing(self, &uid)
+                .or_else(|| crate::tabs::sections::next_visible_after_closing(self, &uid))
+        } else {
+            None
+        };
         let tab = self.tabs.remove(i);
-        let (id, server) = (tab.id.clone(), tab.server.clone());
+        let (id, server, closed_session) = (tab.id.clone(), tab.server.clone(), tab.kind == TabKind::Session);
         match tab.kind {
             TabKind::Session => {
                 // Its history goes where its server's sessions are known: the window's own fields
@@ -305,6 +314,14 @@ impl App {
                     // where the closed page's focus would fall to New session.
                     tx.blur();
                 }
+            }
+        }
+        if closed_session {
+            crate::shell::memory_reclaim::on_tab_closed(self, &server, &id, shown);
+            let still_open = self.tabs.iter().any(|t| !t.is_draft() && t.id == id)
+                || matches!(&*self.route, Route::Session { id: rid, .. } if rid == &id);
+            if !still_open {
+                self.hibernate_browser_tabs_for_session(&id);
             }
         }
         self.save_tabs();
@@ -371,7 +388,7 @@ impl App {
                 let root = self.root_of(id);
                 self.tabs.iter().find(|t| t.id == root && !t.is_draft() && t.server == *server).map(Tab::uid)
             }
-            Route::Home => None,
+            Route::Home | Route::Automations => None,
         }
     }
 
@@ -395,11 +412,13 @@ impl App {
             } else {
                 // Under Settings › Group tabs, the groups' shown tabs in the groups' order: a
                 // collapsed group's hidden tabs take no key (`tab-strip.tsx:715-719`, `:916-917`).
-                let shown: Vec<usize> = match crate::tabs::auto_groups::groups(self) {
-                    Some(groups) => groups.iter().flat_map(|g| g.tabs.iter().copied()).collect(),
-                    None => (0..self.tabs.len()).filter(|&i| !crate::tabs::pins::holds(self, &self.tabs[i])).collect(),
+                let shown_uids: Vec<String> = match crate::tabs::auto_groups::groups(self) {
+                    Some(groups) => groups.iter().flat_map(|g| g.tabs.iter().copied()).map(|i| self.tabs[i].uid()).collect(),
+                    None => crate::tabs::sections::visible_uids(self).unwrap_or_else(|| {
+                        (0..self.tabs.len()).filter(|&i| !crate::tabs::pins::holds(self, &self.tabs[i])).map(|i| self.tabs[i].uid()).collect()
+                    }),
                 };
-                for uid in shown.into_iter().map(|i| self.tabs[i].uid()) {
+                for uid in shown_uids {
                     if !order.contains(&uid) {
                         order.push(uid);
                     }
@@ -417,7 +436,7 @@ impl App {
     }
 
     /// The tab, or inbox row, the open page belongs to.
-    fn nav_current(&self) -> Option<String> {
+    pub(crate) fn nav_current(&self) -> Option<String> {
         match (&*self.route, self.tab_layout()) {
             (Route::Session { id, server }, crate::layout_state::TabLayout::Inbox) if !self.settings_open() => Some(tabs::session_uid(server, self.root_of(id))),
             (Route::Session { id, server }, _) if self.settings.navigation_prototype() && !self.settings_open() => {

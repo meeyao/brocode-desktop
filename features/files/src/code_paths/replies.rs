@@ -26,6 +26,7 @@ const MAX_KEY_BYTES: usize = 256 * 1024;
 struct Paths {
     base: String,
     directory: String,
+    home: String,
     entries: HashMap<String, Check>,
     bytes: usize,
     used: u64,
@@ -33,10 +34,11 @@ struct Paths {
 }
 
 impl Paths {
-    fn new(base: &str, directory: &str, serial: u64) -> Self {
+    fn new(base: &str, directory: &str, home: &str, serial: u64) -> Self {
         Self {
             base: base.into(),
             directory: directory.into(),
+            home: home.into(),
             entries: HashMap::new(),
             bytes: 0,
             used: serial,
@@ -102,14 +104,14 @@ impl Replies {
         let mut found = HashSet::new();
         let mut sessions = self.sessions.borrow_mut();
         let directory = directory();
-        if sessions.get(sid).is_none_or(|p| p.base != server.base || p.directory != directory) {
+        if sessions.get(sid).is_none_or(|p| p.base != server.base || p.directory != directory || p.home != home) {
             if sessions.len() >= MAX_SESSIONS
                 && !sessions.contains_key(sid)
                 && let Some(old) = sessions.iter().min_by_key(|(_, p)| p.used).map(|(k, _)| k.clone())
             {
                 sessions.remove(&old);
             }
-            sessions.insert(sid.to_owned(), Paths::new(&server.base, &directory, attempt));
+            sessions.insert(sid.to_owned(), Paths::new(&server.base, &directory, &home, attempt));
         }
         let paths = sessions.get_mut(sid)?;
         paths.used = attempt;

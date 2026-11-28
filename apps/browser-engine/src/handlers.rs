@@ -201,6 +201,7 @@ wrap_render_handler! {
         mach_port: Arc<AtomicU32>,
         out_tx: Output,
         frame_seq: Arc<AtomicU64>,
+        awake: Arc<AtomicBool>,
         frames: FrameRing,
         failures: Failures,
     }
@@ -240,7 +241,7 @@ wrap_render_handler! {
             _dirty: Option<&[Rect]>,
             info: Option<&AcceleratedPaintInfo>,
         ) {
-            if type_ != PaintElementType::default() {
+            if type_ != PaintElementType::default() || !self.awake.load(Ordering::Acquire) {
                 return;
             }
             let Some(info) = info else { return };
@@ -298,7 +299,12 @@ wrap_render_handler! {
             width: i32,
             height: i32,
         ) {
-            if type_ != PaintElementType::default() || buffer.is_null() || width <= 0 || height <= 0 {
+            if type_ != PaintElementType::default()
+                || !self.awake.load(Ordering::Acquire)
+                || buffer.is_null()
+                || width <= 0
+                || height <= 0
+            {
                 return;
             }
             let id = self.frame_seq.fetch_add(1, Ordering::Relaxed) + 1;
@@ -345,6 +351,7 @@ wrap_display_handler! {
         preview: Option<Arc<crate::preview::PreviewGrant>>,
         snap: Arc<Mutex<TabSnapshot>>,
         prompts: Arc<crate::prompts::TabPrompts>,
+        media_gate: Arc<crate::media_gate::TabMediaGate>,
         permissions: Arc<crate::permissions::PermissionTracker>,
         context_scope_id: Option<String>,
         favicon: Arc<crate::favicon::TabFavicon>,
@@ -426,6 +433,7 @@ wrap_display_handler! {
                     url: Some(url.clone()),
                     title: None,
                     loading: None,
+                    audible: None,
                 });
                 emit_web_nav(&self.events, self.tab_id, frame.as_deref(), url, crate::extensions::web_nav::WebNavKind::AddressChanged);
             }
@@ -468,6 +476,7 @@ wrap_display_handler! {
                     url: None,
                     title: Some(display),
                     loading: None,
+                    audible: None,
                 });
             }
         }
@@ -503,6 +512,22 @@ wrap_display_handler! {
             }
             1
         }
+
+        fn on_media_access_change(
+            &self,
+            _browser: Option<&mut Browser>,
+            has_video_access: ::std::os::raw::c_int,
+            has_audio_access: ::std::os::raw::c_int,
+        ) {
+            let active = has_video_access != 0 || has_audio_access != 0;
+            if let Some(audible) = self.media_gate.set_capture(active) {
+                let mut s = self.snap.lock().unwrap();
+                if s.audible != audible {
+                    s.audible = audible;
+                    let _ = self.out_tx.send(EngineMsg::TabUpdate { tab: s.clone() });
+                }
+            }
+        }
     }
 }
 
@@ -513,6 +538,7 @@ wrap_load_handler! {
         preview: Option<Arc<crate::preview::PreviewGrant>>,
         snap: Arc<Mutex<TabSnapshot>>,
         prompts: Arc<crate::prompts::TabPrompts>,
+        media_gate: Arc<crate::media_gate::TabMediaGate>,
         diagnostics: Arc<crate::diagnostics::TabDiagnostics>,
         deferred_initial: Arc<AtomicBool>,
         out_tx: Output,
@@ -532,9 +558,7 @@ wrap_load_handler! {
                 self.prompts.set_pending_top_url(None);
             }
             let mut s = self.snap.lock().unwrap();
-            let waiting_deferred = !loading
-                && s.url.eq_ignore_ascii_case("about:blank")
-                && self.deferred_initial.load(Ordering::Acquire);
+            let waiting_deferred = !loading && self.deferred_initial.load(Ordering::Acquire);
             let effective_loading = loading || waiting_deferred;
             s.loading = effective_loading;
             s.can_go_back = can_go_back != 0;
@@ -545,6 +569,7 @@ wrap_load_handler! {
                 url: None,
                 title: None,
                 loading: Some(effective_loading),
+                audible: None,
             });
         }
 
@@ -559,9 +584,20 @@ wrap_load_handler! {
             emit_web_nav(&self.events, self.tab_id, Some(frame), url.clone(), crate::extensions::web_nav::WebNavKind::Committed);
             if frame.is_main() == 1 {
                 self.prompts.clear_all_ext_frame_tracking();
+                let (_, was_playback) = self.media_gate.reset_audible();
                 let mut s = self.snap.lock().unwrap();
                 s.document += 1;
+                s.audible = false;
                 let _ = self.out_tx.send(EngineMsg::TabUpdate { tab: s.clone() });
+                if was_playback {
+                    let _ = self.events.send(crate::Event::TabMeta {
+                        tab_id: self.tab_id,
+                        url: None,
+                        title: None,
+                        loading: None,
+                        audible: Some(false),
+                    });
+                }
             } else if crate::extensions::manifest::is_extension_scheme(&url) {
                 let fid = CefString::from(&frame.identifier()).to_string();
                 self.prompts.mark_pending_ext_subframe(fid);
@@ -796,6 +832,7 @@ wrap_request_handler! {
         snap: Arc<Mutex<TabSnapshot>>,
         prompt_shared: crate::prompts::PromptShared,
         prompts: Arc<crate::prompts::TabPrompts>,
+        media_gate: Arc<crate::media_gate::TabMediaGate>,
         input_guard: Arc<Mutex<crate::input_guard::InputGuard>>,
         emulation_scale: Arc<std::sync::atomic::AtomicU32>,
         next_cdp_id: Arc<std::sync::atomic::AtomicI32>,
@@ -1242,14 +1279,25 @@ wrap_request_handler! {
                 .unwrap()
                 .reset_all(self.tab_id, &self.out_tx, "The page crashed before input completed.");
             let err_str = error_string.map(CefString::to_string).unwrap_or_default();
+            let (_, was_playback) = self.media_gate.reset_audible();
             let (url, was_loading) = {
                 let mut s = self.snap.lock().unwrap();
                 let was_loading = s.loading;
                 s.loading = false;
+                s.audible = false;
                 s.load_error = Some("page_crashed".into());
                 let _ = self.out_tx.send(EngineMsg::TabUpdate { tab: s.clone() });
                 (s.url.clone(), was_loading)
             };
+            if was_playback {
+                let _ = self.events.send(crate::Event::TabMeta {
+                    tab_id: self.tab_id,
+                    url: None,
+                    title: None,
+                    loading: None,
+                    audible: Some(false),
+                });
+            }
             self.diagnostics.report_renderer_terminated(
                 self.tab_id,
                 status,
@@ -1310,8 +1358,14 @@ pub fn wheel_delta(dx: f32, dy: f32) -> (f32, f32) {
         // WHEEL_PAGESCROLL (u32::MAX) pages instead of lines; keep the default then.
         if read.is_ok() && (1..1000).contains(&value) { value as f32 } else { 3.0 }
     };
-    let units = |px: f32, per_notch: f32| px * 120.0 / (per_notch * 100.0 / 3.0);
-    (units(dx, setting(SPI_GETWHEELSCROLLCHARS)), units(dy, setting(SPI_GETWHEELSCROLLLINES)))
+    let units = |px: f32, action| {
+        if px == 0.0 {
+            0.0
+        } else {
+            px * 120.0 / (setting(action) * 100.0 / 3.0)
+        }
+    };
+    (units(dx, SPI_GETWHEELSCROLLCHARS), units(dy, SPI_GETWHEELSCROLLLINES))
 }
 
 /// The key's `native_key_code`: a macOS virtual key code, or on Windows the `WM_KEYDOWN`

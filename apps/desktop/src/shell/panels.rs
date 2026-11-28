@@ -213,6 +213,23 @@ impl PanelsHost for App {
         crate::plugin_host::panels::launchers(self, ctx)
     }
 
+    fn panel_new_tab_slots(
+        &self,
+        p: &Pal,
+        slot: &str,
+        session_id: &str,
+        pane: SessionPane,
+        width: f32,
+        focus_token: Option<u64>,
+    ) -> Vec<El> {
+        let slug = match pane {
+            SessionPane::Side => "side",
+            SessionPane::Split => "split",
+            SessionPane::Bottom => "bottom",
+        };
+        crate::plugin_host::surfaces::new_tab_slot(self, p, slot, session_id, slug, width, focus_token)
+    }
+
     fn open_panel_entry(&mut self, plugin: &str, id: &str, pane: SessionPane, tx: &mut Tx) {
         crate::plugin_host::panels::open_entry(self, plugin, id, pane, tx);
     }
@@ -292,8 +309,11 @@ impl PanelsHost for App {
 
     fn on_side_tab_closing(&mut self, session_id: &str, key: &str) {
         if let Some(path) = key.strip_prefix("file:").and_then(crate::files::data::file_tab_path) {
-            if let Some(ws) = self.kernel.slots.get_mut(&crate::files::FILES).sessions.get_mut(session_id) {
-                ws.close_preview(&path);
+            let files = self.kernel.slots.get_mut(&crate::files::FILES);
+            files.reads.clear(session_id, &path);
+            files.forget_video_auth(session_id, &path);
+            if let Some(ws) = files.sessions.get_mut(session_id) {
+                ws.close_file(&path);
             }
             crate::files::watch::unwatch(self, session_id, &path);
         }

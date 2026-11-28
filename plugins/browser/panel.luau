@@ -840,4 +840,141 @@ function panel.render(env: Env, view: View, props: PanelProps): ui.Node
     return ui.col({ key = "browser-pane", w = "full", h = "full", minW = 0, fill = "bg-base", clip = true }, items)
 end
 
+-- Browser address bar at the top of the side panel's New tab view (`packages/gui-plugins/src/browser/new-tab.tsx`, opencode#66818).
+function panel.newTabBar(
+    env: Env,
+    view: View,
+    width: number,
+    onEdit: () -> (),
+    onFocus: () -> (),
+    onGo: (url: string) -> (),
+    onForget: (url: string) -> ()
+): ui.Node
+    local barState = address.view(env.state(), address.NEW_TAB_ID, address.BLANK_EPOCH, env.visits())
+    local rightW = 2 * 28 + 4
+    local fieldW = math.max(40, width - 24 - 92 - 8 - 8 - rightW)
+    local fieldItems: { ui.Node } = {}
+    local chosen = barState.chosen
+    if barState.editing and chosen ~= nil and chosen.type == "search" then
+        table.insert(fieldItems, ui.icon("magnifying-glass", { size = 16, color = "icon-weak" }))
+    elseif barState.editing and chosen ~= nil and chosen.type == "page" and chosen.page.icon ~= nil and chosen.page.icon ~= "" then
+        table.insert(fieldItems, ui.image({ src = chosen.page.icon, w = 16, h = 16 }, {
+            ui.icon("outline-globe", { size = 16, color = "icon-weak" }),
+        }))
+    else
+        table.insert(fieldItems, ui.icon("outline-globe", { size = 16, color = "icon-weak" }))
+    end
+    local body: { ui.Node } = {}
+    if barState.editing then
+        table.insert(body, ui.field({
+            key = "browser-address-input",
+            editor = env.editor,
+            variant = "bare",
+            dir = "ltr",
+            placeholder = env.I18n:T("address.search"),
+            keys = { "ArrowUp", "ArrowDown", "Tab", "Shift+Tab", "Escape", "Shift+Delete", "Shift+Backspace" },
+            label = env.I18n:T("address.label"),
+            grow = 1,
+        }))
+    elseif barState.field ~= "" then
+        table.insert(body, display(barState.field, math.max(16, fieldW - 44)))
+    else
+        table.insert(body, text(env.I18n:T("address.search"), "text-faint", { truncate = true, shrink = true, minW = 0 }))
+    end
+    table.insert(fieldItems, ui.box({ key = "browser-address-text", grow = 1, shrink = true, minW = 0, h = "full", clip = true, align = "center" }, {
+        ui.row({ w = "full", h = "full", clip = true, align = "center" }, body),
+    }))
+    local addrField = ui.row({
+        key = "browser-address",
+        cursor = "text",
+        dir = "ltr",
+        grow = 1,
+        shrink = true,
+        minW = 0,
+        h = 28,
+        pl = 8,
+        pr = 8,
+        gap = 6,
+        radius = 6,
+        align = "center",
+        fill = "surface-1",
+        hover = if barState.editing then nil else "surface-2",
+        hoverTransition = "instant",
+        border = if barState.editing then "border-focus" else nil,
+        borderWidth = if barState.editing then 1 else nil,
+        onPress = view:Handler(function()
+            if barState.editing then
+                onFocus()
+            else
+                onEdit()
+            end
+        end),
+    }, fieldItems)
+    local noop = function() end
+    local children: { ui.Node } = {
+        ui.row({ key = "browser-bar", w = "full", h = 43, pt = 1, px = 12, gap = 8, align = "center", fill = "bg-base" }, {
+            ui.row({ align = "center", gap = 4 }, {
+                large(view, "browser-back", "outline-arrow-left", env.I18n:T("common.goBack"), false, noop),
+                large(view, "browser-forward", "outline-arrow-right", env.I18n:T("common.goForward"), false, noop),
+                large(view, "browser-reload", "outline-rotate-clockwise", env.I18n:T("action.reload"), false, noop, { keybind = "browser.reload" }),
+            }),
+            addrField,
+            ui.row({ align = "center", gap = 4 }, {
+                large(view, "browser-inspect", "select-element", env.I18n:T("inspect"), false, noop, { keybind = "browser.inspect" }),
+                large(view, "browser-options", "outline-dots", env.I18n:T("options"), false, noop),
+            }),
+        }),
+        ui.col({ w = "full", h = 1, fill = "border-weak" }),
+    }
+    if barState.listed then
+        local sRows: { ui.Node } = {}
+        local proxyEnv: Env = table.clone(env)
+        proxyEnv.act = function(what: string, _tab: BrowserTab?, arg: any?)
+            if what == "go" then
+                onGo(arg :: string)
+            elseif what == "forget" then
+                onForget(arg :: string)
+            end
+        end
+        for n, r in barState.rows do
+            table.insert(sRows, omniboxRow(proxyEnv, view, nil :: any, n, r, barState.query, fieldW, n == barState.active))
+        end
+        table.insert(children, ui.col({
+            key = "browser-suggestions",
+            role = "list",
+            label = env.I18n:T("address.suggestions"),
+            pin = { left = 12 + 92 + 8 - 8, top = 8 + 28 + 4 },
+            w = fieldW + 16,
+            pad = 8,
+            radius = 12,
+            fill = "bg-base",
+            shadow = "floating",
+        }, sRows))
+    end
+    return ui.col({ key = "browser-bar-frame", w = "full" }, children)
+end
+
+-- Recent browser pages below the side panel's New tab launchers (`new-tab.tsx:66-85`, opencode#66818).
+function panel.newTabRecent(env: Env, view: View, width: number, onOpen: (url: string) -> ()): ui.Node?
+    local list = env.visits()
+    if #list == 0 then
+        return nil
+    end
+    local listW = math.max(120, math.min(560, width - 48))
+    local rows: { ui.Node } = {
+        ui.box({ px = 8, pb = 4 }, {
+            ui.text(env.I18n:T("home.recent"), { size = 13, weight = "regular", lineHeight = 16, color = "text-muted" }),
+        }),
+    }
+    for n, visit in list do
+        if n > address.SUGGESTIONS then
+            break
+        end
+        table.insert(rows, panel.row(view, `browser-new-tab-recent-{n}`, visit, "", listW, false, false, function()
+            onOpen(visit.url)
+        end))
+    end
+    return ui.col({ key = "browser-new-tab-recent", w = "full", pt = 12, gap = 4 }, rows)
+end
+
 return panel

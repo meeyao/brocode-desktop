@@ -219,16 +219,20 @@ void _mi_prim_mem_init( mi_os_mem_config_t* config )
   config->has_virtual_reserve = true; // todo: check if this true for NetBSD?  (for anonymous mmap with PROT_NONE)
   config->has_transparent_huge_pages = unix_detect_thp();
 
-  // disable transparent huge pages for this process?
-  #if (defined(__linux__) || defined(__ANDROID__)) && defined(PR_GET_THP_DISABLE)
+  // disable transparent huge pages for mimalloc mappings?
+  // rune-desktop: on desktop Linux, mark THP disabled in config without calling
+  // prctl(PR_SET_THP_DISABLE, 1), which is inherited across fork/exec into user terminals
+  // and child processes. Instead, unix_mmap applies MADV_NOHUGEPAGE per-VMA to mimalloc's
+  // own mappings. Android keeps upstream's prctl behavior unchanged.
+  #if defined(__linux__) || defined(__ANDROID__)
   if (!mi_option_is_enabled(mi_option_allow_thp)) // disable THP if requested through an option
   {
     config->has_transparent_huge_pages = false;
+    #if defined(__ANDROID__) && defined(PR_GET_THP_DISABLE)
     if (prctl(PR_GET_THP_DISABLE, 0, 0, 0, 0) == 0) {   // -1 on error, 1 if already disabled
-      // Most likely since distros often come with always/madvise settings.
-      // Disabling only for mimalloc process rather than touching system wide settings
       (void)prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0);
     }
+    #endif
   }
   #endif
 }
@@ -409,6 +413,13 @@ static void* unix_mmap(void* addr, size_t size, size_t try_alignment, int protec
   if (p == NULL) {
     *is_large = false;
     p = unix_mmap_prim_aligned(addr, size, try_alignment, protect_flags, flags, fd);
+    #if (defined(__linux__) || defined(__ANDROID__)) && defined(MADV_NOHUGEPAGE)
+    if (p != NULL && !mi_option_is_enabled(mi_option_allow_thp)) {
+      // rune-desktop: opt mimalloc's arena/OS VMAs out of 2 MiB THP promotion per-VMA so
+      // THP=always distros (Fedora, Debian) don't bloat sparse 64 KiB slices to 2 MiB.
+      (void)unix_madvise(p, size, MADV_NOHUGEPAGE);
+    }
+    #endif
     #if !defined(MI_NO_THP)
     if (p != NULL && allow_large && mi_option_is_enabled(mi_option_allow_thp) && _mi_os_canuse_large_page(size, try_alignment)) {
       #if defined(MADV_HUGEPAGE)

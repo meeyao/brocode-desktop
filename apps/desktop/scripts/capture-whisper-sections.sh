@@ -15,4 +15,4 @@ for theme in dark light; do
   story --theme "$theme" --variant "Naming new section" --at 1.2 --snap "$OUT/naming-$theme.png"
   story --theme "$theme" --variant "Collapsed section" --at 1.2 --snap "$OUT/collapsed-$theme.png"
 done
-story --theme dark --variant "Walkthrough" --fps 60 --duration 7.4 --video "$OUT/walkthrough-dark.mp4"
+story --theme dark --variant "Walkthrough" --fps 60 --duration 9.4 --video "$OUT/walkthrough-dark.mp4"

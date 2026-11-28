@@ -38,6 +38,9 @@ pub enum SettingsRequest {
     ReloadPlugins {
         server: ServerKey,
     },
+    ReloadSkills {
+        server: ServerKey,
+    },
     ReloadConsoleSources {
         server: ServerKey,
         active_dir: Option<String>,
@@ -135,6 +138,10 @@ pub enum SettingsReply {
     PluginsReloaded {
         server: ServerKey,
         plugins: Result<Vec<PluginInfo>, ()>,
+    },
+    SkillsReloaded {
+        server: ServerKey,
+        skills: Option<Vec<SkillInfo>>,
     },
     ConsoleSourcesReloaded {
         server: ServerKey,
@@ -244,6 +251,10 @@ pub fn execute_request(srv: &Server, request: SettingsRequest) -> SettingsReply 
         SettingsRequest::ReloadPlugins { server } => {
             let plugins = load_plugins(srv, None);
             SettingsReply::PluginsReloaded { server, plugins }
+        }
+        SettingsRequest::ReloadSkills { server } => {
+            let skills = srv.list_skills(None).ok().map(|ep| ep.into_option().unwrap_or_default());
+            SettingsReply::SkillsReloaded { server, skills }
         }
         SettingsRequest::ReloadConsoleSources { server, active_dir } => {
             let sources = load_console_sources(srv, active_dir.as_deref());
@@ -429,6 +440,15 @@ pub fn apply_reply(host: &mut dyn SettingsHost, reply: SettingsReply, tx: &mut T
             host.settings_pages_mut().extensions.plugins = Some(plugins);
             if let Some(outdated) = flags {
                 extensions::dispatch_update(host, plugin_update::Event::ListLoaded { outdated }, tx);
+            }
+        }
+        SettingsReply::SkillsReloaded { server, skills } => {
+            tx.instant();
+            if host.settings_pages().extensions.server != server {
+                return;
+            }
+            if skills.is_some() {
+                host.settings_pages_mut().extensions.skills = skills;
             }
         }
         SettingsReply::ConsoleSourcesReloaded { server, sources } => {

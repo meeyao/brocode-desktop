@@ -3,6 +3,7 @@
 //! `video`). `App`-independent UI primitives live in `opencode_plugin_runtime::ui_nodes`.
 
 use opencode_plugin_runtime::ui_nodes::{self, dir, named_icon, text_style};
+use opencode_ui::popup::MenuButton as _;
 use rune::{El, TextStyle, Tx, el, row, text};
 use rune_luau::{Data, HostNode, NodeArgs};
 
@@ -20,6 +21,7 @@ pub fn all() -> Vec<HostNode> {
         ui_nodes::node("video", services::images::video_node),
         ui_nodes::node("shimmer", shimmer),
         ui_nodes::node("switch", switch),
+        ui_nodes::node("select", select),
         ui_nodes::node("field", field),
         ui_nodes::node("pill", pill),
         ui_nodes::node("settingsRow", settings_row),
@@ -55,6 +57,60 @@ fn shimmer(a: &mut NodeArgs) -> Result<El, String> {
     let font = text_style(a, TextStyle::new(13.0, 440.0));
     let pal = p(a);
     cx::with_app(|app| session_view::working::shimmer(app, &pal, &words, font, *app.clock)).ok_or_else(|| "ui.shimmer draws only in a render".into())
+}
+
+/// Desktop's `Select` dropdown control (`packages/ui/src/forms/select/select.css:22-45`,
+/// contract 1.12): renders `rune_kit::Select` and opens a `Menu::picker` anchored to its trigger.
+fn select(a: &mut NodeArgs) -> Result<El, String> {
+    let pal = p(a);
+    let key = a.string("key").unwrap_or("select").to_owned();
+    let label = a.string("label").unwrap_or_default().to_owned();
+    let current = a.string("value").unwrap_or_default().to_owned();
+    let placeholder = a.string("placeholder").unwrap_or_default().to_owned();
+    let disabled = a.flag("disabled");
+    let options: Vec<(String, String)> = match a.data("options") {
+        Some(Data::List(items)) => items
+            .iter()
+            .filter_map(|item| {
+                let value = item.get("value").as_str()?.to_owned();
+                let title = item.get("label").as_str().unwrap_or(&value).to_owned();
+                Some((value, title))
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    let shown = options
+        .iter()
+        .find(|(v, _)| *v == current)
+        .map(|(_, l)| l.clone())
+        .unwrap_or_else(|| placeholder.clone());
+    let anchor = format!("{key}-trigger");
+    let open = cx::with_app(|app| app.popup.open_at(&anchor)).unwrap_or(false);
+    let mut trigger = rune_kit::Select::new(key, &[shown.as_str()])
+        .current((!shown.is_empty()).then_some(shown.as_str()))
+        .label(label.clone())
+        .open(open)
+        .trigger(kit(&pal));
+    if disabled {
+        return Ok(opencode_ui::widgets::not_allowed(trigger.disabled(true).layer_opacity(0.5), true));
+    }
+    let on_change = a.press_later("onChange");
+    trigger = trigger.menu_button(anchor.clone(), move |s: &mut App, tx: &mut Tx| {
+        let menu = crate::popup::Menu::picker(label.clone(), options.clone(), &current)
+            .align(rune::Align::Start)
+            .min_width(160.0)
+            .gap(6.0);
+        let on_change = on_change.clone();
+        crate::popup::open(s, menu, anchor.clone(), tx, move |s: &mut App, picked, tx| {
+            if let Some(id) = picked {
+                tx.instant();
+                if let Some(cb) = &on_change {
+                    cb.run(s, tx, vec![("value", Data::String(id.to_owned()))]);
+                }
+            }
+        });
+    });
+    Ok(trigger)
 }
 
 fn switch(a: &mut NodeArgs) -> Result<El, String> {

@@ -13,27 +13,40 @@ fn commit_pages_on_demand() {
         fn mi_version() -> std::ffi::c_int;
         fn mi_option_set(option: std::ffi::c_int, value: std::ffi::c_long);
     }
-    // `mi_option_page_commit_on_demand` is 40 in mimalloc 3.3's `mi_option_t` (mimalloc.h); a
-    // later mimalloc may number it otherwise, so it's only set on the version it was read from.
-    // SAFETY: plain calls into the linked mimalloc; an option set after start applies to the
-    // pages taken from then on.
+    // Verified against vendor/libmimalloc-sys/c_src/mimalloc/v3/include/mimalloc.h (3.3):
+    //   15 = mi_option_purge_delay (default 1000 ms -> 250 ms for faster OS decommit)
+    //   35 = mi_option_page_reclaim_on_free (1 = allow cross-thread reclaim of abandoned pages)
+    //   40 = mi_option_page_commit_on_demand (1 = commit pages in 16 KiB steps on demand)
+    // Guarded on mimalloc 3.3 so a later version with renumbered options is never misconfigured.
+    // SAFETY: plain calls into the linked mimalloc before worker threads spin up.
     unsafe {
         if mi_version() / 100 == 303 {
+            mi_option_set(15, 250);
+            mi_option_set(35, 1);
             mi_option_set(40, 1);
         }
     }
 }
 
-/// `App::rest`: mimalloc collects this thread's heap and purges every free page now; on Windows
-/// the process heap compacts too.
+/// Collects the calling thread's mimalloc heap and purges freed arena slices back to the OS.
+/// Long-lived worker threads call this before parking so cross-thread frees don't stay pinned.
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(unsafe_code)]
-pub(crate) fn purge_free_pages() {
+pub(crate) fn collect_thread_heap() {
     unsafe extern "C" {
         fn mi_collect(force: bool);
     }
-    // SAFETY: a plain call into the linked mimalloc, on the UI thread.
+    // SAFETY: a plain call into the linked mimalloc for the calling thread's theap.
     unsafe { mi_collect(true) }
+}
+
+/// `App::rest`: mimalloc collects this thread's heap and purges every free page now; on Windows
+/// the process heap compacts too. (On Linux/glibc, Rune's own rest trim reclaims C-library arenas
+/// off the UI thread via `App::trim_c_heap_at_rest(true)`.)
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(unsafe_code)]
+pub(crate) fn purge_free_pages() {
+    collect_thread_heap();
     // The process heap (UI Automation, COM, the D3D runtime and driver) keeps freed pages
     // committed; compacting it gives its large free blocks back.
     #[cfg(windows)]
@@ -86,6 +99,7 @@ pub use app::{App, Source, TabStatus};
 pub(crate) use app::{FIXTURE, arg, attended, auto_focus_composer, flag, harness_writes, headless, realtime};
 pub use shell::nav::route::Route;
 pub use shell::panels;
+pub use surfaces::automations;
 pub use surfaces::code_view;
 pub(crate) use stories::scenes::open_scene;
 pub(crate) use tick::{poll, setup, visibility};
@@ -125,37 +139,34 @@ pub(crate) fn init_features() {
     });
 }
 
-/// The app's fonts. Desktop sets every IBM Plex Mono weight below 600 in its Text cut and the rest
-/// in its Bold cut (`index.css`), which a Markdown heading in a diff takes, and italic Plex in its
-/// Text Italic cut (inline code in emphasis). JetBrains Mono is desktop's terminal face
-/// (`terminalDefault`), Nerd Font glyphs included for prompts.
+/// The app's fonts (`packages/app/src/index.css`, `opencode#64797`): Inter (variable) for UI,
+/// and OpenMono Regular (weights below 600), Bold (600 and up), Italic, and Nerd Fonts icons for
+/// both code and the terminal, plus optional CommitMono cuts.
 #[cfg(all(not(target_arch = "wasm32"), not(bundle_assets)))]
 const FONTS: &[&[u8]] = &[
     include_bytes!("../assets/fonts/InterVariable.ttf"),
-    include_bytes!("../assets/fonts/IBMPlexMono-Text.ttf"),
-    include_bytes!("../assets/fonts/IBMPlexMono-Bold.ttf"),
-    include_bytes!("../assets/fonts/IBMPlexMono-TextItalic.ttf"),
+    include_bytes!("../assets/fonts/OpenMono-Regular.ttf"),
+    include_bytes!("../assets/fonts/OpenMono-Bold.ttf"),
+    include_bytes!("../assets/fonts/OpenMono-Italic.ttf"),
+    include_bytes!("../assets/fonts/OpenMono-Icons.ttf"),
     include_bytes!("../assets/fonts/CommitMono-400-Regular.otf"),
     include_bytes!("../assets/fonts/CommitMono-700-Regular.otf"),
     include_bytes!("../assets/fonts/CommitMono-400-Italic.otf"),
     include_bytes!("../assets/fonts/CommitMono-700-Italic.otf"),
-    include_bytes!("../assets/fonts/JetBrainsMonoNerdFontMono-Regular.ttf"),
-    include_bytes!("../assets/fonts/JetBrainsMonoNerdFontMono-Bold.ttf"),
 ];
-/// A packaged macOS app's fonts are files in its bundle (`bundle`), mapped: 7.1 MiB the system does
-/// not read before the exe's first run. A font whose file is missing is left out.
+/// A packaged macOS app's fonts are files in its bundle (`bundle`), mapped so the system does not
+/// read them before the exe's first run. A font whose file is missing is left out.
 #[cfg(bundle_assets)]
 const FONT_FILES: &[&str] = &[
     "InterVariable.ttf",
-    "IBMPlexMono-Text.ttf",
-    "IBMPlexMono-Bold.ttf",
-    "IBMPlexMono-TextItalic.ttf",
+    "OpenMono-Regular.ttf",
+    "OpenMono-Bold.ttf",
+    "OpenMono-Italic.ttf",
+    "OpenMono-Icons.ttf",
     "CommitMono-400-Regular.otf",
     "CommitMono-700-Regular.otf",
     "CommitMono-400-Italic.otf",
     "CommitMono-700-Italic.otf",
-    "JetBrainsMonoNerdFontMono-Regular.ttf",
-    "JetBrainsMonoNerdFontMono-Bold.ttf",
 ];
 #[cfg(bundle_assets)]
 fn fonts() -> &'static [&'static [u8]] {
@@ -166,28 +177,29 @@ fn fonts() -> &'static [&'static [u8]] {
 fn fonts() -> &'static [&'static [u8]] {
     FONTS
 }
-/// In a browser, only the fonts the default appearance draws in: the page fetches Plex's italic and
-/// Commit Mono once its first frame is up (`LATE_FONTS`), and JetBrains Mono, the terminal's (4.8 MB), when a
-/// terminal first attaches (`TERMINAL_FONTS`).
+/// In a browser, only the fonts the default appearance draws in: the page fetches OpenMono's italic
+/// and Commit Mono once its first frame is up (`LATE_FONTS`), and OpenMono's Nerd Fonts icons
+/// (`OpenMono-Icons.ttf`) when a terminal first attaches (`TERMINAL_FONTS`).
 #[cfg(target_arch = "wasm32")]
 const FONTS: &[&[u8]] = &[
     include_bytes!("../assets/fonts/InterVariable.ttf"),
-    include_bytes!("../assets/fonts/IBMPlexMono-Text.ttf"),
-    include_bytes!("../assets/fonts/IBMPlexMono-Bold.ttf"),
+    include_bytes!("../assets/fonts/OpenMono-Regular.ttf"),
+    include_bytes!("../assets/fonts/OpenMono-Bold.ttf"),
 ];
 /// The fonts a browser fetches after its first frame, which the web build serves from `fonts/`
 /// beside the page (`scripts/web.ps1`).
 #[cfg(target_arch = "wasm32")]
 pub(crate) const LATE_FONTS: &[&str] = &[
-    "fonts/IBMPlexMono-TextItalic.ttf",
+    "fonts/OpenMono-Italic.ttf",
     "fonts/CommitMono-400-Regular.otf",
     "fonts/CommitMono-700-Regular.otf",
     "fonts/CommitMono-400-Italic.otf",
     "fonts/CommitMono-700-Italic.otf",
 ];
-/// The terminal's face, which a page fetches when its first terminal attaches (`terminal::fetch_terminal_font`).
+/// The terminal's Nerd Fonts icon face, which a page fetches when its first terminal attaches
+/// (`terminal::fetch_terminal_font`).
 #[cfg(target_arch = "wasm32")]
-pub(crate) const TERMINAL_FONTS: &[&str] = &["fonts/JetBrainsMonoNerdFontMono-Regular.ttf", "fonts/JetBrainsMonoNerdFontMono-Bold.ttf"];
+pub(crate) const TERMINAL_FONTS: &[&str] = &["fonts/OpenMono-Icons.ttf"];
 
 /// The app's spec: `init` makes its state (`App::new`, or `App::empty`).
 pub(crate) fn spec(init: fn() -> App) -> AppSpec<App> {
@@ -233,6 +245,9 @@ pub(crate) fn rune_app(spec: AppSpec<App>) -> rune::App<App> {
             // the window rests (opt-in since rune#2006, per effect since rune#2011), so the button's
             // first showing in a scroll does not wait for the GPU driver (about 80 to 100 ms on a
             // cold shader cache). Nothing else is named: no layer blur, no blend is compiled ahead.
+            // On Linux/glibc, C libraries (Mesa/Vulkan, GLib/GIO, fontconfig) still allocate via
+            // glibc while Rust uses mimalloc; opt in to Rune's rest-only off-UI-thread malloc_trim.
+            .trim_c_heap_at_rest(true)
             .prewarm_effects(rune::PrewarmEffects::BACKDROP_BLUR)
             .titlebar(rune::Titlebar::new(view::TITLEBAR_H))
             .chrome(rune::Chrome {
@@ -256,8 +271,9 @@ thread_local! {
 /// idle one can't hold it.
 #[cfg(not(target_arch = "wasm32"))]
 fn quit_last() {
-    // Release any threads waiting on local server startup without stopping the detached daemon.
-    servers::sidecar::dispose();
+    // Release waiters on local server startup and stop the local daemon when the user turned
+    // off "Keep running in the background" (`opencode#66499`).
+    servers::sidecar::shutdown_on_quit(background_notice::should_stop_service_on_quit());
     // First, so its threads have left their writes by the time the process ends.
     browser_pane::installer::quit();
     rune::marks::mark("browser.engine.stopped");
@@ -305,6 +321,8 @@ pub fn run_native() {
     #[cfg(windows)]
     launch::warm_gpu_if_asked();
     commit_pages_on_demand();
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    shell::memory_reclaim::bound_glibc_arenas();
     #[cfg(feature = "alloc-sites")]
     plugin_host::memory::register_reports();
     // A debug build COM starts for a proof's scratch toast activator (`LocalServer32`, whose
@@ -416,6 +434,8 @@ pub fn run_native() {
     let handle = app.handle();
     let mut motion_log = motion_log::Log::default();
     let (encoded, drawn) = (diagnostics.clone(), diagnostics.clone());
+    let display_hz = std::rc::Rc::new(std::cell::Cell::new(None::<f64>));
+    let display_hz_enc = display_hz.clone();
     let app = app
         .on_ready(move |_| {
             storage::presented();
@@ -428,11 +448,16 @@ pub fn run_native() {
             });
         })
         .on_frame_encoded(move |f| {
+            if let Some(hz) = f.refresh_hz() { display_hz_enc.set(Some(hz)); }
             encoded.encoded(f);
             telemetry::encoded(f);
             files::trace::frame(f);
         })
         .on_frame_drawn(move |rt| {
+            if let Some(hz) = display_hz.get() {
+                rt.state.set_display_hz(hz);
+                rt.state.workspace_panes.browser.host.set_display_hz(hz);
+            }
             drawn.drawn(rt);
             if let Some(frame) = telemetry::last_frame() { telemetry::drawn(rt.state.painted_session(), frame); }
             motion_log.frame(rt);

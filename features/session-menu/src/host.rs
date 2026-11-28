@@ -303,10 +303,13 @@ pub trait SessionMenuHost: opencode_kernel::AppEnv + opencode_kernel::AppOverlay
     fn duplicate_session(&mut self, server: &ServerKey, id: &str, tx: &mut Tx) {
         let _ = (server, id, tx);
     }
+    /// Snapshots the inbox's visible row order before a delete hides or removes sessions
+    /// (`packages/app/src/shell/titlebar/inbox.tsx:212-248`, `opencode#66558`).
+    fn record_inbox_shown(&mut self) {}
     /// Cleans up tabs, navigation history, closed tabs, and active route after `server` confirms
     /// sessions `gone` were deleted (the session list itself has already been pruned).
-    fn on_sessions_removed(&mut self, server: &ServerKey, gone: &[String]) {
-        let _ = (server, gone);
+    fn on_sessions_removed(&mut self, server: &ServerKey, gone: &[String], tx: &mut Tx) {
+        let _ = (server, gone, tx);
     }
     /// Handles a server reply to an `archive` session write: a refusal puts the session back.
     fn on_archive_replied(&mut self, session: String, ok: bool, tx: &mut Tx) {

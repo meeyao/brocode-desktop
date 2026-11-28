@@ -1,6 +1,6 @@
 //! Multi-tab CEF OSR manager inside the sidecar process.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -52,6 +52,8 @@ pub(crate) struct ManagedTab {
     pub(crate) prompts: Arc<crate::prompts::TabPrompts>,
     menu: Arc<crate::menu::TabMenuState>,
     download_gen: u64,
+    /// Download generations carried over from prior hibernation cycles so real `CloseTab` cleans them up.
+    prior_download_gens: Vec<u64>,
     download_alive: Arc<AtomicBool>,
     context: crate::wire::ContextKind,
     /// Last seen `loading`, so a finished load marks its side of the cookie mirror dirty.
@@ -60,7 +62,9 @@ pub(crate) struct ManagedTab {
     deferred_initial: Arc<AtomicBool>,
     _cdp_reg: Option<Registration>,
     held_buttons: u32,
-    /// Linux: whether it's the tab the app shows (`HostMsg::FocusTab`), to open it again so.
+    pub(crate) render_mode: lifecycle::TabRenderMode,
+    pub(crate) awake: Arc<AtomicBool>,
+    /// Linux: whether it's currently visible in a desktop pane, to reopen it so on transport reset.
     #[cfg(target_os = "linux")]
     shown: bool,
     #[cfg(any(windows, target_os = "linux"))]
@@ -69,6 +73,12 @@ pub(crate) struct ManagedTab {
 
 pub struct EngineManager {
     tabs: HashMap<u64, ManagedTab>,
+    /// Preserved download generations for hibernated tabs until woken or permanently closed.
+    hibernated_downloads: HashMap<u64, Vec<u64>>,
+    visible_tabs: HashSet<u64>,
+    unthrottled_tabs: HashSet<u64>,
+    focused_tab: Option<u64>,
+    lifecycle_mode: lifecycle::LifecycleMode,
     mach_port: Arc<AtomicU32>,
     out_tx: crate::output::Output,
     events: std::sync::mpsc::Sender<crate::Event>,
@@ -139,6 +149,11 @@ impl EngineManager {
         let registered_ext_ids = Arc::new(Mutex::new(extensions.as_ref().map(|e| e.registered_ext_ids()).unwrap_or_default()));
         Self {
             tabs: HashMap::new(),
+            hibernated_downloads: HashMap::new(),
+            visible_tabs: HashSet::new(),
+            unthrottled_tabs: HashSet::new(),
+            focused_tab: None,
+            lifecycle_mode: lifecycle::LifecycleMode::Legacy,
             mach_port: Arc::new(AtomicU32::new(0)),
             out_tx,
             events: events.clone(),
@@ -174,12 +189,13 @@ impl EngineManager {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.tabs.is_empty()
+        self.tabs.is_empty() && self.hibernated_downloads.is_empty()
     }
 
     pub fn on_host_disconnected(&mut self) {
         self.previews.cancel_all_proxies();
         self.downloads.cancel_all_pending_saves();
+        self.on_disconnect_lifecycle();
     }
 
     pub fn handle(&mut self, msg: HostMsg) -> bool {
@@ -194,10 +210,11 @@ impl EngineManager {
 
     fn handle_msg(&mut self, msg: HostMsg) -> bool {
         match msg {
-            HostMsg::Hello { mach_service, prompts, extensions, download_save, .. } => {
+            HostMsg::Hello { mach_service, prompts, extensions, download_save, tab_lifecycle, .. } => {
                 self.prompt_shared.enabled.store(prompts, Ordering::Relaxed);
                 self.app_handles_ext_tabs = extensions;
                 self.downloads.set_download_save_enabled(download_save);
+                self.on_hello_lifecycle(tab_lifecycle);
                 #[cfg(not(target_os = "macos"))]
                 let _ = mach_service;
                 #[cfg(target_os = "macos")]
@@ -227,6 +244,13 @@ impl EngineManager {
                     passkeys: true,
                     trace_isolation: true,
                     menu_extras: true,
+                    tab_lifecycle: true,
+                    tab_hibernation: true,
+                    host_clipboard: true,
+                    #[cfg(target_os = "linux")]
+                    x11_clipboard: crate::linux_gpu::is_x11(),
+                    #[cfg(not(target_os = "linux"))]
+                    x11_clipboard: false,
                 });
                 for (&tab_id, t) in &self.tabs {
                     t.menu.cancel_all();
@@ -260,7 +284,9 @@ impl EngineManager {
                         if let Some(ring) = &t.frames {
                             let _ = ring.lock().unwrap().step(crate::dmabuf_frames::Event::Released);
                         }
-                        t.host.invalidate(PaintElementType::default());
+                        if !tab_lifecycle && t.render_mode.is_awake() {
+                            t.host.invalidate(PaintElementType::default());
+                        }
                     }
                 }
             }
@@ -311,29 +337,11 @@ impl EngineManager {
                 }
             }
             HostMsg::CloseTab { tab_id } => self.close_managed_tab(tab_id),
-            HostMsg::FocusTab { tab_id } => {
-                for (&id, t) in &mut self.tabs {
-                    let active = id == tab_id;
-                    let agent = t.prompts.agent_driven.load(Ordering::Relaxed);
-                    #[cfg(target_os = "linux")]
-                    {
-                        t.shown = active;
-                        // A hidden tab paints nothing: its buffers go until it's shown again.
-                        if let Some(ring) = t.frames.as_ref().filter(|_| !active) {
-                            let _ = ring.lock().unwrap().step(crate::dmabuf_frames::Event::Released);
-                        }
-                    }
-                    if !t.is_popup {
-                        // Agent-driven background tabs stay unthrottled so waits, screenshots and traces never stall.
-                        t.host.was_hidden(i32::from(!active && !agent));
-                    }
-                    t.host.set_focus(i32::from(active));
-                    if active {
-                        t.host.invalidate(PaintElementType::default());
-                    }
-                }
-                self.on_tab_focus_extensions(tab_id);
-            }
+            HostMsg::FocusTab { tab_id } => self.handle_focus_tab(tab_id),
+            HostMsg::SetVisibleTabs { tab_ids } => self.handle_set_visible_tabs(tab_ids),
+            HostMsg::SetTabUnthrottled { tab_id, active } => self.handle_set_tab_unthrottled(tab_id, active),
+            HostMsg::FreezeTab { tab_id, frozen } => self.handle_freeze_tab(tab_id, frozen),
+            HostMsg::HibernateTab { tab_id } => self.handle_hibernate_tab(tab_id),
             HostMsg::Navigate { tab_id, url } => {
                 if let Some((is_preview, is_popup, snap_url, is_agent, isolated, ext_allowed, roots)) =
                     self.tabs.get(&tab_id).map(|t| {
@@ -390,7 +398,10 @@ impl EngineManager {
                     } else {
                         match self.contexts.gate_navigation(tab_id, &url) {
                             Ok(true) => {
-                                if let Some(t) = self.tabs.get(&tab_id) {
+                                self.ensure_tab_unfrozen(tab_id);
+                                if self.gate_remote_sign_in_nav(tab_id, &url) {
+                                    self.mark_tab_waiting_sign_in(tab_id);
+                                } else if let Some(t) = self.tabs.get(&tab_id) {
                                     t.deferred_initial.store(false, Ordering::Release);
                                     if !t.clipboard_gate.replace_held_first_load(&url) && let Some(frame) = t.browser.main_frame() {
                                         t.prompts.set_pending_top_url(Some(url.clone()));
@@ -399,6 +410,7 @@ impl EngineManager {
                                 }
                             }
                             Ok(false) => {
+                                self.cookies.cancel_tab_gate(tab_id);
                                 if let Some(t) = self.tabs.get(&tab_id) {
                                     t.deferred_initial.store(
                                         !url.trim().eq_ignore_ascii_case("about:blank"),
@@ -420,50 +432,41 @@ impl EngineManager {
                 }
             }
             HostMsg::Back { tab_id } => {
+                self.ensure_tab_unfrozen(tab_id);
+                self.cancel_tab_sign_in_gate(tab_id, false);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     if self.contexts.is_tab_ready(tab_id) {
-                        if !self.refuse_history_nav_if_inherited(tab_id, t, -1) {
-                            t.browser.go_back();
-                        }
+                        if !self.refuse_history_nav_if_inherited(tab_id, t, -1) { t.browser.go_back(); }
                     } else if self.contexts.is_tab_suspended(tab_id) {
-                        let _ = self.out_tx.send(EngineMsg::Refused {
-                            tab_id,
-                            reason: "browser.proxy.required".to_owned(),
-                        });
+                        let _ = self.out_tx.send(EngineMsg::Refused { tab_id, reason: "browser.proxy.required".to_owned() });
                     }
                 }
             }
             HostMsg::Forward { tab_id } => {
+                self.ensure_tab_unfrozen(tab_id);
+                self.cancel_tab_sign_in_gate(tab_id, false);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     if self.contexts.is_tab_ready(tab_id) {
-                        if !self.refuse_history_nav_if_inherited(tab_id, t, 1) {
-                            t.browser.go_forward();
-                        }
+                        if !self.refuse_history_nav_if_inherited(tab_id, t, 1) { t.browser.go_forward(); }
                     } else if self.contexts.is_tab_suspended(tab_id) {
-                        let _ = self.out_tx.send(EngineMsg::Refused {
-                            tab_id,
-                            reason: "browser.proxy.required".to_owned(),
-                        });
+                        let _ = self.out_tx.send(EngineMsg::Refused { tab_id, reason: "browser.proxy.required".to_owned() });
                     }
                 }
             }
             HostMsg::Reload { tab_id, ignore_cache } => {
+                self.ensure_tab_unfrozen(tab_id);
+                // A reload while waiting on the initial sign-in copy lets the held URL satisfy it (`navigation-turn.ts:51`).
+                if self.cookies.is_tab_gated(tab_id) { return true; }
                 if let Some(t) = self.tabs.get(&tab_id) {
                     if self.contexts.is_tab_ready(tab_id) {
-                        if ignore_cache {
-                            t.browser.reload_ignore_cache();
-                        } else {
-                            t.browser.reload();
-                        }
+                        if ignore_cache { t.browser.reload_ignore_cache(); } else { t.browser.reload(); }
                     } else if self.contexts.is_tab_suspended(tab_id) {
-                        let _ = self.out_tx.send(EngineMsg::Refused {
-                            tab_id,
-                            reason: "browser.proxy.required".to_owned(),
-                        });
+                        let _ = self.out_tx.send(EngineMsg::Refused { tab_id, reason: "browser.proxy.required".to_owned() });
                     }
                 }
             }
             HostMsg::Stop { tab_id } => {
+                self.cancel_tab_sign_in_gate(tab_id, true);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     t.browser.stop_load();
                     t.prompts.clear_auth_on_nav(tab_id, &self.out_tx);
@@ -482,10 +485,9 @@ impl EngineManager {
             // context's Chrome colour scheme doesn't reach windowless pages, DevTools emulation does.
             HostMsg::SetColorScheme { dark } => {
                 self.dark = Some(dark);
-                for t in self.tabs.values() {
-                    self.send_color_scheme(&t.host, dark);
-                }
+                for t in self.tabs.values() { self.send_color_scheme(&t.host, dark); }
             }
+            HostMsg::SetFrameRate { fps } => self.set_frame_rate(fps),
             HostMsg::Emulate { tab_id, device, scale } => {
                 if let Some(t) = self.tabs.get(&tab_id)
                     && self.contexts.is_tab_ready(tab_id)
@@ -531,6 +533,7 @@ impl EngineManager {
                 // The person's press takes the tab back before the click reaches the page, so a
                 // file picker this click opens is theirs (official `policy.ts:121-125`).
                 if !up {
+                    self.focused_tab = Some(tab_id);
                     self.set_user_reclaimed(tab_id, true);
                 }
                 if let Some(t) = self.tabs.get_mut(&tab_id) {
@@ -587,21 +590,9 @@ impl EngineManager {
                     send_key(&t.host, down, text.as_deref(), named.as_deref(), cef_mods(mods));
                 }
             }
-            HostMsg::EditCmd { tab_id, cmd } => {
-                if let Some(t) = self.tabs.get(&tab_id)
-                    && let Some(frame) = t.browser.main_frame()
-                {
-                    match cmd.as_str() {
-                        "select_all" => frame.select_all(),
-                        "copy" => frame.copy(),
-                        "paste" => frame.paste(),
-                        "cut" => frame.cut(),
-                        "undo" => frame.undo(),
-                        "redo" => frame.redo(),
-                        _ => {}
-                    }
-                }
-            }
+            HostMsg::EditCmd { tab_id, cmd } => if let Some(t) = self.tabs.get(&tab_id) { crate::menu_extras::run_edit_cmd(t, &cmd); }
+            HostMsg::CopySelection { tab_id, cut } => if let Some(t) = self.tabs.get(&tab_id) { crate::menu_extras::start_copy_selection(t, &self.next_cdp_id, cut); }
+            HostMsg::PasteText { tab_id, text } => if let Some(t) = self.tabs.get(&tab_id) { crate::menu_extras::paste_host_text(t, &text); }
             HostMsg::Ime { tab_id, commit, preedit } => {
                 if let Some(t) = self.tabs.get(&tab_id) {
                     if let Some(c) = commit {
@@ -623,6 +614,7 @@ impl EngineManager {
             HostMsg::SetInspect { tab_id, enabled } => self.handle_set_inspect(tab_id, enabled),
             HostMsg::HighlightNode { tab_id, backend_node_id } => self.handle_highlight_node(tab_id, backend_node_id),
             HostMsg::CdpCall { tab_id, request_id, method, params, session_id } => {
+                self.ensure_tab_unfrozen(tab_id);
                 self.set_user_reclaimed(tab_id, false);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     t.prompts.agent_command(method.starts_with("Input."));
@@ -630,12 +622,16 @@ impl EngineManager {
                 self.handle_cdp_call(tab_id, request_id, method, params, session_id);
             }
             HostMsg::SiteCookies { tab_id, request_id } => {
+                self.ensure_tab_unfrozen(tab_id);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     let not_ready = (!self.contexts.is_tab_ready(tab_id)).then(|| self.contexts.not_ready_reason(tab_id));
                     crate::cdp_ledger::handle_site_cookies(tab_id, request_id, not_ready, t, &self.next_cdp_id, &self.out_tx);
                 }
             }
-            HostMsg::ClearSite { tab_id, request_id } => self.handle_clear_site(tab_id, request_id),
+            HostMsg::ClearSite { tab_id, request_id } => {
+                self.ensure_tab_unfrozen(tab_id);
+                self.handle_clear_site(tab_id, request_id);
+            }
             #[cfg(target_os = "linux")]
             HostMsg::FrameRead { tab_id, pool, frame_id } => {
                 if let Some(ring) = self.tabs.get(&tab_id).and_then(|t| t.frames.as_ref()) {
@@ -713,6 +709,7 @@ impl EngineManager {
                 self.handle_set_agent_driven(tab_id, agent_driven);
             }
             HostMsg::TypedCdpCall { tab_id, request_id, method, params, session_id, frame_id } => {
+                self.ensure_tab_unfrozen(tab_id);
                 self.set_user_reclaimed(tab_id, false);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     t.prompts.agent_command(method.starts_with("Input."));
@@ -740,6 +737,7 @@ impl EngineManager {
                 }
             }
             HostMsg::ClearSiteCache { tab_id, request_id } => {
+                self.ensure_tab_unfrozen(tab_id);
                 if let Some(t) = self.tabs.get(&tab_id) {
                     if !self.contexts.is_tab_ready(tab_id) {
                         let reason = self.contexts.not_ready_reason(tab_id);
@@ -806,18 +804,13 @@ impl EngineManager {
                             }
                         }
                         Some(crate::menu::MenuFollowUp::CopyImage { url, frame_id }) => {
-                            // The menu's own frame when the engine knows it on the tab's session,
-                            // else the main frame (an image in an out-of-process frame is not read).
-                            let frame = {
-                                let ledger = t.cdp_ledger.lock().unwrap();
-                                frame_id.filter(|f| ledger.is_root_session_frame(f)).or_else(|| ledger.main_frame_id())
-                            };
-                            if let Some(frame) = frame {
-                                let msg_id = self.next_cdp_id.fetch_add(1, Ordering::Relaxed);
-                                t.cdp_id_map.lock().unwrap().insert(msg_id, CdpPending::CopyImageContent { frame_id: frame.clone() });
-                                let raw = crate::menu_extras::resource_request(msg_id, &frame, &url);
-                                t.host.send_dev_tools_message(Some(raw.as_bytes()));
-                            }
+                            crate::menu_extras::start_copy_image(t, &self.next_cdp_id, &url, frame_id);
+                        }
+                        Some(crate::menu::MenuFollowUp::CopyText { text }) => {
+                            let _ = self.out_tx.send(EngineMsg::CopiedText { tab_id, text });
+                        }
+                        Some(crate::menu::MenuFollowUp::CopySelection { cut }) => {
+                            crate::menu_extras::start_copy_selection(t, &self.next_cdp_id, cut);
                         }
                         None => {}
                     }
@@ -843,6 +836,7 @@ impl EngineManager {
                         // Transient proxy loss: keep live tabs & unsaved state intact while blocking
                         // every request/CDP/menu/navigation fail-closed until a new proxy arrives.
                         for tid in tabs {
+                            self.cookies.cancel_tab_gate(tid);
                             self.downloads.cancel_pending_saves_for_tab(tid);
                             if let Some(t) = self.tabs.get_mut(&tid) {
                                 if let crate::wire::ContextKind::RemoteServer { proxy: cur, .. } = &mut t.context {
@@ -954,6 +948,9 @@ impl EngineManager {
             prev.download_alive.store(false, Ordering::Release);
             prev.host.close_browser(1);
             self.downloads.close_tab(tab_id, prev.download_gen);
+            for old_gen in prev.prior_download_gens {
+                self.downloads.close_tab(tab_id, old_gen);
+            }
             self.release_tab_context(tab_id);
             if !prev.isolated && !prev.is_popup
                 && let Some(ext) = &mut self.extensions
@@ -1092,7 +1089,13 @@ impl EngineManager {
             context_ready = resolved_ctx.ready;
             deferred_initial = resolved_ctx.deferred_initial;
             tab_generation = resolved_ctx.generation;
-            let (init, display) = crate::clipboard_gate::first_load_urls(agent_driven, resolved_ctx.defer_initial_load, is_allowed_ext_url.is_some(), target_url, &mut first_load_url);
+            self.seed_remote_partition(&effective_context);
+            let sign_in_defers = !resolved_ctx.defer_initial_load
+                && self.gate_remote_open(&effective_context, tab_id, tab_generation, target_url);
+            if sign_in_defers {
+                deferred_initial.store(true, Ordering::Release);
+            }
+            let (init, display) = crate::clipboard_gate::first_load_urls(agent_driven, resolved_ctx.defer_initial_load || sign_in_defers, is_allowed_ext_url.is_some(), target_url, &mut first_load_url);
             (init, display, isolated, allow_ext, is_popup_valid)
         };
         let is_preview = preview_grant.is_some();
@@ -1118,6 +1121,7 @@ impl EngineManager {
             preview: preview_grant.as_ref().map(|g| g.kind.tag()),
             agent_driven,
             document: 0,
+            audible: false,
         }));
         #[cfg(windows)]
         let frames: FrameRing = self
@@ -1132,12 +1136,14 @@ impl EngineManager {
         let shared_texture = frames.is_some();
         #[cfg(target_os = "macos")]
         let shared_texture = true;
+        let awake = Arc::new(AtomicBool::new(true));
         let render = TabRenderHandler::new(
             tab_id,
             view_state.clone(),
             self.mach_port.clone(),
             self.out_tx.clone(),
             Arc::new(AtomicU64::new(0)),
+            awake.clone(),
             frames.clone(),
             #[cfg(target_os = "linux")]
             self.events.clone(),
@@ -1156,11 +1162,13 @@ impl EngineManager {
         {
             crate::permissions::block_device_permission_guards_for_origin(ctx, &initial_url);
         }
+        let media_gate = Arc::new(crate::media_gate::TabMediaGate::new());
         let display = TabDisplayHandler::new(
             tab_id,
             preview_grant.clone(),
             snap.clone(),
             prompts.clone(),
+            media_gate.clone(),
             self.permissions.clone(),
             scope_id.clone(),
             favicon,
@@ -1173,6 +1181,7 @@ impl EngineManager {
             preview_grant.clone(),
             snap.clone(),
             prompts.clone(),
+            media_gate.clone(),
             diagnostics.clone(),
             deferred_initial.clone(),
             self.out_tx.clone(),
@@ -1193,6 +1202,7 @@ impl EngineManager {
             snap.clone(),
             self.prompt_shared.clone(),
             prompts.clone(),
+            media_gate.clone(),
             input_guard.clone(),
             emulation_scale.clone(),
             self.next_cdp_id.clone(),
@@ -1330,27 +1340,12 @@ impl EngineManager {
             });
             return;
         };
-        if is_popup {
-            host.was_hidden(0);
-            host.set_focus(1);
-        } else if focused {
-            for existing in self.tabs.values() {
-                if !existing.is_popup {
-                    if !existing.prompts.agent_driven.load(Ordering::Relaxed) {
-                        existing.host.was_hidden(1);
-                    }
-                    existing.host.set_focus(0);
-                }
-            }
-            host.set_focus(1);
-        } else {
-            host.was_hidden(1);
-        }
+        // Initial visibility, FPS throttling, and GPU frame ring release are applied
+        // uniformly via `self.on_tab_opened` right after insertion into `self.tabs`.
 
         let cdp_id_map = Arc::new(Mutex::new(HashMap::new()));
         let cdp_ledger = Arc::new(Mutex::new(crate::cdp_ledger::EngineCdpLedger::with_registered_exts(self.registered_ext_ids.clone())));
         let passkeys = Arc::new(crate::passkeys::TabPasskeyGate::new(tab_id, agent_driven));
-        let media_gate = Arc::new(crate::media_gate::TabMediaGate::new());
         let notification_gate = Arc::new(crate::notification_gate::TabNotificationGate::new());
         let ext_cw = is_allowed_ext_url.as_deref().is_some_and(|id| self.ext_clipboard_write_ids.lock().unwrap().contains(id));
         let clipboard_gate = Arc::new(crate::clipboard_gate::TabClipboardGate::new(is_popup, is_preview, agent_driven, ext_cw, self.ext_clipboard_write_ids.clone(), first_load_url));
@@ -1382,8 +1377,8 @@ impl EngineManager {
         if let Some(dark) = self.dark {
             self.send_color_scheme(&host, dark);
         }
-
-        self.seed_remote_partition(&effective_context);
+        // Only consume preserved hibernated download generations after browser creation succeeds.
+        let prior_download_gens = self.hibernated_downloads.remove(&tab_id).unwrap_or_default();
         self.tabs.insert(
             tab_id,
             ManagedTab {
@@ -1412,6 +1407,7 @@ impl EngineManager {
                 prompts,
                 menu: menu_state,
                 download_gen,
+                prior_download_gens,
                 download_alive,
                 context: effective_context,
                 last_loading: false,
@@ -1419,12 +1415,15 @@ impl EngineManager {
                 deferred_initial,
                 _cdp_reg: cdp_reg,
                 held_buttons: 0,
+                render_mode: lifecycle::TabRenderMode::AwakeBackground,
+                awake,
                 #[cfg(target_os = "linux")]
                 shown: focused,
                 #[cfg(any(windows, target_os = "linux"))]
                 frames,
             },
         );
+        self.on_tab_opened(tab_id, focused, is_popup);
         if !isolated && !is_preview && !is_popup {
             self.notify_ext_tab_opened(tab_id, &initial_url, width_pt, height_pt, focused, ext_open_request_id, agent_driven);
         }
@@ -1436,31 +1435,6 @@ impl EngineManager {
                 tab_id,
                 url: Some(refused_url),
             });
-        }
-    }
-
-    fn close_managed_tab(&mut self, tab_id: u64) {
-        self.permissions.on_tab_closed(tab_id);
-        if let Some(tab) = self.tabs.remove(&tab_id) {
-            if self.prompt_shared.release_trace(tab_id) {
-                self.send_internal_cdp(&tab.host, "Tracing.end", json!({}));
-            }
-            self.release_preview(tab_id, tab.preview.as_ref());
-            tab.menu.cancel_all();
-            tab.prompts.dismiss_all();
-            tab.download_alive.store(false, Ordering::Release);
-            tab.host.close_browser(1);
-            self.downloads.close_tab(tab_id, tab.download_gen);
-            crate::agent::remove_tab_uploads(&self.profile_dir, tab_id);
-            self.release_tab_context(tab_id);
-            if !tab.isolated && !tab.is_popup
-                && let Some(ext) = &mut self.extensions
-            {
-                ext.on_tab_closed(tab_id);
-            }
-            let _ = self.out_tx.send(EngineMsg::TabClosed { tab_id });
-        } else {
-            self.release_tab_context(tab_id);
         }
     }
 
@@ -1477,10 +1451,14 @@ impl EngineManager {
         self.send_internal_cdp(host, "Emulation.setEmulatedMedia", json!({ "features": [{ "name": "prefers-color-scheme", "value": value }] }));
     }
 
-    pub(super) fn send_internal_cdp(&self, host: &BrowserHost, method: &str, params: Value) {
-        let id = self.next_cdp_id.fetch_add(1, Ordering::Relaxed);
+    pub(super) fn send_internal_cdp_with(next_cdp_id: &AtomicI32, host: &BrowserHost, method: &str, params: Value) {
+        let id = next_cdp_id.fetch_add(1, Ordering::Relaxed);
         let raw = json!({ "id": id, "method": method, "params": params }).to_string();
         let _ = host.send_dev_tools_message(Some(raw.as_bytes()));
+    }
+
+    pub(super) fn send_internal_cdp(&self, host: &BrowserHost, method: &str, params: Value) {
+        Self::send_internal_cdp_with(&self.next_cdp_id, host, method, params);
     }
 }
 
@@ -1495,5 +1473,7 @@ pub(crate) use extensions::{Surface, classify_surface};
 mod emulation;
 mod extensions;
 mod frames;
+mod lifecycle;
 mod picks;
 mod profile_cookies;
+pub(crate) mod sign_in_gate;

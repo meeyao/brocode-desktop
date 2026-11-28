@@ -218,6 +218,8 @@ fn window(mut w: Window, frame: Option<Frame>, diagnostics: &crate::diagnostics:
     let ready = handle.clone();
     let mut motion_log = crate::motion_log::Log::default();
     let (encoded, drawn) = (diagnostics.clone(), diagnostics);
+    let display_hz = std::rc::Rc::new(std::cell::Cell::new(None::<f64>));
+    let display_hz_enc = display_hz.clone();
     // The first frame draws with the appearance the last run saw; the portal's answer follows.
     #[cfg(target_os = "linux")]
     rune::last_appearance(store::load_appearance(), store::save_appearance);
@@ -242,11 +244,16 @@ fn window(mut w: Window, frame: Option<Frame>, diagnostics: &crate::diagnostics:
             })
         })
         .on_frame_encoded(move |f| {
+            if let Some(hz) = f.refresh_hz() { display_hz_enc.set(Some(hz)); }
             encoded.encoded(f);
             crate::telemetry::encoded(f);
             crate::files::trace::frame(f);
         })
         .on_frame_drawn(move |rt| {
+            if let Some(hz) = display_hz.get() {
+                rt.state.set_display_hz(hz);
+                rt.state.workspace_panes.browser.host.set_display_hz(hz);
+            }
             drawn.drawn(rt);
             if let Some((sid, msgs)) = rt.state.painted_session()
                 && msgs > 0
@@ -267,14 +274,24 @@ fn window(mut w: Window, frame: Option<Frame>, diagnostics: &crate::diagnostics:
         .on_focus(|s, focused, _| {
             s.window.hidden &= !focused;
             s.window.focused = focused;
+            super::set_focused(&s.window.id, focused);
             if focused {
-                super::focused(&s.window.id);
                 s.taskbar_focused();
             }
+        })
+        // On non-macOS, closing the last window quits the app: hold the first quit once to tell
+        // the user that the background service keeps running (`opencode#66499`).
+        .on_close_request(|s, tx| {
+            #[cfg(not(target_arch = "wasm32"))]
+            if !cfg!(target_os = "macos") && !s.other_windows() && crate::background_notice::holds_quit(s, tx) {
+                return rune::CloseResponse::Defer;
+            }
+            rune::CloseResponse::Close
         })
         // Quitting (File > Quit, the Quit command) installs a ready update on the way out too, as
         // closing the last window does; the second call of the two does nothing.
         .on_quit(|s, _| {
+            crate::background_notice::on_quit(s);
             // Before the state is saved: the engine's download has that long to leave its write.
             #[cfg(not(target_arch = "wasm32"))]
             browser_pane::installer::quit();

@@ -62,6 +62,9 @@ pub(super) fn methods(lua: &Lua, m: &Table) -> mlua::Result<()> {
                         .is_some_and(|t| (t.zoom - 1.0).abs() < 0.001)
                 {
                     s.workspace_panes.browser.host.set_device(id, device);
+                    if s.workspace_panes.browser.host.tab(id).is_some_and(|t| t.residency().is_hibernated()) {
+                        s.wake_browser_tab(id, s.active_browser_tab_id() == Some(id));
+                    }
                 }
             })
         })?,

@@ -95,6 +95,7 @@ pub fn build() -> Kernel<App> {
     b.add_overlay_key_bands(crate::overlays::key_band::ALL);
     b.add_escape_bands(crate::overlays::escape_band::ALL);
     register_core_systems(&mut b);
+    b.with_feature(&crate::surfaces::automations::AutomationsFeature);
     b.with_feature(&crate::surfaces::egg::EggFeature);
     #[cfg(feature = "office")]
     b.with_feature(&crate::surfaces::office::OfficeFeature);
@@ -112,6 +113,7 @@ pub fn build() -> Kernel<App> {
     b.with_feature(&crate::files::FilesFeature);
     b.with_feature(&crate::find::FindFeature);
     b.with_feature(&crate::free_limit::FreeLimitFeature);
+    b.with_feature(&crate::location_missing::LocationMissingFeature);
     b.with_feature(&crate::message_nav::HistoryFeature);
     b.with_feature(&crate::queue::InboxFeature);
     b.with_feature(&crate::mcp::McpFeature);
@@ -127,6 +129,7 @@ pub fn build() -> Kernel<App> {
     b.with_feature(&crate::review::ReviewFeature);
     b.with_feature(&crate::session_menu::SessionMenuFeature);
     b.with_feature(&crate::settings::SettingsFeature);
+    b.with_feature(&crate::background_notice::BackgroundNoticeFeature);
     b.with_feature(&crate::subagents::SubagentsFeature);
     b.with_feature(&crate::switcher::SwitcherFeature);
     b.with_feature(&crate::surfaces::terminal::TerminalSurfaceFeature);
@@ -253,16 +256,20 @@ pub fn build() -> Kernel<App> {
     ));
     crate::commands::register_shell_commands(&mut b);
     b.register_slot(&crate::app::VIEW_RUNS)
+        .register_slot(&crate::app::DISPLAY_HZ)
         .register_slot(&crate::app::OUTPUT_ERRORS)
         .register_slot(&crate::app::CODE_WRAP)
         .register_slot(&crate::app::MATH)
         .register_slot(&crate::session_catalog::CATALOG)
+        .register_slot(&crate::session::meta::flags::FLAGS)
+        .register_slot(&crate::shell::view::sidebar::recent::HOVERED_HEADER)
         .register_slot(&crate::events::TAIL_CHANGE)
         .register_slot(&crate::events::STREAM_GAPS)
         .register_slot(&crate::speech::SPEECH)
         .register_slot(&crate::crash_notice::CRASH_NOTICE)
         .register_slot(&crate::key_sequence::SEQUENCE)
-        .register_slot(&crate::servers::dialog::DIALOG);
+        .register_slot(&crate::servers::dialog::DIALOG)
+        .register_slot(&crate::shell::memory_reclaim::SWEEP);
     let kernel = b.build();
     crate::shortcuts::validate(&kernel.commands);
     kernel
@@ -386,6 +393,9 @@ fn register_core_systems(b: &mut KernelBuilder<App>) {
 
     b.schedule(stage::INGEST_SESSION_PRE, "turn_errors.poll", |s, _, tx| {
         crate::turn_errors::poll(s, tx)
+    });
+    b.schedule(stage::INGEST_SESSION_PRE, "flags.poll", |s, _, _| {
+        crate::session::meta::flags::poll(s)
     });
 
     b.schedule(stage::INGEST_PAGES, "session_pages.poll", |s, _, tx| {

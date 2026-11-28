@@ -257,7 +257,13 @@ pub fn dep_version(app: &App, dep: &Dep) -> u64 {
     match dep {
         Dep::Session(id) => session_version(app, id).hash(&mut h),
         Dep::Routed => app.active_session_id().hash(&mut h),
-        Dep::Sessions => app.sessions.iter().map(|s| session_version(app, &s.id)).for_each(|v| v.hash(&mut h)),
+        Dep::Sessions => {
+            let running = watch::running_ancestors(app);
+            app.sessions
+                .iter()
+                .map(|s| session::session_version_for(app, s, running.contains(s.id.as_str())))
+                .for_each(|v| v.hash(&mut h));
+        }
         Dep::Model(provider, model) => session::model_version(app, provider, model).hash(&mut h),
         Dep::Models => session::models_version(app).hash(&mut h),
         Dep::Resource(plugin, path) => app.plugins.half(plugin).and_then(|half| half.resources.borrow().get(path).map(|r| r.ticket.generation())).hash(&mut h),

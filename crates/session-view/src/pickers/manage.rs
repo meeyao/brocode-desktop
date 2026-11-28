@@ -157,17 +157,28 @@ pub fn layer<S: PickerHost>(s: &S, p: &Pal) -> Vec<El> {
     let modal = col().key("manage-models-modal").absolute(0.0, 0.0).w_full().h_full().px(16.0).py(48.0).center().transition(Transition::none()).child(dialog).raise();
     let mut out = vec![scrim, modal];
     if let Some((provider, keys)) = menu_keys {
+        let dismiss = |s: &mut S, tx: &mut Tx| {
+            tx.instant();
+            if let Some(m) = s.pickers_mut().manage.as_mut() {
+                m.menu = None;
+            }
+        };
         out.push(
-            pop::scrim::<S>("manage-menu-dismiss", |s: &mut S, tx| {
-                tx.instant();
-                if let Some(m) = s.pickers_mut().manage.as_mut() {
-                    m.menu = None;
-                }
-            })
-            .press_on_down()
-            .raise(),
+            el().key("manage-menu-modal")
+                .role("none")
+                .absolute(0.0, 0.0)
+                .w_full()
+                .h_full()
+                .transition(Transition::none())
+                .modal_tx(false, dismiss)
+                .child(
+                    pop::scrim::<S>("manage-menu-dismiss", dismiss)
+                        .press_on_down()
+                        .on_secondary_press(move |s: &mut S, _: rune::PointerPress, tx: &mut Tx| dismiss(s, tx)),
+                )
+                .child(provider_menu::<S>(s, p, &provider, keys))
+                .raise(),
         );
-        out.push(provider_menu::<S>(s, p, &provider, keys).raise());
     }
     out
 }

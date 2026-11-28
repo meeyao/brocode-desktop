@@ -282,6 +282,8 @@ impl SessionFiles {
         }
     }
 
+    /// Resets rendered-preview state when switching to source view while keeping the loaded
+    /// document and decoded media in memory.
     pub fn close_preview(&mut self, path: &str) {
         if let Some(doc) = self.docs.get(path)
             && let Some(drawing) = self.diagram.current(doc)
@@ -299,6 +301,17 @@ impl SessionFiles {
         if let Some(doc) = self.docs.get_mut(path) {
             doc.set_find_open(false);
         }
+    }
+
+    /// Releases all buffers (code, decoded images, video players, tables, HTML) when a file side
+    /// tab is closed.
+    pub fn close_file(&mut self, path: &str) {
+        self.close_preview(path);
+        self.tables.remove(path);
+        self.html.remove(path);
+        self.images.remove(path);
+        self.videos.remove(path);
+        self.docs.remove(path);
     }
 
     pub(crate) fn shown_diagram(&self, path: &str) -> Option<std::rc::Rc<mermaid::Diagram>> {
@@ -421,6 +434,52 @@ impl FilesPane {
 
     pub fn retain_reply_links(&self, keep: impl Fn(&str) -> bool) {
         self.replies.retain(keep);
+    }
+
+    pub fn video_loading(&self, sid: &str, path: &str) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.auth_videos.is_loading(sid, path)
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (sid, path);
+            false
+        }
+    }
+
+    pub(crate) fn video_auth_failed(&self, sid: &str, path: &str) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.auth_videos.has_failed(sid, path)
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (sid, path);
+            false
+        }
+    }
+
+    pub fn forget_video_auth(&mut self, sid: &str, path: &str) {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.auth_videos.clear(sid, path);
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (sid, path);
+        }
+    }
+
+    pub(crate) fn forget_video_auth_session(&mut self, sid: &str) {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.auth_videos.forget_session(sid);
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = sid;
+        }
     }
 
     pub fn set_waker(&mut self, waker: Waker) {

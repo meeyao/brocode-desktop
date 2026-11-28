@@ -35,7 +35,9 @@ pub(super) enum OutboundMsg {
     Stop,
 }
 
+mod captures;
 mod refs;
+pub(super) use captures::prune_idle_captures;
 pub(super) use refs::TabRefs;
 
 
@@ -115,6 +117,8 @@ pub(super) struct SessionAttachment {
     pub bootstrap_frame_reqs: Vec<(u64, u64, Option<String>)>,
     pub diagnostics: HashMap<u64, TabDiagnostics>,
     pub captures: HashMap<u64, Vec<CapturedFile>>,
+    pub capture_lru: VecDeque<(u64, String)>,
+    pub last_activity: Instant,
     pub download_wire_ids: HashMap<(u64, String), String>,
     pub trace_recording: Option<TraceRecording>,
     pub cpu_started: HashMap<u64, CpuRecording>,
@@ -123,6 +127,7 @@ pub(super) struct SessionAttachment {
     pub pending_close_tabs: Vec<u64>,
     pub agent_tab_id: Option<String>,
     pub active_commands: Vec<ActiveCommand>,
+    pub hold_touched: Vec<u64>,
     pub diag_scope_seed: u64,
 }
 
@@ -153,6 +158,8 @@ impl SessionAttachment {
             bootstrap_frame_reqs: Vec::new(),
             diagnostics: HashMap::new(),
             captures: HashMap::new(),
+            capture_lru: VecDeque::new(),
+            last_activity: Instant::now(),
             download_wire_ids: HashMap::new(),
             trace_recording: None,
             cpu_started: HashMap::new(),
@@ -161,6 +168,7 @@ impl SessionAttachment {
             pending_close_tabs: Vec::new(),
             agent_tab_id: None,
             active_commands: Vec::new(),
+            hold_touched: Vec::new(),
             diag_scope_seed,
         }
     }
@@ -454,6 +462,7 @@ impl SessionAttachment {
             self.bootstrap_frame_reqs.retain(|(h, _, _)| *h != host_id);
             self.diagnostics.remove(&host_id);
             self.captures.remove(&host_id);
+            self.capture_lru.retain(|(h, _)| *h != host_id);
             self.download_wire_ids.retain(|(hid, _), _| *hid != host_id);
             if let Some(rec) = self.cpu_started.remove(&host_id)
                 && rec.auto_stopped.is_none()
@@ -576,10 +585,13 @@ impl SessionAttachment {
     /// Stores a capture while bounding BOTH per-tab count (<= 16) and session-wide memory
     /// (<= 32 MiB) so repeated captures across many tabs cannot OOM the app.
     pub fn record_capture(&mut self, host_id: u64, file: CapturedFile) {
+        self.last_activity = Instant::now();
+        self.capture_lru.push_back((host_id, file.id.clone()));
         let list = self.captures.entry(host_id).or_default();
         list.push(file);
         while list.len() > 16 {
-            list.remove(0);
+            let evicted = list.remove(0);
+            self.capture_lru.retain(|(h, id)| !(*h == host_id && id == &evicted.id));
         }
         loop {
             let total: usize = self
@@ -601,7 +613,8 @@ impl SessionAttachment {
             if let Some(v) = self.captures.get_mut(&tid)
                 && !v.is_empty()
             {
-                v.remove(0);
+                let evicted = v.remove(0);
+                self.capture_lru.retain(|(h, id)| !(*h == tid && id == &evicted.id));
             } else {
                 break;
             }

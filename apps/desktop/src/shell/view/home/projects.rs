@@ -14,6 +14,7 @@ use opencode_i18n::t;
 fn add_project(s: &mut App, tx: &mut Tx) {
     let key = crate::servers::runtime::active(s).clone();
     super::servers::choose_project(s, &key, tx);
+    super::picked(s, tx);
 }
 
 /// `HomeProjectsPanel`. Wide: 280 pt, 56 down and sticking there (`lg:sticky lg:top-14 lg:mt-14`),
@@ -49,7 +50,8 @@ pub(super) fn column(s: &App, p: &Pal, selected: Option<&model::Project>, wide: 
         });
     } else {
         for proj in used {
-            rows = rows.child(project_row(s, p, server, proj, selected.is_some_and(|sel| sel.id == proj.id), row_w));
+            let active = selected.is_some_and(|sel| opencode_servers::home::same_directory_key(&sel.directory) == opencode_servers::home::same_directory_key(&proj.directory));
+            rows = rows.child(project_row(s, p, server, proj, active, row_w));
         }
     }
     if !wide {
@@ -66,9 +68,11 @@ pub(super) fn column(s: &App, p: &Pal, selected: Option<&model::Project>, wide: 
     c.mt(56.0).pt(52.0).sticky_top(56.0).child(utility(p, true).mt(16.0).mb(32.0))
 }
 
-/// `HomeUtilityNav`: Settings and Help. Under the projects (`lg:flex-col lg:pr-3`, full-width
+/// `HomeUtilityNav`: Automations, Settings and Help. Under the projects (`lg:flex-col lg:pr-3`, full-width
 /// rows `gap-1`), or along Home's foot, one at each end.
 pub(super) fn utility(p: &Pal, stacked: bool) -> El {
+    let automations = nav_row(p, "home-automations", &crate::automations::CLOCK, t!("automations.title"))
+        .on_press_tx(|s: &mut App, tx: &mut Tx| crate::automations::open(s, tx));
     let settings = nav_row(p, "home-settings", &ic::SETTINGS_GEAR, t!("sidebar.settings")).on_press_tx(|s: &mut App, tx: &mut Tx| {
         if !s.settings_open() {
             s.toggle_settings(tx);
@@ -78,10 +82,17 @@ pub(super) fn utility(p: &Pal, stacked: bool) -> El {
         crate::open_in::open_external(tx, "https://github.com/meeyao/brocode-desktop/issues/new");
     });
     if stacked {
-        return col().key("home-utility").w_full().pr(12.0).gap(4.0).child(settings.w_full()).child(help.w_full());
+        return col()
+            .key("home-utility")
+            .w_full()
+            .pr(12.0)
+            .gap(4.0)
+            .child(automations.w_full())
+            .child(settings.w_full())
+            .child(help.w_full());
     }
     // `[&>button]:w-auto`: each as wide as its icon and label.
-    row().w_full().gap(4.0).justify_between().child(settings).child(help)
+    row().w_full().gap(4.0).justify_between().child(automations).child(settings).child(help)
 }
 
 /// `HomeProjectNavButton`: 28 tall, `px-1.5 gap-2`, the normal (16 pt) icon in icon-muted, the
@@ -104,9 +115,10 @@ fn nav_row(p: &Pal, key: &str, glyph: &'static Icon, label: &str) -> El {
         .child(text(label).font(HOME).color(p.muted).group_color(p.text).grow(1.0).shrink().truncate().align(text_left()))
 }
 
-/// The project menu's trigger: the menu opens below its end, 6 away (`gutter={6}`).
-fn menu_key(id: &str) -> String {
-    format!("hp-menu-{id}")
+/// The project menu's trigger: scoped by server and directory so identical project IDs across
+/// servers (or multiple `"global"` folders) never share a popup anchor.
+fn menu_key(server: &ServerKey, id: &str, dir: &str) -> String {
+    format!("hp-menu-{server}-{id}-{dir}")
 }
 
 /// `HomeProjectRow` in a column `width` wide: the avatar and name as the nav button (layer-01
@@ -114,9 +126,9 @@ fn menu_key(id: &str) -> String {
 /// and New session (small ghost-muted IconButtons, `right-1 gap-1 pl-2`) over an 8 pt fade into
 /// the row's surface. A click scopes Home to it; a right-click opens its menu.
 pub(super) fn project_row(s: &App, p: &Pal, server: &ServerKey, proj: &model::Project, active: bool, width: f32) -> El {
-    let menu = menu_key(&proj.id);
+    let menu = menu_key(server, &proj.id, &proj.directory);
     let menu_open = s.popup.open_at(&menu);
-    let (menu_id, ctx_id, new_dir, dir) = (proj.id.clone(), proj.id.clone(), proj.directory.clone(), proj.directory.clone());
+    let (menu_id, ctx_id, menu_dir, ctx_dir, new_dir, dir) = (proj.id.clone(), proj.id.clone(), proj.directory.clone(), proj.directory.clone(), proj.directory.clone(), proj.directory.clone());
     let (menu_server, ctx_server, new_server, server) = (server.clone(), server.clone(), server.clone(), server.clone());
     let surface = if active { p.layer3 } else { p.layer1 };
     // `pl-2`, two 20 pt buttons `gap-1`: the fade runs over the first 8.
@@ -132,9 +144,9 @@ pub(super) fn project_row(s: &App, p: &Pal, server: &ServerKey, proj: &model::Pr
         .linear_gradient(std::f32::consts::FRAC_PI_2, [(0.0, surface.alpha(0.0)), (8.0 / actions_w, surface), (1.0, surface)])
         .child(
             icon_button(p, &menu, t!("common.moreOptions"), &ic::OUTLINE_DOTS, menu_open)
-                .menu_button(menu.clone(), move |s: &mut App, tx: &mut Tx| open_menu(s, &menu_server, &menu_id, tx)),
+                .menu_button(menu.clone(), move |s: &mut App, tx: &mut Tx| open_menu(s, &menu_server, &menu_id, &menu_dir, tx)),
         )
-        .child(icon_button(p, &format!("hp-new-{}", proj.id), t!("command.session.new"), &ic::EDIT, false).on_press_tx(move |s: &mut App, tx: &mut Tx| {
+        .child(icon_button(p, &format!("hp-new-{new_server}-{}-{}", proj.id, proj.directory), t!("command.session.new"), &ic::EDIT, false).on_press_tx(move |s: &mut App, tx: &mut Tx| {
             crate::servers::runtime::switch(s, &new_server);
             s.new_session_in(&new_dir, tx);
         }));
@@ -169,14 +181,14 @@ pub(super) fn project_row(s: &App, p: &Pal, server: &ServerKey, proj: &model::Pr
         })
     };
     let mut r = row()
-        .key(format!("hp-{}", proj.id))
+        .key(format!("hp-{ctx_server}-{}-{}", proj.id, proj.directory))
         .w(width)
         .h(28.0)
         .center_y()
         .radius(6.0)
         .hover_group()
         .hover(surface)
-        .on_secondary_press(move |s: &mut App, _: rune::PointerPress, tx: &mut Tx| open_menu(s, &ctx_server, &ctx_id, tx))
+        .on_secondary_press(move |s: &mut App, _: rune::PointerPress, tx: &mut Tx| open_menu(s, &ctx_server, &ctx_id, &ctx_dir, tx))
         .child(nav)
         .child(if menu_open || session_view::style::hover_none() { actions } else { actions.group_opacity(0.0, 1.0) });
     if active || menu_open {
@@ -204,13 +216,24 @@ pub(crate) fn icon_button(p: &Pal, key: &str, label: &str, glyph: &'static Icon,
 /// `ProjectMenuItems`: New session, Import session, Edit project, Reveal in File Explorer (a
 /// local server's), Clear notifications (while any of its sessions is unread), then Close.
 /// Server `server`'s project `id`: the menu reads it there, and its picks act there.
-fn open_menu(s: &mut App, server: &ServerKey, id: &str, tx: &mut Tx) {
-    crate::servers::runtime::with_server(s, server, |s| open_project_menu(s, id, menu_key(id), tx));
+fn open_menu(s: &mut App, server: &ServerKey, id: &str, dir: &str, tx: &mut Tx) {
+    crate::servers::runtime::with_server(s, server, |s| open_project_menu_in(s, id, Some(dir), menu_key(server, id, dir), tx));
 }
 
 /// `open_menu` under the element keyed `anchor`, for the server the window works against.
 pub(crate) fn open_project_menu(s: &mut App, id: &str, anchor: String, tx: &mut Tx) {
-    let Some(proj) = s.project(id).cloned() else { return };
+    open_project_menu_in(s, id, None, anchor, tx);
+}
+
+fn open_project_menu_in(s: &mut App, id: &str, dir: Option<&str>, anchor: String, tx: &mut Tx) {
+    let proj = dir
+        .and_then(|d| {
+            let key = opencode_servers::home::same_directory_key(d);
+            s.projects.iter().find(|p| p.id == id && opencode_servers::home::same_directory_key(&p.directory) == key)
+        })
+        .or_else(|| s.project(id))
+        .cloned();
+    let Some(proj) = proj else { return };
     let server = crate::servers::runtime::active(s).clone();
     let unread = project_unread(s, &proj).next().is_some();
     let local = matches!(&*s.source, crate::Source::Live { server, .. } if server.is_local());
@@ -411,7 +434,7 @@ pub(crate) fn home_projects_popover(s: &App, p: &Pal) -> Option<[El; 2]> {
     if s.route != Route::Home || !s.project_state.home_menu_open {
         return None;
     }
-    let selected_id = s.home_selected().map(|p| p.id.as_str());
+    let selected_dir = s.home_selected().map(|p| opencode_servers::home::same_directory_key(&p.directory));
     let scope = super::scoped(s);
     let width = if scope { 280.0 } else { s.project_state.trigger_w.max(160.0) };
     let server = crate::servers::runtime::active(s);
@@ -431,12 +454,13 @@ pub(crate) fn home_projects_popover(s: &App, p: &Pal) -> Option<[El; 2]> {
             s.clear_home_project(tx);
             super::picked(s, tx);
         });
-        if selected_id.is_none() {
+        if selected_dir.is_none() {
             all = all.fill(p.layer3);
         }
         let mut list = col().key("home-projects-options").w_full().gap(4.0);
         for proj in s.used_projects() {
-            list = list.child(project_row(s, p, server, proj, selected_id == Some(proj.id.as_str()), row_w));
+            let active = selected_dir.as_deref() == Some(opencode_servers::home::same_directory_key(&proj.directory).as_str());
+            list = list.child(project_row(s, p, server, proj, active, row_w));
         }
         let add = nav_row(p, "hpm-add", &ic::FOLDER_ADD_LEFT, t!("home.project.add")).w_full().mt(4.0);
         let add = if failed {

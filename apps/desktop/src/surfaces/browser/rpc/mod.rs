@@ -8,6 +8,7 @@ mod comes_back;
 mod exec;
 pub mod express;
 mod frames;
+mod hold;
 mod session;
 mod start_gate;
 mod suppression;
@@ -28,6 +29,7 @@ use rune::{Tx, Waker, time::Instant};
 use serde_json::Value;
 
 pub use self::comes_back::person_came;
+pub use self::exec::wake::{is_tab_or_session_busy, on_tab_hibernated};
 use self::session::SessionAttachment;
 pub use self::tunnel::grant_remote_navigation;
 use self::start_gate::{StartWaiter, drain_start_waiters};
@@ -119,6 +121,7 @@ pub struct BrowserRpcState {
     ref_counter: u64,
     /// App-wide single active trace owner (`Some(host_id)` while tracing; official `shared.trace`).
     pub(super) active_trace_host: Option<u64>,
+    holds: hold::RpcHoldManager,
 }
 
 impl Default for BrowserRpcState {
@@ -141,6 +144,7 @@ impl Default for BrowserRpcState {
             next_diag_scope: 1,
             ref_counter: 0,
             active_trace_host: None,
+            holds: hold::RpcHoldManager::default(),
         }
     }
 }
@@ -179,29 +183,7 @@ pub fn session_prompt_gate_settled(app: &App, server_key: &ServerKey, session_id
         .is_none_or(|att| att.attach.prompt_gate_settled())
 }
 
-static CONNECTED_BASES: std::sync::LazyLock<std::sync::Mutex<BTreeSet<String>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(BTreeSet::new()));
-
-fn mark_base_connected(base: &str) {
-    CONNECTED_BASES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(base.to_owned());
-}
-
-fn clear_base_connected(base: &str) {
-    CONNECTED_BASES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .remove(base);
-}
-
-fn is_base_connected(base: &str) -> bool {
-    CONNECTED_BASES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .contains(base)
-}
+use self::workers::{clear_base_connected, is_base_connected, mark_base_connected};
 
 /// Called when `/api/event` drops (`Incoming::StreamDown`) so stale connected bases and remote
 /// tunnels are cleared immediately.
@@ -479,9 +461,9 @@ pub fn poll(app: &mut App, tx: &mut Tx) -> bool {
 
     // 4. Start newly fetched commands & step in-flight commands without blocking the UI thread.
     // Move `sessions` temporarily out of `Slot` so executors can mutably borrow `App`.
-    let (mut sessions, mut ref_counter, waker) = {
+    let (mut sessions, mut holds, mut ref_counter, waker) = {
         let st = app.kernel.slots.get_mut(&BROWSER_RPC);
-        (std::mem::take(&mut st.sessions), st.ref_counter, st.waker.clone())
+        (std::mem::take(&mut st.sessions), std::mem::take(&mut st.holds), st.ref_counter, st.waker.clone())
     };
 
     for (key, conn_id, req_id, res) in fetched_commands {
@@ -566,9 +548,21 @@ pub fn poll(app: &mut App, tx: &mut Tx) -> bool {
         }
     }
 
+    let active_root = app
+        .active_session_id()
+        .map(|sid| app.panel_root(sid).to_owned());
+    session::prune_idle_captures(&mut sessions, |sid| {
+        active_root.as_deref() == Some(app.panel_root(sid))
+            || app.session_busy(sid)
+            || app.subtree_busy(sid)
+    });
+    if let Some(w) = holds.sync(app, &mut sessions, now) {
+        earliest_wake = Some(earliest_wake.map_or(w, |cur| cur.min(w)));
+    }
     {
         let st = app.kernel.slots.get_mut(&BROWSER_RPC);
         st.sessions = sessions;
+        st.holds = holds;
         st.ref_counter = ref_counter;
     }
     apply_batch_effects(app, tick_effects, Some(tx));
@@ -748,15 +742,19 @@ fn apply_batch_effects(
                         att.mark_cancelled(id);
                     }
                     let cmds = std::mem::take(&mut att.active_commands);
+                    let mut cancelled = Vec::new();
                     let mut kept = Vec::with_capacity(cmds.len());
-                    for mut cmd in cmds {
+                    for cmd in cmds {
                         if request_ids.iter().any(|id| id == &cmd.request_id) {
-                            cmd.cancel_cleanup(att, app, tx_opt.as_deref_mut());
+                            cancelled.push(cmd);
                         } else {
                             kept.push(cmd);
                         }
                     }
                     att.active_commands = kept;
+                    for mut cmd in cancelled {
+                        cmd.cancel_cleanup(att, app, tx_opt.as_deref_mut());
+                    }
                 }
                 AttachEffect::ActivateTunnel { .. }
                 | AttachEffect::ScheduleTimer { .. }

@@ -280,8 +280,8 @@ pub fn apply_reply(host: &mut dyn ConnectHost, reply: ConnectReply, tx: &mut Tx)
                 }
                 SyncAfter::ClaudeConfirm { session, check } => {
                     let problem = crate::accounts_of(host, CLAUDE).problem;
-                    let first = crate::first_model(host, CLAUDE);
-                    crate::connect_event(host, Event::ClaudeConfirmed { session, check, problem, first }, tx);
+                    let has_models = crate::has_models(host, CLAUDE);
+                    crate::connect_event(host, Event::ClaudeConfirmed { session, check, problem, has_models }, tx);
                 }
                 SyncAfter::RefreshConnection { dir, provider, session, attempt, tries } => {
                     finish_refresh_connection(host, dir, provider, session, attempt, tries, ok, tx);
@@ -560,7 +560,7 @@ fn finish_refresh_connection(
         });
         return;
     }
-    let catalog = Snapshot { pending: tries == Some(0) && !console_loaded(host), first: crate::first_model(host, &provider) };
+    let catalog = Snapshot { pending: tries == Some(0) && !console_loaded(host), has_models: crate::has_models(host, &provider) };
     crate::connect_event(
         host,
         Event::Result { session, provider, event: Answer::RefreshSucceeded { attempt }, catalog: Some(catalog) },

@@ -59,16 +59,35 @@ impl WireError {
         }
     }
 
-    /// Whether the call certainly never reached OpenCode: no connection was made, or OpenCode
-    /// refused it (a 4xx). A timeout, a dropped connection or a 5xx may have arrived.
-    pub fn failed_for_sure(&self) -> bool {
-        matches!(self.kind, WireKind::Unreachable(_)) || self.status().is_some_and(|s| (400..500).contains(&s))
+    /// The server's own explanation, when it sent one.
+    pub fn message(&self) -> Option<&str> {
+        match &self.kind {
+            WireKind::Status { message: Some(m), .. } if !m.trim().is_empty() => Some(m.trim()),
+            _ => None,
+        }
     }
 
-    /// Whether the same call is worth asking again: the server may be busy or briefly gone. A 4xx
-    /// or an answer that isn't OpenCode's won't change on a retry.
+    /// Structured `SkillLoadError` returned when preparing a prompt or loading a skill fails
+    /// (`packages/protocol/src/groups/session.ts`, `opencode#66207`).
+    pub fn is_skill_load_error(&self) -> bool {
+        matches!(&self.kind, WireKind::Status { tag: Some(t), .. } if t == "SkillLoadError")
+    }
+
+    /// Whether the call certainly never reached OpenCode: no connection was made, or OpenCode
+    /// refused it (a 4xx or a pre-admission `SkillLoadError`). A timeout, a dropped connection or
+    /// any other 5xx may have arrived.
+    pub fn failed_for_sure(&self) -> bool {
+        matches!(self.kind, WireKind::Unreachable(_))
+            || self.status().is_some_and(|s| (400..500).contains(&s))
+            || self.is_skill_load_error()
+    }
+
+    /// Whether the same call is worth asking again: the server may be busy or briefly gone. A 4xx,
+    /// a structured `SkillLoadError` (HTTP 502), or an answer that isn't OpenCode's won't change
+    /// on a retry.
     pub fn transient(&self) -> bool {
-        matches!(self.kind, WireKind::Unreachable(_) | WireKind::TimedOut | WireKind::Dropped(_)) || matches!(self.status(), Some(502..=504))
+        matches!(self.kind, WireKind::Unreachable(_) | WireKind::TimedOut | WireKind::Dropped(_))
+            || matches!(&self.kind, WireKind::Status { status: 502..=504, tag, .. } if tag.as_deref() != Some("SkillLoadError"))
     }
 
     /// Something other than OpenCode answered (`Redirected`, `NotOpenCode`).
@@ -232,10 +251,20 @@ pub(crate) fn explanation(content_type: &str, body: &[u8]) -> (Option<String>, O
     if is_json(content_type) {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return (None, None) };
         let tag = v["_tag"].as_str().or_else(|| v["name"].as_str()).or_else(|| v["error"]["code"].as_str()).map(str::to_owned);
-        let message = [&v["message"], &v["error"]["message"], &v["data"]["message"], &v["error"]]
+        let mut message = [&v["message"], &v["error"]["message"], &v["data"]["message"], &v["error"]]
             .into_iter()
             .find_map(|m| m.as_str().map(str::trim).filter(|m| !m.is_empty()))
             .map(|m| m.lines().next().unwrap_or(m).to_owned());
+        // Include the failing skill identifier for structured SkillLoadError responses (opencode#66207).
+        if tag.as_deref() == Some("SkillLoadError")
+            && let Some(skill) = v["skill"].as_str().map(str::trim).filter(|s| !s.is_empty())
+        {
+            message = Some(match message {
+                Some(m) if m.contains(skill) => m,
+                Some(m) => format!("Skill \"{skill}\": {m}"),
+                None => format!("Failed to load skill \"{skill}\""),
+            });
+        }
         return (tag, message);
     }
     let plain = content_type.split(';').next().is_some_and(|t| t.trim().eq_ignore_ascii_case("text/plain"));

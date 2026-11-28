@@ -10,8 +10,8 @@ use super::{header, page, select};
 use crate::host::SettingsHost;
 use crate::{Choice as _, Organize, change_settings, list, setting, switch};
 
-fn toggle_new_question_ui(s: &mut dyn SettingsHost) {
-    change_settings(s, |x| x.new_question_ui = !x.new_question_ui);
+fn toggle_question_composer(s: &mut dyn SettingsHost) {
+    change_settings(s, |x| x.question_composer = Some(!x.question_composer()));
 }
 
 fn toggle_tab_groups(s: &mut dyn SettingsHost) {
@@ -33,7 +33,7 @@ fn pick_organize(s: &mut dyn SettingsHost, id: &str, tx: &mut Tx) {
 
 pub fn view<H: SettingsHost + PopupHost + 'static>(s: &H, p: &Pal) -> El {
     let st = s.settings();
-    let rows = vec![
+    let mut rows = vec![
         (
             "settings-tab-groups",
             setting(
@@ -65,13 +65,13 @@ pub fn view<H: SettingsHost + PopupHost + 'static>(s: &H, p: &Pal) -> El {
             ),
         ),
         (
-            "settings-new-question-ui",
+            "settings-question-composer",
             setting(
                 p,
-                "settings-new-question-ui",
-                t!("settings.experimental.row.newQuestionUI.title"),
-                t!("settings.experimental.row.newQuestionUI.description"),
-                switch(p, "new-question-ui-switch", st.new_question_ui).on_press(|s: &mut H| toggle_new_question_ui(s)),
+                "settings-question-composer",
+                t!("settings.experimental.row.questionComposer.title"),
+                t!("settings.experimental.row.questionComposer.description"),
+                switch(p, "question-composer-switch", st.question_composer()).on_press(|s: &mut H| toggle_question_composer(s)),
             ),
         ),
         (
@@ -85,6 +85,9 @@ pub fn view<H: SettingsHost + PopupHost + 'static>(s: &H, p: &Pal) -> El {
             ),
         ),
     ];
+    if !crate::question_composer_available() {
+        rows.retain(|(id, _)| *id != "settings-question-composer");
+    }
     let developer = s.developer_section(p).map(|section| super::revealable(s, p, "record-glitches", 0.0, section));
     let body = col()
         .w_full()

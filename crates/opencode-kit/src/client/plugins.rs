@@ -116,4 +116,13 @@ impl Server {
             Err(e) => Err(e),
         }
     }
+
+    /// Resolved UI feature flags for `directory` (`GET /api/experimental/flag`,
+    /// `packages/protocol/src/groups/flag.ts`, `opencode#66509`). Flags not listed are off.
+    pub fn flags(&self, directory: Option<&str>) -> Result<std::collections::BTreeMap<String, bool>, WireError> {
+        let path = format!("/api/experimental/flag{}", location_query(directory));
+        let v = self.get(&path)?;
+        let obj = v.get("data").and_then(Value::as_object).or_else(|| v.as_object());
+        Ok(obj.into_iter().flatten().filter_map(|(k, v)| v.as_bool().map(|b| (k.clone(), b))).collect())
+    }
 }

@@ -235,6 +235,15 @@ impl App {
         self.running.iter().any(|id| self.root_of(id) == root)
     }
 
+    /// Whether any direct child session of `session_id` is currently running (`hasRunningChild` in
+    /// `packages/app/src/shell/notifications/notification.tsx:33-43`): only direct children count
+    /// (a grandchild reports to its own parent, and running shells do not count).
+    pub(crate) fn has_running_child(&self, session_id: &str) -> bool {
+        self.running
+            .iter()
+            .any(|c| c != session_id && self.session(c).and_then(|s| s.parent.as_deref()) == Some(session_id))
+    }
+
     /// The permission and the form waiting on a person anywhere in `root`'s family, by request
     /// id (`sessionPermissionRequest`, `sessionFormRequest`). A permission with a reply on its way,
     /// or one auto-accept answers, doesn't wait (`needsUser`).

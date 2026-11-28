@@ -21,5 +21,5 @@
   "problem.depth": "This file could not be shown because its content is nested too deeply.",
   "problem.format": "This file is not a valid Office document.",
   "problem.openFailed": "This file could not be shown.",
-  "view.binary": "Binary file \u00b7 {{size}}"
+  "view.binary": "Binary file · {{size}}"
 }

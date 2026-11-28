@@ -174,6 +174,9 @@ impl App {
     fn preview_blocked(&self, id: &str) -> bool {
         self.gestures.tab_drag.phase() != rune_kit::shell::TabDragPhase::Idle
             || !matches!(crate::tabs::groups::state(self).drag, crate::tabs::groups::drag::State::Idle)
+            || crate::tabs::sections::state(self).drag.is_gesture()
+            || crate::tabs::sections::state(self).naming.editing().is_some()
+            || !crate::tabs::sections::state(self).selection.is_empty()
             || self.kernel.slots.get(&crate::session_menu::MENUS).renaming().is_some_and(|t| self.names(&t, id))
             || self.kernel.slots.get(&crate::session_menu::MENUS).on.as_ref().is_some_and(|t| self.names(t, id))
     }

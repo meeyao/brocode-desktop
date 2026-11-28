@@ -67,7 +67,11 @@ fn app() -> Vec<MenuItem<App>> {
     plugin_items().into_iter().chain([
         keyed(MenuItem::new(t!("desktop.menu.settings"), |s: &mut App, tx: &mut Tx| run(s, Act::Settings, tx)).id("App/Settings"), Bind::Settings).keys_first(),
         MenuItem::new(t!("desktop.menu.reloadWebview"), |s: &mut App, tx: &mut Tx| run(s, Act::Reload, tx)).id("App/ReloadWebview"),
-        MenuItem::new(t!("desktop.menu.restart"), |_: &mut App, tx: &mut Tx| tx.relaunch()).id("App/Restart"),
+        MenuItem::new(t!("desktop.menu.restart"), |_: &mut App, tx: &mut Tx| {
+            crate::background_notice::mark_relaunch();
+            tx.relaunch();
+        })
+        .id("App/Restart"),
         MenuItem::new(t!("desktop.menu.exportLogs"), |s: &mut App, tx: &mut Tx| run(s, Act::ExportLogs, tx)).id("App/ExportLogs"),
     ])
     .collect()

@@ -84,6 +84,8 @@ return plugin.defineApp(function(ctx)
                 for _, a in args do
                     table.insert(all, a)
                 end
+                -- The desktop host resolves bare "opencode" to the bundled/staged CLI and its service
+                -- environment, matching Desktop's `ctx.cli` (`packages/gui-plugins/src/pairing/main.ts:76-81`).
                 local out = Process:RunAsync({ program = "opencode", args = all, timeout = effect.timeout })
                 if out.ok then
                     return dispatch({ type = "succeeded", attempt = attempt, stdout = string.match(out.stdout, "^%s*(.-)%s*$") or "" })

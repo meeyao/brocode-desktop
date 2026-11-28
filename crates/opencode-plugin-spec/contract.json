@@ -1,6 +1,6 @@
 {
   "$comment": "The OpenCode plugin contract: the single source of truth for plugin types, the plugin.toml schema, the selene std, the API docs and the host's Rust decoders. Edit this file, then run `cargo run -p opencode-plugin-spec -- --write`. Type strings use Luau syntax; `integer` is a whole number (Luau `number`).",
-  "contract": "1.11",
+  "contract": "1.13",
   "versioning": {
     "format": "MAJOR.MINOR",
     "rules": [
@@ -129,7 +129,9 @@
       { "value": "window.bottom", "doc": "A full-width strip under the window content, above toasts." },
       { "value": "session.header", "doc": "The end of the session header, before the usage numbers." },
       { "value": "session.location.menu", "doc": "Rows in the session's project and location menu." },
-      { "value": "session.panel.end", "doc": "The actions after the side panel's tabs." }
+      { "value": "session.panel.end", "doc": "The actions after the side panel's tabs." },
+      { "value": "session.panel.new", "doc": "The top of the side panel's New tab view, above its launchers." },
+      { "value": "session.panel.new.list", "doc": "Below the launchers of the side panel's New tab view, before Recently closed." }
     ] },
     { "name": "HostSettingsPage", "rust": true, "doc": "A host settings page a settings page can add a section to.", "values": [
       { "value": "general", "doc": "Settings › General." },
@@ -673,6 +675,7 @@
       { "name": "checked", "type": "boolean", "doc": "Ticked." },
       { "name": "indeterminate", "type": "boolean?", "since": "1.11", "doc": "Some of what it stands for is ticked: the box shows a dash, as Desktop's `indeterminate`. A press still reports the opposite of `checked`." },
       { "name": "surface", "type": "(\"base\" | \"layer-1\")?", "doc": "The background the box sits on: `base` (the default) or `layer-1`, as Desktop's `surface`; an unticked box takes its fill." },
+      { "name": "presentation", "type": "boolean?", "since": "1.12", "doc": "Draws only the checkbox box visually with no role, focus or click handler, for use inside an `option` row (Desktop's `Checkbox presentation`)." },
       { "name": "disabled", "type": "boolean?", "doc": "Cannot change; drawn at half opacity." },
       { "name": "onChange", "type": "UiHandler?", "doc": "Runs with the new state in `event.checked`." }
     ] },
@@ -706,6 +709,21 @@
       { "name": "icon", "type": "IconName", "doc": "Its icon." },
       { "name": "label", "type": "string", "doc": "Its accessible name and tooltip." },
       { "name": "key", "type": "string?", "doc": "Its element's key. Defaults to `id`." }
+    ] },
+    { "name": "UiListboxProps", "kind": "record", "extends": ["UiFrameProps"], "doc": "`ui.listbox` props: a listbox container (`role=\"listbox\"`) holding `ui.option` rows.", "fields": [] },
+    { "name": "UiOptionProps", "kind": "record", "extends": ["UiFrameProps"], "doc": "`ui.option` props: one selectable option row (`role=\"option\"`) inside a `ui.listbox`.", "fields": [
+      { "name": "selected", "type": "boolean?", "since": "1.12", "doc": "Whether this option is selected (`aria-selected`)." }
+    ] },
+    { "name": "UiSelectOption", "kind": "record", "rust": true, "doc": "One option of `ui.select`.", "fields": [
+      { "name": "value", "type": "string", "doc": "What `onChange` receives in `event.value`." },
+      { "name": "label", "type": "string", "doc": "The option's visible text." }
+    ] },
+    { "name": "UiSelectProps", "kind": "record", "extends": ["UiLayoutProps"], "official": "Select", "doc": "`ui.select` props: Desktop's `Select` dropdown control (`select-v2`).", "fields": [
+      { "name": "value", "type": "string?", "doc": "The selected option's `value`." },
+      { "name": "placeholder", "type": "string?", "doc": "Text shown when no option matches `value`." },
+      { "name": "options", "type": "{ UiSelectOption }", "doc": "The options, in order." },
+      { "name": "disabled", "type": "boolean?", "doc": "Cannot open; drawn at half opacity." },
+      { "name": "onChange", "type": "UiHandler?", "doc": "Runs when an option is picked, with its value in `event.value`." }
     ] },
     { "name": "UiSegmentedProps", "kind": "record", "extends": ["UiLayoutProps"], "doc": "`ui.segmented` props: the app's segmented control of icon items.", "fields": [
       { "name": "items", "type": "{ UiSegmentedItem }", "doc": "Its items, in order." },
@@ -1248,7 +1266,8 @@
     { "name": "BrowserOpenSpec", "kind": "record", "rust": true, "doc": "A page to open.", "fields": [
       { "name": "url", "type": "string", "doc": "The URL, or a local `:port`. Defaults to `about:blank`." },
       { "name": "sessionId", "type": "string?", "doc": "The session whose side region gets the page's tab. Defaults to the routed session." },
-      { "name": "background", "type": "boolean?", "doc": "Opens the tab without moving the keyboard: focus stays where it is." }
+      { "name": "background", "type": "boolean?", "doc": "Opens the tab without moving the keyboard: focus stays where it is." },
+      { "name": "pane", "type": "string?", "doc": "The side-region pane (`side`, `split`, or `bottom`) to open the page's tab in." }
     ] },
     { "name": "BrowserShowOptions", "kind": "record", "rust": true, "doc": "Where to show a page's tab.", "fields": [
       { "name": "sessionId", "type": "string?", "doc": "The session whose side region shows it. Defaults to the routed session." },
@@ -1607,7 +1626,10 @@
       { "name": "directory", "type": "string?", "doc": "Session slots: its workspace folder." },
       { "name": "active", "type": "boolean?", "doc": "`session.header`: the timeline is on screen." },
       { "name": "compact", "type": "boolean?", "doc": "`session.header`: the title needs the room, so draw the compact form." },
-      { "name": "shown", "type": "boolean?", "doc": "`session.location.menu`: the menu is open." }
+      { "name": "shown", "type": "boolean?", "doc": "`session.location.menu`: the menu is open." },
+      { "name": "pane", "type": "string?", "doc": "New tab slots: the pane (`side`, `split`, or `bottom`)." },
+      { "name": "width", "type": "number?", "doc": "New tab slots: the pane's available width in points." },
+      { "name": "focusToken", "type": "integer?", "doc": "New tab slots: incremented when the user explicitly asked for this New tab, so its first field takes focus once." }
     ] },
     { "name": "SlotSpec", "kind": "record", "rust": true, "official": "Slot", "doc": "Content for one of the shell's slots.", "fields": [
       { "name": "id", "type": "string", "doc": "Its id within the plugin." },
@@ -2002,6 +2024,9 @@
     { "name": "checkbox", "category": "control", "since": "1.7", "sig": "(props: UiCheckboxProps) -> UiNode", "props": "UiCheckboxProps", "doc": "Desktop's compact checkbox with its label." },
     { "name": "radio", "category": "control", "sig": "(props: UiRadioProps) -> UiNode", "props": "UiRadioProps", "doc": "A radio row." },
     { "name": "field", "category": "control", "sig": "(props: UiFieldProps) -> UiNode", "props": "UiFieldProps", "doc": "The app's own text field." },
+    { "name": "listbox", "category": "layout", "since": "1.12", "sig": "(props: UiListboxProps?, children: { UiNode }?) -> UiNode", "props": "UiListboxProps", "doc": "A listbox container (`role=\"listbox\"`) of selectable `ui.option` rows." },
+    { "name": "option", "category": "layout", "since": "1.12", "sig": "(props: UiOptionProps?, children: { UiNode }?) -> UiNode", "props": "UiOptionProps", "doc": "One selectable option row (`role=\"option\"`) inside a `ui.listbox`." },
+    { "name": "select", "category": "control", "since": "1.12", "sig": "(props: UiSelectProps) -> UiNode", "props": "UiSelectProps", "doc": "Desktop's select dropdown control." },
     { "name": "segmented", "category": "control", "sig": "(props: UiSegmentedProps) -> UiNode", "props": "UiSegmentedProps", "doc": "The app's segmented control." },
     { "name": "loader", "category": "control", "sig": "(props: UiLoaderProps?) -> UiNode", "props": "UiLoaderProps", "doc": "The app's spinner." },
     { "name": "progressCircle", "category": "content", "sig": "(props: UiProgressCircleProps) -> UiNode", "props": "UiProgressCircleProps", "doc": "The app's progress ring: a track and an arc from twelve o'clock, clockwise." },

@@ -18,6 +18,8 @@ local address = {}
 address.SUGGESTIONS = 5
 address.HISTORY_ANSWER = 8
 address.HINT_MAX_LENGTH = 48
+address.NEW_TAB_ID = "__new_tab__"
+address.BLANK_EPOCH = table.freeze({ url = "", loading = false, settled = 0, followed = 0, rejected = 0, moved = 0 })
 
 export type Epoch = {
     url: string,
@@ -61,6 +63,7 @@ export type Event =
     | { type: "forget", url: string?, visits: { history.Visit } }
     | { type: "submitted", tab: string, epoch: Epoch, visits: { history.Visit } }
     | { type: "navigated", tab: string, url: string, epoch: Epoch }
+    | { type: "page.followed", tab: string, epoch: Epoch }
 
 export type Effect =
     { type: "select" }
@@ -492,8 +495,27 @@ function address.step(state: State, event: Event): (State, { Effect })
             return navigate(state, event.tab, text, event.epoch, true)
         end
         return { asked = state.asked, edit = { status = "rest" }, holds = state.holds }, { BLUR }
-    else
+    elseif event.type == "navigated" then
         return navigate(state, event.tab, event.url, event.epoch, false)
+    elseif event.type == "page.followed" then
+        if edit.status ~= "editing" or edit.tab ~= event.tab or edit.typed or edit.list.type ~= "following" then
+            return state, {}
+        end
+        if activeHold(state, event.tab, event.epoch) ~= nil or edit.text == event.epoch.url then
+            return state, {}
+        end
+        local nextEdit: Edit = {
+            status = "editing",
+            tab = edit.tab,
+            text = event.epoch.url,
+            typed = false,
+            list = edit.list,
+            answer = edit.answer,
+            completing = false,
+        }
+        return { asked = state.asked, edit = nextEdit, holds = state.holds }, { SELECT }
+    else
+        return state, {}
     end
 end
 

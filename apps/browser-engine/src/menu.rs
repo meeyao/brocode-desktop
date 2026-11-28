@@ -52,6 +52,10 @@ struct HeldMenu {
     target: crate::extensions::context_menus::MenuTarget,
     /// The menu was for an editable field: only then do Spellcheck / Languages run.
     editable: bool,
+    /// Full (wire-bounded) selection captured at menu open for host-clipboard Copy/Cut.
+    selection_text: String,
+    can_copy: bool,
+    can_cut: bool,
     /// The frame the menu opened in (CEF's identifier, which is the DevTools frame id).
     frame_id: Option<String>,
     callback: RunContextMenuCallback,
@@ -63,6 +67,10 @@ pub enum MenuFollowUp {
     Extension { ext_id: String, item_id: String, target: crate::extensions::context_menus::MenuTarget },
     /// Copy image: the engine reads and re-encodes the image (`menu_extras.rs`).
     CopyImage { url: String, frame_id: Option<String> },
+    /// Host-bridged Copy/Cut: text captured directly from `ContextMenuParams::selection_text`.
+    CopyText { text: String },
+    /// Host-bridged Copy/Cut fallback via isolated-world selection reader.
+    CopySelection { cut: bool },
 }
 
 /// Per-tab held CEF context menu callback (at most one active at a time).
@@ -135,6 +143,25 @@ impl TabMenuState {
             ContextMenuCommand::Copy => {
                 if let Some(f) = browser.focused_frame().or_else(|| browser.main_frame()) {
                     f.copy();
+                }
+            }
+            ContextMenuCommand::CutToHost => {
+                if held.can_cut {
+                    if !held.selection_text.is_empty() {
+                        if let Some(f) = browser.focused_frame().or_else(|| browser.main_frame()) {
+                            f.del();
+                        }
+                        return Some(MenuFollowUp::CopyText { text: held.selection_text });
+                    }
+                    return Some(MenuFollowUp::CopySelection { cut: true });
+                }
+            }
+            ContextMenuCommand::CopyToHost => {
+                if held.can_copy {
+                    if !held.selection_text.is_empty() {
+                        return Some(MenuFollowUp::CopyText { text: held.selection_text });
+                    }
+                    return Some(MenuFollowUp::CopySelection { cut: false });
                 }
             }
             ContextMenuCommand::Paste => {
@@ -342,11 +369,18 @@ wrap_context_menu_handler! {
                 languages,
                 dictionaries,
             };
+            let full_selection = crate::menu_extras::truncate_utf8(
+                &selection_text,
+                crate::menu_extras::MAX_COPIED_TEXT_BYTES,
+            );
             if let Some(prev) = self.menu_state.held.lock().unwrap().replace(HeldMenu {
                 id,
                 src_url: menu.src_url.clone().filter(|_| menu.has_image_contents),
                 target,
                 editable: is_editable,
+                selection_text: full_selection,
+                can_copy: menu.can_copy,
+                can_cut: menu.can_cut,
                 frame_id: frame.map(|f| CefString::from(&f.identifier()).to_string()).filter(|s| !s.is_empty()),
                 callback: callback.clone(),
             }) {

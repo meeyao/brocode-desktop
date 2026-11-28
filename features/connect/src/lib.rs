@@ -487,7 +487,9 @@ pub fn preview_step(host: &mut dyn ConnectHost, provider: &str, step: Step) {
             provider: Some(Provider { id: provider.into(), accounts: Accounts::default(), step, closed: false }),
             ..Dialog::default()
         };
-        open.search.focused = false;
+        let in_models = matches!(open.dialog.provider.as_ref().map(|p| &p.step), Some(Step::Models));
+        open.search = if in_models { focused("") } else { TextEdit::new("") };
+        open.active = None;
     }
 }
 
@@ -520,8 +522,10 @@ pub fn connect_event(host: &mut dyn ConnectHost, event: Event, tx: &mut Tx) {
     };
     if moved {
         fresh_inputs(host);
-        // Like the dialog's focus host. A freshly focused entry or the picker search wins.
-        if host.connect().dialog().is_some_and(|o| o.dialog.provider.is_some()) {
+        let in_models = host.connect().dialog().and_then(|o| o.dialog.provider.as_ref()).is_some_and(|p| matches!(p.step, Step::Models));
+        if in_models {
+            tx.focus("connect-models-search", false);
+        } else if host.connect().dialog().is_some_and(|o| o.dialog.provider.is_some()) {
             tx.focus("connect-focus-host", false);
         }
     }
@@ -534,9 +538,15 @@ pub fn connect_event(host: &mut dyn ConnectHost, event: Event, tx: &mut Tx) {
 fn fresh_inputs(host: &mut dyn ConnectHost) {
     let Some(open) = host.connect_mut().dialog_mut() else { return };
     let value = steps::field_default(&open.dialog);
+    let in_models = open.dialog.provider.as_ref().is_some_and(|p| matches!(p.step, Step::Models));
     open.field = focused(&value);
     open.entry = focused("");
-    open.search.focused = open.dialog.provider.is_none();
+    if in_models {
+        open.search = focused("");
+        open.active = None;
+    } else {
+        open.search.focused = open.dialog.provider.is_none();
+    }
     open.menu = None;
 }
 
@@ -565,9 +575,9 @@ pub fn connection_models(host: &dyn ConnectHost, id: &str) -> Vec<Model> {
     host.models().iter().filter(|m| of(&m.provider)).cloned().collect()
 }
 
-/// The first model the connection offers, `provider:id`, as its models step lights it.
-pub fn first_model(host: &dyn ConnectHost, provider: &str) -> Option<String> {
-    steps::connection_groups(host, provider).first().and_then(|(_, models)| models.first()).map(|m| m.key.clone())
+/// Whether the connection offers any models to pick from (`controller.ts:hasModels`).
+pub fn has_models(host: &dyn ConnectHost, provider: &str) -> bool {
+    !steps::connection_groups(host, provider).is_empty()
 }
 
 /// Display name for integration/provider `id` in the open dialog's location.
@@ -585,8 +595,12 @@ pub fn key(host: &mut dyn ConnectHost, ev: &KeyEvent, tx: &mut Tx) -> bool {
     if welcome::key(host, ev, tx) || usage_limit::key(host, ev, tx) || unpaid::key(host, ev, tx) {
         return true;
     }
-    let (menu_open, in_picker) = match host.connect().dialog() {
-        Some(open) => (open.menu.is_some(), open.dialog.provider.is_none()),
+    let (menu_open, in_picker, in_models) = match host.connect().dialog() {
+        Some(open) => (
+            open.menu.is_some(),
+            open.dialog.provider.is_none(),
+            open.dialog.provider.as_ref().is_some_and(|p| matches!(p.step, Step::Models)),
+        ),
         None => return false,
     };
     if ev.key == Key::Escape {
@@ -602,6 +616,9 @@ pub fn key(host: &mut dyn ConnectHost, ev: &KeyEvent, tx: &mut Tx) -> bool {
     }
     if in_picker {
         return view::picker_key(host, ev, tx);
+    }
+    if in_models {
+        return steps::models::models_key(host, ev, tx);
     }
     false
 }

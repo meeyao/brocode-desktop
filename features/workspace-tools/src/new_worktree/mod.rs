@@ -291,7 +291,7 @@ pub fn project_worktrees(host: &dyn NewWorktreeHost, project: &str, root: &str) 
     let listed = host.new_worktree().listed.get(project).cloned().unwrap_or_default();
     let mut out: Vec<String> = Vec::new();
     for dir in listed.into_iter().chain(project_sandboxes(project)) {
-        if path::trim(&dir) != path::trim(root) && !out.iter().any(|d| path::trim(d) == path::trim(&dir)) {
+        if !path::same(path::trim(&dir), path::trim(root)) && !out.iter().any(|d| path::same(path::trim(d), path::trim(&dir))) {
             out.push(dir);
         }
     }
@@ -306,7 +306,8 @@ pub fn managed_worktrees(host: &dyn NewWorktreeHost, project: &str) -> Vec<Strin
 /// Membership doesn't need the picker's owned, deduplicated list.
 pub fn has_worktree_at(host: &dyn NewWorktreeHost, project: &Project, dir: &str) -> bool {
     let root = path::trim(&project.directory);
-    let matches = |s: &String| path::trim(s.trim()) == dir && path::trim(s) != root;
+    let dir = path::trim(dir.trim());
+    let matches = |s: &String| path::same(path::trim(s.trim()), dir) && !path::same(path::trim(s.trim()), root);
     host.new_worktree().listed.get(&project.id).is_some_and(|dirs| dirs.iter().any(matches))
         || project_sandboxes(&project.id).iter().any(matches)
 }

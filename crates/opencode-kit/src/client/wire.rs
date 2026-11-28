@@ -35,7 +35,7 @@ pub enum Incoming {
     /// A read or write that failed, as the client knows it: the call and what answered, typed.
     /// The UI builds what it says from this, never from text.
     Failed(WireError),
-    /// A prompt write (`Write::Send`, `SendMovingHome`, `SendFromRevert`, `StartAs`) that failed,
+    /// A prompt write (`Write::Send`, `SendFromRevert`, `StartAs`) that failed,
     /// with the id the prompt was sent under and its error.
     SendFailed { session: String, id: String, error: WireError },
     /// A rename, delete, archive or restore this window sent (`client.session.write`'s `data`),
@@ -66,6 +66,8 @@ pub enum Incoming {
     /// The folder the server was started in, its default location (the reply to
     /// `Request::DefaultDirectory`).
     DefaultDirectory(String),
+    /// Resolved UI feature flags for `directory` (the reply to `Request::Flags`).
+    Flags { directory: Option<String>, flags: std::collections::BTreeMap<String, bool> },
     /// A folder resolved and registered as a project (`Write::OpenProject`), with the updated
     /// project list and, when `start_session` was set, the new session opened in it.
     ProjectOpened { location: model::LocationInfo, projects: Vec<model::Project>, session: Option<SessionInfo> },
@@ -113,6 +115,9 @@ pub enum Request {
     /// The server's default location (`GET /api/location` with no directory), replied as
     /// `Incoming::DefaultDirectory`; a failed read stays quiet.
     DefaultDirectory,
+    /// Resolved UI feature flags for `directory` (`GET /api/experimental/flag`,
+    /// `packages/protocol/src/groups/flag.ts`), replied as `Incoming::Flags`.
+    Flags { directory: Option<String> },
     /// One session's info (`time.idle`/`time.viewed` after it finishes or someone views it).
     Info(String),
     /// [`Request::Info`] for a session named in a message, which may not exist: replied as
@@ -149,9 +154,7 @@ pub enum Write {
     Create { directory: String, text: String },
     /// `Prompt` with its client id and files.
     Send { session: String, prompt: Prompt },
-    /// `Send` that moves a session whose folder is gone to its project's main checkout first
-    /// (`Server::send_moving_home`).
-    SendMovingHome { session: String, prompt: Prompt },
+
     /// `Create` with a full first prompt.
     Start { directory: String, prompt: Prompt },
     /// `Start` under an id the app chose (`session_id`), so it can show the session before the
@@ -226,7 +229,7 @@ impl Write {
         match self {
             Self::Prompt { session, .. } | Self::Permission { session, .. }
             | Self::Form { session, .. } | Self::CancelForm { session, .. }
-            | Self::Send { session, .. } | Self::SendMovingHome { session, .. }
+            | Self::Send { session, .. }
             | Self::StartAs { session, .. } | Self::Cancel { session, .. }
             | Self::Deliver { session, .. } | Self::Shell { session, .. }
             | Self::Rename { session, .. } | Self::View { session, .. }

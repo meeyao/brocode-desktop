@@ -15,6 +15,7 @@ mod same_doc;
 mod settle;
 pub(super) mod snapshot;
 mod target_url;
+pub(super) mod wake;
 
 use std::time::Duration;
 
@@ -32,6 +33,7 @@ use self::nav::WaitLoadState;
 use self::profile::ProfileState;
 use self::read::{EvalState, InspectState, VerifyFramesState, WaitState};
 use self::snapshot::{FramesState, SnapshotState};
+use self::wake::{WakePolicy, WakePoll, WakeState};
 use super::session::SessionAttachment;
 use crate::App;
 
@@ -40,6 +42,7 @@ const MAX_WAIT_CMD_TIMEOUT: Duration = Duration::from_secs(31);
 
 /// Explicit non-blocking execution state of one in-flight `experimental.browser` command.
 enum ExecPhase {
+    Wake(WakeState),
     Inspect(InspectState),
     VerifyFrames(VerifyFramesState),
     WaitLoad(WaitLoadState),
@@ -58,6 +61,7 @@ enum ExecPhase {
 impl ExecPhase {
     pub fn target_host_tab(&self) -> u64 {
         match self {
+            Self::Wake(s) => s.host_id,
             Self::Inspect(s) => s.host_id,
             Self::VerifyFrames(s) => s.host_id,
             Self::WaitLoad(s) => s.host_id,
@@ -76,6 +80,7 @@ impl ExecPhase {
 
     pub fn next_wake(&self) -> Option<Instant> {
         match self {
+            Self::Wake(s) => Some(s.next_wake()),
             Self::WaitLoad(s) => {
                 // A back/forward also waits for its commit's events, at most until the grace. Past
                 // the grace only the load ends the wait, and the load's own messages wake the poll.
@@ -97,8 +102,10 @@ impl ExecPhase {
         att: &mut SessionAttachment,
         app: &mut App,
         tx: Option<&mut Tx>,
+        other_waking: bool,
     ) {
         match self {
+            Self::Wake(st) => st.cancel_cleanup(att, app, other_waking),
             Self::Inspect(st) => {
                 for (req_id, _) in st.pending.drain(..) {
                     app.workspace_panes.browser.host.cancel_cdp(req_id);
@@ -153,13 +160,31 @@ pub(super) struct ActiveCommand {
 }
 
 impl ActiveCommand {
+    pub fn target_host_tab(&self) -> u64 {
+        self.phase.target_host_tab()
+    }
+
+    pub fn is_waking_tab(&self, tab_id: u64) -> bool {
+        matches!(&self.phase, ExecPhase::Wake(st) if st.host_id == tab_id)
+    }
+
     pub fn cancel_cleanup(
         &mut self,
         att: &mut SessionAttachment,
         app: &mut App,
         tx: Option<&mut Tx>,
     ) {
-        self.phase.cancel_cleanup(att, app, tx);
+        self.phase.cancel_cleanup(att, app, tx, false);
+    }
+
+    fn cancel_cleanup_with(
+        &mut self,
+        att: &mut SessionAttachment,
+        app: &mut App,
+        tx: Option<&mut Tx>,
+        other_waking: bool,
+    ) {
+        self.phase.cancel_cleanup(att, app, tx, other_waking);
     }
 }
 
@@ -251,7 +276,59 @@ pub(super) fn start_command(
     if !att.attach.is_request_in_flight(&connection_id, &request_id) {
         return;
     }
+    att.last_activity = now;
     let _ = att.sync_tabs(app);
+    let policy = wake::classify_command(&cmd);
+    let target_hid = cmd.tab_id().and_then(|wid| att.resolve_tab(app, wid).ok());
+    let residency = target_hid.and_then(|hid| app.workspace_panes.browser.host.tab(hid).map(|t| t.residency()));
+    let is_hibernated_or_waking = matches!(
+        residency,
+        Some(browser_pane::TabResidency::Hibernated { .. } | browser_pane::TabResidency::Waking)
+    );
+    if let Some(hid) = target_hid {
+        let should_hold = !matches!(residency, Some(browser_pane::TabResidency::Hibernated { .. }))
+            || (policy == WakePolicy::DirectTarget && !cmd.is_inspect())
+            || policy == WakePolicy::WakeBeforeDispatch;
+        if should_hold {
+            super::hold::acquire_now(att, app, hid);
+        }
+    }
+    if policy == WakePolicy::WakeBeforeDispatch
+        && is_hibernated_or_waking
+        && let Some(hid) = target_hid
+    {
+        if !cmd.is_inspect() && (cmd.generation.is_some() || cmd.target.is_some()) {
+            finish_and_reply(
+                att,
+                app,
+                &connection_id,
+                request_id,
+                Outcome::fail(
+                    failure_code::DOCUMENT_CHANGED,
+                    "The tab hibernated or is waking and must be re-inspected before running authorized actions. Refresh state and retry.",
+                ),
+                now,
+            );
+            return;
+        }
+        let is_dialog = cmd.is_inspect() || cmd.action_type() == Some("tabs.focus");
+        match wake::begin_wake(att, app, hid, cmd, now) {
+            StepOutcome::Done(outcome) => {
+                finish_and_reply(att, app, &connection_id, request_id, outcome, now);
+            }
+            StepOutcome::Pending(phase) => {
+                let deadline = phase_deadline(&phase, now);
+                att.active_commands.push(ActiveCommand {
+                    connection_id,
+                    request_id,
+                    is_dialog,
+                    deadline,
+                    phase,
+                });
+            }
+        }
+        return;
+    }
     if cmd.is_inspect() {
         match read::start_inspect(att, app, cmd) {
             StepOutcome::Done(outcome) => {
@@ -269,34 +346,8 @@ pub(super) fn start_command(
         }
         return;
     }
-    if read::needs_live_frame_verify(&cmd) {
-        if let Err(outcome) = verify_authorized_state(att, app, &cmd, cmd.generation, None) {
-            finish_and_reply(att, app, &connection_id, request_id, outcome, now);
-            return;
-        }
-        if let Some(wire_id) = cmd.tab_id()
-            && let Ok(host_id) = att.resolve_tab(app, wire_id)
-            && app.workspace_panes.browser.host.tab_open_in_engine(host_id)
-        {
-            let pending = read::queue_live_frame_refresh(att, app, host_id);
-            if !pending.is_empty() {
-                att.active_commands.push(ActiveCommand {
-                    connection_id,
-                    request_id,
-                    is_dialog: cmd.action_type() == Some("dialog"),
-                    deadline: now + DEFAULT_CMD_TIMEOUT,
-                    phase: ExecPhase::VerifyFrames(VerifyFramesState { host_id, pending, cmd }),
-                });
-                return;
-            }
-        }
-    }
-    if let Err(outcome) = verify_authorized_state(att, app, &cmd, cmd.generation, cmd.target.as_ref()) {
-        finish_and_reply(att, app, &connection_id, request_id, outcome, now);
-        return;
-    }
     let is_dialog = cmd.action_type() == Some("dialog");
-    match dispatch_verified_command(att, app, &cmd, now, waker, tx) {
+    match dispatch_command_after_wake(att, app, cmd, now, waker, tx) {
         StepOutcome::Done(outcome) => {
             finish_and_reply(att, app, &connection_id, request_id, outcome, now);
         }
@@ -313,8 +364,41 @@ pub(super) fn start_command(
     }
 }
 
+fn dispatch_command_after_wake(
+    att: &mut SessionAttachment,
+    app: &mut App,
+    cmd: Command,
+    now: Instant,
+    waker: Option<Waker>,
+    tx: &mut Tx,
+) -> StepOutcome {
+    if read::needs_live_frame_verify(&cmd) {
+        if let Err(outcome) = verify_authorized_state(att, app, &cmd, cmd.generation, None) {
+            return StepOutcome::Done(outcome);
+        }
+        if let Some(wire_id) = cmd.tab_id()
+            && let Ok(host_id) = att.resolve_tab(app, wire_id)
+            && app.workspace_panes.browser.host.tab_open_in_engine(host_id)
+        {
+            let pending = read::queue_live_frame_refresh(att, app, host_id);
+            if !pending.is_empty() {
+                return StepOutcome::Pending(ExecPhase::VerifyFrames(VerifyFramesState {
+                    host_id,
+                    pending,
+                    cmd,
+                }));
+            }
+        }
+    }
+    if let Err(outcome) = verify_authorized_state(att, app, &cmd, cmd.generation, cmd.target.as_ref()) {
+        return StepOutcome::Done(outcome);
+    }
+    dispatch_verified_command(att, app, &cmd, now, waker, tx)
+}
+
 fn phase_deadline(phase: &ExecPhase, now: Instant) -> Instant {
     match phase {
+        ExecPhase::Wake(w) => w.deadline,
         ExecPhase::Wait(w) => (w.deadline + Duration::from_secs(1)).min(now + MAX_WAIT_CMD_TIMEOUT),
         ExecPhase::WaitLoad(w) => w.deadline,
         ExecPhase::Profile(p)
@@ -362,16 +446,23 @@ pub(super) fn poll_commands(
 ) -> (bool, Option<Instant>) {
     let mut changed = false;
     let mut earliest: Option<Instant> = None;
-    let mut cmds = std::mem::take(&mut att.active_commands);
+    let cmds = std::mem::take(&mut att.active_commands);
     let mut still_running = Vec::with_capacity(cmds.len());
+    let mut iter = cmds.into_iter();
 
-    for mut cmd in cmds.drain(..) {
+    while let Some(mut cmd) = iter.next() {
+        let host_id = cmd.phase.target_host_tab();
+        let other_waking = || {
+            still_running
+                .iter()
+                .chain(iter.as_slice())
+                .any(|c| c.is_waking_tab(host_id))
+        };
         if !att.attach.is_request_in_flight(&cmd.connection_id, &cmd.request_id) {
-            cmd.cancel_cleanup(att, app, Some(tx));
+            cmd.cancel_cleanup_with(att, app, Some(tx), other_waking());
             changed = true;
             continue;
         }
-        let host_id = cmd.phase.target_host_tab();
         let mid_guard_fail = if !cmd.is_dialog {
             if let Some(site) = app.workspace_panes.browser.host.take_agent_passkey_refused(host_id) {
                 Some(Outcome::fail(
@@ -408,16 +499,38 @@ pub(super) fn poll_commands(
         };
 
         let done = if let Some(fail) = mid_guard_fail {
-            cmd.cancel_cleanup(att, app, Some(tx));
+            cmd.cancel_cleanup_with(att, app, Some(tx), other_waking());
             Some(fail)
-        } else if now >= cmd.deadline && !matches!(cmd.phase, ExecPhase::Wait(_) | ExecPhase::WaitLoad(_)) {
-            cmd.cancel_cleanup(att, app, Some(tx));
+        } else if now >= cmd.deadline && !matches!(cmd.phase, ExecPhase::Wake(_) | ExecPhase::Wait(_) | ExecPhase::WaitLoad(_)) {
+            cmd.cancel_cleanup_with(att, app, Some(tx), other_waking());
             Some(Outcome::fail(
                 failure_code::OPERATION_FAILED,
                 "Browser command timed out locally.",
             ))
         } else {
             match &mut cmd.phase {
+                ExecPhase::Wake(st) => match wake::step_wake(att, app, st, now) {
+                    WakePoll::Wait => None,
+                    WakePoll::Failed(outcome) => Some(outcome),
+                    WakePoll::Ready => {
+                        let wake_cmd = st.cmd.clone();
+                        let inspect = st.inspect;
+                        let step = if inspect {
+                            read::start_inspect(att, app, wake_cmd)
+                        } else {
+                            dispatch_command_after_wake(att, app, wake_cmd, now, waker.clone(), tx)
+                        };
+                        match step {
+                            StepOutcome::Done(outcome) => Some(outcome),
+                            StepOutcome::Pending(next_phase) => {
+                                cmd.deadline = phase_deadline(&next_phase, now);
+                                cmd.phase = next_phase;
+                                changed = true;
+                                None
+                            }
+                        }
+                    }
+                },
                 ExecPhase::Inspect(st) => read::step_inspect(att, app, st),
                 ExecPhase::VerifyFrames(st) => {
                     match read::step_live_frame_refresh(att, app, st.host_id, &mut st.pending, None) {
@@ -511,6 +624,7 @@ fn finish_and_reply(
     if !att.attach.is_request_in_flight(connection_id, &request_id) {
         return;
     }
+    att.last_activity = now;
     // The tabs as the command left them go first, but only when they changed: an unchanged state is
     // one more request to the server before every result (official sends state on change too).
     let (state, hash) = att.sync_tabs(app);

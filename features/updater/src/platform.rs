@@ -22,7 +22,8 @@ pub trait Platform: Send + Sync + 'static {
 
     /// After `install`, the app starts the update itself by quitting and starting again
     /// (`Tx::relaunch`, the app menu's Restart), rather than the hand-off starting it (Windows'
-    /// helper puts the update in place only after the app exits, then starts it).
+    /// helper puts the update in place and restarts after the app exits, and macOS's detached
+    /// helper waits for the app to exit before reopening the swapped bundle without `-n`).
     fn relaunches(&self) -> bool {
         false
     }

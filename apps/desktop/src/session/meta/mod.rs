@@ -1,6 +1,7 @@
 pub mod catalog;
 pub mod context_window;
 pub mod cost;
+pub mod flags;
 pub mod open;
 pub mod state;
 pub mod status;

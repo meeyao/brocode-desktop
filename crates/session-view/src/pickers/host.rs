@@ -507,7 +507,8 @@ fn model_items(pk: &Pickers) -> Vec<Item> {
 }
 
 /// Desktop's `popularProviders` (`providers/catalog/order.ts`), which lead the list in this order.
-const POPULAR: [&str; 8] = ["opencode-go", "opencode", "anthropic", "github-copilot", "openai", "google", "openrouter", "vercel"];
+// `packages/app/src/providers/catalog/order.ts` (`opencode#66736`).
+const POPULAR: [&str; 9] = ["opencode-go", "opencode", "openai", "anthropic", "claude-agent", "github-copilot", "google", "openrouter", "vercel"];
 
 /// Where a model's provider goes: a popular one by its place, the rest after them by name.
 pub(super) fn provider_rank(m: &Model) -> (usize, String) {

@@ -1,142 +1,219 @@
-//! The models a new connection offers (`FirstConnectionModels`): pick one to start with, then
-//! Continue in the footer.
+//! Searchable model picker shown after connecting a provider
+//! (packages/app/src/providers/connect/connected-models.tsx, opencode#66608).
+//!
+//! Reuses the model picker's SearchList presentation (opencode_ui::popover::LIST) scoped strictly
+//! to the models the new connection brought: single-provider connections omit section headers;
+//! multi-provider connections (such as Console workspaces) show sticky provider headers. Choosing
+//! a model by click or Enter immediately confirms it and closes the dialog.
 
-use rune::{El, Tx, col, el, icon, row, spacer, text};
-use rune_kit::ButtonVariant;
-use rune_theme_opencode::icons as ic;
 use opencode_kit::model::Model;
-use opencode_ui::focus::FocusExt;
-use opencode_ui::palette::{Pal, kit};
+use opencode_ui::palette::Pal;
+use opencode_ui::popover::{self as pop, LIST};
 use opencode_ui::style::UI;
+use rune::{El, Key, KeyEvent, Span, Transition, Tx, col, el, rich, row, text};
 
 use super::connection_groups;
-use crate::dialog::{Event, Step};
-use crate::ui::{self, BODY, LABEL};
-use crate::ConnectHost;
+use crate::catalog::ProviderInfo;
+use crate::dialog::{CONSOLE, Event};
+use crate::{ConnectHost, Open};
 
-fn select_model(host: &mut dyn ConnectHost, key: &str, tx: &mut Tx) {
-    tx.instant();
-    crate::connect_event(host, Event::ModelSelected(key.to_owned()), tx);
-}
+/// search-list-empty height matching DialogSelectModel (120 pt).
+const EMPTY_H: f32 = 120.0;
 
-fn toggle_group(host: &mut dyn ConnectHost, provider: &str, collapsed: bool, tx: &mut Tx) {
-    tx.instant();
-    crate::connect_event(host, Event::GroupCollapsed { provider: provider.to_owned(), collapsed }, tx);
+struct ModelRow {
+    provider: ProviderInfo,
+    model: Model,
 }
 
 fn confirm_model(host: &mut dyn ConnectHost, key: &str, tx: &mut Tx) {
+    tx.instant();
     crate::connect_event(host, Event::ModelConfirmed(key.to_owned()), tx);
 }
 
-pub(super) fn view<H: ConnectHost + 'static>(s: &H, p: &Pal, id: &str) -> El {
-    let Some(Step::Models { selected, collapsed }) = s.connect().dialog().and_then(|o| o.dialog.provider.as_ref()).map(|p| &p.step) else {
-        return col();
-    };
-    let groups = connection_groups(s, id);
-    let row_for = |m: &Model, last: bool| {
-        let checked = *selected == m.key;
-        let key = m.key.clone();
-        let shell = col().key(format!("connected-model-{}", m.key)).mx(4.0).py(4.0).child(
-            row()
-                .role("radio")
-                .label(m.name.clone())
-                .w_full()
-                .h(40.0)
-                .px(12.0)
-                .center_y()
-                .radius(4.0)
-                .focus_inset(p)
-                .hover(p.layer3)
-                .on_press_tx(move |s: &mut H, tx: &mut Tx| select_model(s, &key, tx))
-                .child(text(m.name.clone()).font(UI).color(p.text).grow(1.0).shrink().truncate())
-                .child(el().size(16.0, 16.0).center().children(checked.then(|| icon(&ic::CHECK_SMALL, 14.0).color(p.icon)))),
-        );
-        if last { shell } else { col().w_full().child(shell).child(el().h(0.5).mx(16.0).fill(p.border)) }
-    };
-    let list = |models: &[Model]| {
-        let n = models.len();
-        col()
-            .key("connected-models")
-            .w_full()
-            .radius(8.0)
-            .fill(p.layer2)
-            .box_shadow(Pal::ring_in(p.border_muted))
-            .clip_soft(0.0)
-            .children(models.iter().enumerate().map(|(at, m)| row_for(m, at + 1 == n)))
-    };
-    let mut scroll = col()
-        .w_full()
-        .gap(12.0)
-        .pb(16.0)
-        .child(row().key("available-models-heading").gap(6.0).center_y().child(text(opencode_i18n::t!("provider.connect.models.available")).font(LABEL).color(p.text)));
-    if groups.len() == 1 {
-        scroll = scroll.child(list(&groups[0].1));
-    } else {
-        for (info, models) in &groups {
-            let open = !collapsed.contains(&info.id);
-            let pid = info.id.clone();
-            let mut section = col().w_full().gap(8.0).pb(if open { 8.0 } else { 0.0 }).child(
-                row()
-                    .key(format!("connect-group-{}", info.id))
-                    .role("button")
-                    .h(28.0)
-                    .pt(4.0)
-                    .pr(8.0)
-                    .pb(4.0)
-                    .pl(4.0)
-                    .gap(4.0)
-                    .center_y()
-                    .radius(4.0)
-                    .hover(p.layer2)
-                    .on_press_tx(move |s: &mut H, tx: &mut Tx| toggle_group(s, &pid, open, tx))
-                    .child(
-                        el().size(20.0, 20.0).center().child(
-                            icon(&ic::CHEVRON_DOWN, 14.0)
-                                .color(p.icon_muted)
-                                .rotate(if open { 0.0 } else { -std::f32::consts::FRAC_PI_2 })
-                                .mirror_in_rtl(),
-                        ),
-                    )
-                    .child(
-                        row()
-                            .gap(8.0)
-                            .center_y()
-                            .child(ui::provider_mark(&info.id, p.icon))
-                            .child(text(info.name.clone()).font(LABEL).color(p.text)),
-                    ),
-            );
-            if open {
-                section = section.child(list(models));
+fn clear_active(host: &mut dyn ConnectHost, tx: &mut Tx) {
+    tx.instant();
+    if let Some(o) = host.connect_mut().dialog_mut() {
+        o.active = None;
+    }
+}
+
+fn set_active_on_hover(host: &mut dyn ConnectHost, key: &str, inside: bool, tx: &mut Tx) {
+    if inside && let Some(o) = host.connect_mut().dialog_mut() {
+        tx.instant();
+        o.active = Some(key.to_owned());
+    }
+}
+
+/// Tokenized case-insensitive search matching providers/models/search.ts (matchesModelSearch).
+fn matches_model_search(query: &str, model: &Model, provider_name: &str) -> bool {
+    let q = query.trim();
+    if q.is_empty() {
+        return true;
+    }
+    let hay = format!("{} {} {}", model.name, model.id, provider_name).to_lowercase();
+    q.split_whitespace().all(|tok| hay.contains(&tok.to_lowercase()))
+}
+
+/// First case-insensitive match span of query in label (for SearchHighlight).
+fn highlight_span(label: &str, query: &str) -> Option<std::ops::Range<usize>> {
+    let q = query.trim();
+    if q.is_empty() {
+        return None;
+    }
+    let lower = label.to_lowercase();
+    let needle = q.to_lowercase();
+    let pos = lower.find(&needle).or_else(|| {
+        let first = needle.split_whitespace().next()?;
+        lower.find(first)
+    })?;
+    let end = pos + needle.len().min(label.len() - pos);
+    (label.is_char_boundary(pos) && label.is_char_boundary(end)).then_some(pos..end)
+}
+
+/// Drops a common Console workspace prefix ("Workspace / Provider" -> "Provider") when all
+/// Console groups share one, matching consoleProviderName.
+fn workspace_prefix(groups: &[(ProviderInfo, Vec<Model>)]) -> Option<String> {
+    if groups.len() < 2 {
+        return None;
+    }
+    let first = groups[0].0.name.split_once(" / ")?.0;
+    let prefix = format!("{first} / ");
+    groups.iter().all(|(p, _)| p.name.starts_with(&prefix)).then_some(prefix)
+}
+
+fn filtered_rows(host: &dyn ConnectHost, id: &str) -> (usize, Option<String>, Vec<ModelRow>) {
+    let groups = connection_groups(host, id);
+    let group_count = groups.len();
+    let prefix = (id == CONSOLE).then(|| workspace_prefix(&groups)).flatten();
+    let query = host.connect().dialog().map_or("", |o| o.search.text.as_str());
+    let mut rows = Vec::new();
+    for (provider, models) in groups {
+        for model in models {
+            if matches_model_search(query, &model, &provider.name) {
+                rows.push(ModelRow { provider: provider.clone(), model });
             }
-            scroll = scroll.child(section);
         }
     }
-    let can = groups.iter().any(|(_, ms)| ms.iter().any(|m| m.key == *selected));
-    let pick = selected.clone();
-    let footer = row().key("first-provider-model-footer").w_full().h(60.0).px(16.0).center_y().child(spacer()).child(
-        opencode_ui::widgets::not_allowed(ui::button(opencode_i18n::t!("common.continue"), ButtonVariant::Contrast)
-            .disabled(!can)
-            .on_press_tx(move |s: &mut H, tx: &mut Tx| confirm_model(s, &pick, tx))
-            .build(kit(p))
-            .key("connect-continue"), !can),
-    );
+    (group_count, prefix, rows)
+}
+
+/// Up / Down / Enter keyboard navigation in the connected models search list.
+pub fn models_key(host: &mut dyn ConnectHost, ev: &KeyEvent, tx: &mut Tx) -> bool {
+    let Some(id) = host.connect().dialog().and_then(|o| o.dialog.provider.as_ref()).map(|p| p.id.clone()) else {
+        return false;
+    };
+    let (_, _, rows) = filtered_rows(host, &id);
+    let keys: Vec<String> = rows.into_iter().map(|r| r.model.key).collect();
+    let Some(open) = host.connect_mut().dialog_mut() else { return false };
+    match ev.key {
+        Key::Down | Key::Up if !keys.is_empty() => {
+            let at = open.active.as_ref().and_then(|a| keys.iter().position(|k| k == a));
+            let n = keys.len();
+            let next = match (at, ev.key == Key::Down) {
+                (None, true) => 0,
+                (None, false) => n - 1,
+                (Some(i), true) => (i + 1) % n,
+                (Some(i), false) => (i + n - 1) % n,
+            };
+            let picked = keys[next].clone();
+            open.active = Some(picked.clone());
+            tx.instant();
+            tx.scroll_into_view_in("connect-models-list", format!("connected-model-{picked}"));
+            true
+        }
+        Key::Enter => {
+            let key = open
+                .active
+                .as_ref()
+                .filter(|a| keys.iter().any(|k| k == *a))
+                .cloned()
+                .or_else(|| keys.first().cloned());
+            let Some(key) = key else { return false };
+            confirm_model(host, &key, tx);
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Renders the searchable ConnectedModelPicker inside connect-dialog (no DialogHeader, matching
+/// connected-models.tsx + dialog.tsx:130-145).
+pub fn view<H: ConnectHost + 'static>(s: &H, open: &Open, p: &Pal, id: &str, provider_name: &str, remote: Option<El>) -> El {
+    let (group_count, prefix, rows) = filtered_rows(s, id);
+    let query = open.search.text.as_str();
+    let active_key = open
+        .active
+        .as_deref()
+        .filter(|a| rows.iter().any(|r| r.model.key == *a))
+        .or_else(|| rows.first().map(|r| r.model.key.as_str()));
+
+    let placeholder = opencode_i18n::t!("provider.connect.models.search", provider = provider_name);
+    let list_label = opencode_i18n::t!("provider.connect.models.list", provider = provider_name);
+    let field = pop::search_field(p, "connect-models-search", &open.search, &placeholder)
+        .label(list_label)
+        .active_descendant(active_key.map(|k| format!("connected-model-{k}")).unwrap_or_default())
+        .on_edit(|s: &mut H| s.connect_mut().search_mut())
+        .on_input_change(|s: &mut H, tx: &mut Tx| clear_active(s, tx))
+        .on_input_key(|s: &mut H, ev, tx| crate::key(s, ev, tx));
+
+    let trailing: Vec<El> = remote.into_iter().collect();
+    let mut list = pop::List::new("connect-models-list", LIST).stuck_headers(p);
+    let multi = group_count > 1;
+    let mut last_group = "";
+    for r in &rows {
+        if multi && r.provider.id != last_group {
+            let heading = match &prefix {
+                Some(pre) => r.provider.name.strip_prefix(pre).unwrap_or(&r.provider.name),
+                None => &r.provider.name,
+            };
+            list.header(p, format!("connect-model-group-{}", r.provider.id), heading);
+            last_group = &r.provider.id;
+        }
+        let lit = active_key == Some(r.model.key.as_str());
+        let name_el = match highlight_span(&r.model.name, query) {
+            Some(span) => rich(r.model.name.clone(), vec![Span::new(span.start, span.end).color(p.accent)]),
+            None => text(r.model.name.clone()),
+        };
+        let pick_key = r.model.key.clone();
+        let hover_key = r.model.key.clone();
+        let item = row()
+            .key(format!("connected-model-{}", r.model.key))
+            .role("option")
+            .label(r.model.name.clone())
+            .transition(Transition::none())
+            .h(LIST.row_h)
+            .w_full()
+            .pl(10.0)
+            .pr(LIST.pad_r)
+            .center_y()
+            .radius(LIST.row_radius)
+            .fill(if lit { p.hover } else { rune::Color::TRANSPARENT })
+            .on_hover_change(move |s: &mut H, inside, tx: &mut Tx| set_active_on_hover(s, &hover_key, inside, tx))
+            .on_press_tx(move |s: &mut H, tx: &mut Tx| confirm_model(s, &pick_key, tx))
+            .child(name_el.key("label").font(UI).color(p.text).shrink().min_w(0.0).truncate());
+        list.option(item, lit);
+    }
+    if rows.is_empty() {
+        list.other(
+            el().key("connect-models-empty")
+                .w_full()
+                .h(EMPTY_H)
+                .center()
+                .transition(Transition::none())
+                .child(text(opencode_i18n::t!("dialog.model.empty")).font(UI).color(p.muted)),
+            EMPTY_H,
+        );
+    }
+
+    let results = list.build("connect-models-scroll", f32::MAX).shrink().min_h(0.0);
+    let results = if multi { results } else { results.pt(6.0) };
+
     col()
         .key("connect-body")
         .w_full()
         .grow(1.0)
         .shrink()
         .min_h(0.0)
-        .child(
-            col()
-                .w_full()
-                .grow(1.0)
-                .shrink()
-                .min_h(0.0)
-                .px(20.0)
-                .child(text(opencode_i18n::t!("provider.connect.models.description")).font(BODY).color(p.muted).pb(20.0))
-                // `settings-panel`: no bar, as Desktop hides it (`dialog.tsx:1241`, `settings.css:593-607`).
-                .child(opencode_ui::scroller::scroller("first-provider-model-scroll").hidden(col().w_full().shrink().min_h(0.0), scroll)),
-        )
-        .child(el().w_full().h(0.5).fill(p.border_muted))
-        .child(footer)
+        .child(pop::search_row(p, "connect-models-search-row", field, trailing))
+        .child(results)
 }

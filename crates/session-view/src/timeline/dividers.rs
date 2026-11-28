@@ -10,7 +10,7 @@ use crate::compaction::{Beside, Over, Run};
 
 /// Notes on each divider row in `out` what sits beside it.
 pub(super) fn stack(t: &Transcript, out: &mut [RowSpec]) {
-    let shown: Vec<usize> = (0..out.len()).filter(|&i| !matches!(out[i].content, RowContent::Lane(_))).collect();
+    let shown: Vec<usize> = (0..out.len()).collect();
     let kinds: Vec<Kind> = shown.iter().map(|&i| kind(t, &out[i].content)).collect();
     for (k, &i) in shown.iter().enumerate() {
         if kinds[k] != Kind::Divider {

@@ -33,15 +33,28 @@ pub(crate) fn poll(s: &mut App, tx: &mut Tx) -> bool {
         changed |= match &*h {
             crate::events::Heard::Event(e) => {
                 if crate::motion_log::wanted() { s.diag.motion_events.note(&e.ty); }
-                // A session deleted while its tab is open: the tab says it's gone (`session_state`).
-                let gone = e.ty == "session.deleted" && e.data["sessionID"].as_str().is_some_and(|id| s.route == Route::here(id.to_owned()));
-                if e.ty == "session.deleted" && let Some(id) = e.data["sessionID"].as_str() {
-                    crate::session_menu::unread::set(s, &crate::servers::runtime::current(), id, false);
-                    crate::session_menu::preferences::forget(s, &crate::servers::runtime::current(), id);
-                    crate::pickers::saved::forget(s, id);
+                // Snapshot pre-removal inbox order before `react_live` mutates `sessions`, then
+                // let Inbox layout open the successor on server-pushed `session.deleted` / `session.archived`
+                // (`packages/app/src/shell/tabs/tabs.tsx:739-810`, `opencode#66558`).
+                if matches!(e.ty.as_str(), "session.deleted" | "session.archived") {
+                    s.record_inbox_shown();
                 }
-                if gone && let Some(id) = e.data["sessionID"].as_str() { crate::session_state::missing(s, id, tx); }
-                s.react_live(e) | gone
+                let gone = e.ty == "session.deleted" && e.data["sessionID"].as_str().is_some_and(|id| s.route == Route::here(id.to_owned()));
+                let reacted = s.react_live(e);
+                let mut moved = false;
+                if e.ty == "session.deleted" && let Some(id) = e.data["sessionID"].as_str() {
+                    let server = crate::servers::runtime::active(s).clone();
+                    s.close_browser_tabs_for_session(id);
+                    crate::session_menu::unread::set(s, &server, id, false);
+                    crate::session_menu::preferences::forget(s, &server, id);
+                    crate::pickers::saved::forget(s, id);
+                    moved = s.on_server_inbox_removed(&server, id, false, tx);
+                } else if e.ty == "session.archived" && let Some(id) = e.data["sessionID"].as_str() {
+                    let server = crate::servers::runtime::active(s).clone();
+                    moved = s.on_server_inbox_removed(&server, id, true, tx);
+                }
+                if gone && !moved && let Some(id) = e.data["sessionID"].as_str() { crate::session_state::missing(s, id, tx); }
+                reacted | gone | moved
             }
             crate::events::Heard::Message(m) => message(s, (**m).clone(), tx),
         };
@@ -59,9 +72,11 @@ fn message(s: &mut App, m: Incoming, tx: &mut Tx) -> bool {
             crate::connect::picker_reads::refresh(s);
             s.windows_forgotten();
             crate::session_state::reconnected(s, tx);
+            crate::location_missing::reconnected(s, tx);
             let active_server = crate::servers::runtime::active(s).clone();
             s.sidebar_inbox.branches.reconnected(&active_server);
             reconnect::back(s);
+            crate::plugin_host::bridge::servers::on_stream_up(s, &active_server);
             // Terminals that failed under the old connection attach again (`server.connected`).
             s.kernel.slots.get_mut(&crate::terminal::TERMINAL).connections += 1;
             s.pump_outbox();
@@ -80,26 +95,28 @@ fn message(s: &mut App, m: Incoming, tx: &mut Tx) -> bool {
         // The first open: the link was never down, but the health poll can stand down now.
         Incoming::Opened => {
             reconnect::back(s);
+            let active_server = crate::servers::runtime::active(s).clone();
+            crate::plugin_host::bridge::servers::on_stream_up(s, &active_server);
             crate::start_location::ask(s);
             crate::files::watch::connected(s);
             #[cfg(not(target_arch = "wasm32"))]
-            {
-                let active_server = crate::servers::runtime::active(s).clone();
-                crate::surfaces::browser::rpc::on_sse_connected(s, &active_server);
-            }
+            crate::surfaces::browser::rpc::on_sse_connected(s, &active_server);
         }
         Incoming::Status(e) => status_toast::from_server(s, e),
         Incoming::Failed(e) => failed(s, e, tx),
         Incoming::ActiveFailed(e) => reconnect::active_failed(s, &e, tx),
         Incoming::StreamDown(e) => {
+            let active_server = crate::servers::runtime::active(s).clone();
             #[cfg(not(target_arch = "wasm32"))]
-            {
-                let active_server = crate::servers::runtime::active(s).clone();
-                crate::surfaces::browser::rpc::on_sse_disconnected(s, &active_server);
-            }
+            crate::surfaces::browser::rpc::on_sse_disconnected(s, &active_server);
+            crate::plugin_host::bridge::servers::on_stream_down(s, &active_server, tx);
             reconnect::stream_down(s, e, tx);
         }
-        Incoming::Unanswered(e) => reconnect::unanswered(s, e, tx),
+        Incoming::Unanswered(e) => {
+            let active_server = crate::servers::runtime::active(s).clone();
+            crate::plugin_host::bridge::servers::on_stream_down(s, &active_server, tx);
+            reconnect::unanswered(s, e, tx);
+        }
         _ => {}
     }
     true
@@ -294,6 +311,7 @@ fn reply(s: &mut App, m: Incoming, tx: &mut Tx) -> bool {
         // Only the stream sends this in the app (`windows::peer::heard`); a test's or the fuzz
         // link's inbox gets the same resync.
         Incoming::Reconnected => {
+            crate::session::meta::flags::reset_server(s);
             s.resync_shared();
             return message(s, Incoming::Reconnected, tx);
         }
@@ -328,6 +346,7 @@ fn reply(s: &mut App, m: Incoming, tx: &mut Tx) -> bool {
             s.list_unlisted_worktrees();
         }
         Incoming::DefaultDirectory(directory) => crate::start_location::answered(s, directory),
+        Incoming::Flags { directory, flags } => crate::session::meta::flags::answered(s, directory, flags),
         Incoming::ProjectOpened { location, projects, session } => {
             s.apply_project_opened(location, projects, session, tx);
         }
