@@ -38,7 +38,7 @@ scheme=${scheme,,}
 install -Dm755 "$bin" "$root/usr/bin/brocode"
 # Strip brocode (and libopencode_office.so below when built with office-library), removing
 # ~45 MB of .symtab/.strtab while keeping .eh_frame for panic unwinding. RPM disables __strip
-# globally so bundled opencode-cli's EOF Bun payload stays intact.
+# globally so the bundled brocode-cli stays intact.
 if [ "${OPENCODE_RUNE_KEEP_SYMBOLS:-0}" != "1" ]; then
   if command -v strip >/dev/null 2>&1; then
     strip --strip-unneeded "$root/usr/bin/brocode"
@@ -91,9 +91,8 @@ else
 fi
 cli_rpm_files=""
 if [ "${OPENCODE_RUNE_BUNDLE_CLI:-1}" != "0" ]; then
-  bash "$repo_root/scripts/guardrails/run-js.sh" "$repo_root/scripts/fetch-cli.mjs" \
-    --target "linux-$arch" --dest "$root/usr/share/brocode" --channel "$OPENCODE_RUNE_BUILD_CHANNEL"
-  cli_rpm_files=$'/usr/share/brocode/opencode-cli\n/usr/share/brocode/opencode-cli.version'
+  bash "$repo_root/scripts/fetch-brocode-cli.sh" "brocode-linux-$arch" "$root/usr/share/brocode"
+  cli_rpm_files=$'/usr/share/brocode/brocode-cli\n/usr/share/brocode/brocode-cli.version'
 fi
 install -Dm644 "$(dirname "$0")/../assets/icon/icon-1024.png" "$root/usr/$icon"
 install -Dm644 "$repo_root/LICENSE" "$root/usr/$doc/LICENSE"
@@ -203,7 +202,7 @@ if [ "\$1" = "0" ] && [ -f /etc/apparmor.d/brocode-browser-engine ]; then
   rm -f /etc/apparmor.d/brocode-browser-engine
 fi
 EOF
-# Keep __strip a no-op: opencode-cli is a Bun single-file executable whose payload sits at EOF.
+# Keep __strip a no-op for the bundled brocode-cli.
 rpmbuild -bb --define "_topdir $work/rpm" --define 'debug_package %{nil}' --define '__strip /bin/true' "$work/app.spec"
 cp "$work/rpm/RPMS/$machine/"*.rpm "$stem.rpm"
 rpm -qp --list "$stem.rpm" | grep -Fx /usr/bin/brocode
