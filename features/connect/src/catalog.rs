@@ -64,6 +64,8 @@ pub struct CatalogRead {
     pub integrations: Option<Vec<Integration>>,
     pub providers: Option<Value>,
     pub models: Option<(Value, Value)>,
+    /// `/api/config`: the model new sessions run with.
+    pub config: Option<Value>,
 }
 
 /// Continuation run on the UI thread after a catalog sync completes.
@@ -158,6 +160,7 @@ pub(crate) fn fetch_read(server: &Server, dir: Option<&str>) -> CatalogRead {
         integrations: server.integrations(dir).ok(),
         providers: server.get(&format!("/api/provider{q}")).ok(),
         models: server.get("/api/model").ok().map(|m| (m, server.get("/api/agent").unwrap_or_default())),
+        config: server.get("/api/config").ok(),
     }
 }
 
@@ -174,6 +177,9 @@ pub(crate) fn apply_read(host: &mut dyn ConnectHost, dir: Option<&str>, read: Ca
         let p = without_opencode(p, "id");
         host.catalogs_mut().insert_providers(dir, parse_providers(&p));
         host.load_providers(p.get("data").unwrap_or(&p));
+    }
+    if let Some(config) = &read.config {
+        host.load_config(config);
     }
     if let Some((m, agents)) = &read.models {
         let m = without_opencode(m, "providerID");

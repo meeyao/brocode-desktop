@@ -121,6 +121,8 @@ impl ConnectHost for App {
 
     fn load_config(&mut self, list: &Value) {
         self.composer_ext.pickers.load_config(list);
+        // A new window's pickers start with it, before its server answers (`saved_catalog`).
+        crate::launch::saved_catalog::remember_config(list);
     }
 
     fn load_models(&mut self, list: &Value) {

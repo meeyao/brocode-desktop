@@ -199,6 +199,11 @@ pub trait PickerHost: ComposerHost {
     /// "Default" for no choice) for any model that has variants.
     fn has_effort(&self) -> bool {
         let m = self.selection().model;
+        // brocode: API Brother has no thinking stages on its side, so its models never offer any,
+        // whatever `/api/model` sends.
+        if m.provider == "brocode" {
+            return false;
+        }
         self.pickers().models.iter().find(|x| x.id == m.id && x.provider == m.provider).is_some_and(|x| !x.variants.is_empty())
     }
 

@@ -683,11 +683,11 @@ pub(super) fn connect(s: &mut App, tx: &mut Tx) {
         crate::windows::peer::join(s, Some(inbox_wake.clone()));
         // A window that started in its opener's copy was woken plainly until now.
         crate::windows::peer::set_waker(s, inbox_wake);
-        // Home's provider tip waits for the default location's integrations (`home::tip`), which
-        // are otherwise read only when Connect or Settings opens: with only the free models, read them now.
-        if !s.composer_ext.pickers.models.iter().any(|m| m.provider != "opencode") {
-            s.sync_catalogs(None);
-        }
+        // Home's provider tip waits for the default location's integrations (`home::tip`) and the
+        // pickers need the server's providers and configured model (a clean profile otherwise
+        // starts on the ids it knows, never brocode/pro); both are otherwise read only when
+        // Connect or Settings opens. Models already on screen may be a previous launch's copy.
+        s.sync_catalogs(None);
         super::onboarding::first_launch(s, tx);
         // The session open at last quit (see `restore`) subscribes like a click on its tab.
         if let Route::Session { id, server } = (*s.route).clone()

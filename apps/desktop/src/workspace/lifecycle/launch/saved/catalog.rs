@@ -28,6 +28,8 @@ use crate::App;
 /// Desktop's global storage name: what every window shares, all of it in the boot record.
 const GLOBAL: &str = "opencode.global.dat";
 const KEY: &str = "rune.launch.catalog";
+/// The server's `/api/config` as it last answered, for [`restore`].
+const CONFIG: &str = "rune.launch.config";
 const VERSION: u64 = 1;
 /// More models than a window's tabs run with.
 const MODELS: usize = 16;
@@ -44,6 +46,31 @@ pub(crate) fn restore(s: &mut App) {
     pickers.load_config(&saved["config"]);
     pickers.load_models(&saved["models"]);
     pickers.load_agents(&saved["agents"]);
+}
+
+/// Before the first frame: the server's `/api/config` as it last answered, so a new session
+/// starts on the model the server names (brocode/pro), never on an id guessed from nothing. Its
+/// providers, when there is no catalog copy, keep another provider's models out of the pickers
+/// until the server's list lands.
+pub(crate) fn restore_config(s: &mut App) {
+    if !s.persists() || !crate::servers::runtime::active(s).is_sidecar() {
+        return;
+    }
+    let Some(config) = crate::storage::json(GLOBAL, CONFIG) else { return };
+    let pickers = &mut s.composer_ext.pickers;
+    if pickers.provider_order.is_empty()
+        && let Some(ids) = config.as_array().into_iter().flatten().find_map(|e| e["info"]["providers"].as_object()).map(|p| p.keys().cloned().collect::<Vec<String>>())
+    {
+        let providers: Vec<Value> = ids.into_iter().map(|id| json!({ "id": id })).collect();
+        pickers.load_providers(&Value::Array(providers));
+    }
+    pickers.load_config(&config);
+}
+
+/// The server's `/api/config` as it last answered, for the next window's [`restore`]: which
+/// model new sessions run with and which providers exist, before its server says.
+pub(crate) fn remember_config(config: &Value) {
+    crate::storage::set_json(GLOBAL, CONFIG, config);
 }
 
 /// Keeps what the window's sessions run with, for the next launch. Only from a catalog the
@@ -106,11 +133,10 @@ pub(crate) fn save(s: &App) {
             None => json!({ "id": id }),
         })
         .collect();
-    let config: Vec<Value> = pickers
-        .configured
-        .iter()
-        .map(|m| json!({ "type": "document", "info": { "model": { "providerID": m.provider, "model": m.id, "variant": m.variant } } }))
-        .collect();
+    // The server's own `/api/config` here, not only the models it said: the agents it names and
+    // which providers it has decide a new window's model before its server answers.
+    let mut config: Vec<Value> = crate::storage::json(GLOBAL, CONFIG).into_iter().collect();
+    config.extend(pickers.configured.iter().map(|m| json!({ "type": "document", "info": { "model": { "providerID": m.provider, "model": m.id, "variant": m.variant } } })));
     let value = json!({ "v": VERSION, "providers": providers, "config": config, "models": models, "agents": agents });
     // An unchanged catalog writes nothing (`storage::set`).
     crate::storage::set_json(GLOBAL, KEY, &value);
