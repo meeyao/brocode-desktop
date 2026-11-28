@@ -1,5 +1,6 @@
 # Written by scripts/guardrails/engine-revision.mjs --write: the engine's inputs at this ENGINE_REVISION.
 # Inputs: apps/browser-engine, crates/browser-policy, crates/browser-pane/src/device.rs
+# same-revision: upstream/dev's engine sources arrive with no protocol change
 revision 29
 0a006ceedcb72b86a2aa4d7497ff9a21fddfd428 apps/browser-engine/Cargo.lock
 931b2a947cc75a343a0577a9e903596a6c147ee0 apps/browser-engine/Cargo.toml
@@ -13,10 +14,10 @@ b046beaab8b13b8ad19201043e39e7a645bdad33 apps/browser-engine/scripts/package-win
 ca1eb1771d3fa17ab0fdf8c400ea1ac0abd3c81a apps/browser-engine/src/agent.rs
 dd3064014c9a9eddda7f7f3faaa7ced684ace92e apps/browser-engine/src/bin/opencode_browser_engine_helper.rs
 3f42522ad30d1da41c3f0485a375f625fbe24243 apps/browser-engine/src/cdp_ledger.rs
-4ed333cb2a76c058e1818d15a116f7b796d68c06 apps/browser-engine/src/cef_runtime.rs
+6a5e4ba45c5c027b5c2783819859cd5e13b51458 apps/browser-engine/src/cef_runtime.rs
 b58a42fb56a761fc9fc7b64343c3be78f7831b8f apps/browser-engine/src/clear_storage.rs
 dcc95c6b7d896b01064b2124481851b2f900ecde apps/browser-engine/src/clipboard_gate.rs
-7dfe5dc769e5f571a6918f28e42d22bd6f8d35fe apps/browser-engine/src/context.rs
+0313b1c761293e913dc01b48f00b0efc25993642 apps/browser-engine/src/context.rs
 2f3d48333f108c96ddcfde466b15b766af74226a apps/browser-engine/src/cookies.rs
 44d471956c44a1cca6e68551e3b119577cbd6a84 apps/browser-engine/src/d3d_frames.rs
 28ee51e2c48eb44b7a02101aa0c1c8550891a537 apps/browser-engine/src/diagnostics.rs
