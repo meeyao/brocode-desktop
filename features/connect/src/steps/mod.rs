@@ -294,7 +294,7 @@ fn copy_link(host: &mut dyn ConnectHost, tx: &mut Tx) {
 fn no_models<H: ConnectHost + 'static>(p: &Pal, pending: bool, refreshing: bool) -> El {
     let open_again = (!pending).then(|| {
         ui::button(opencode_i18n::t!("provider.connect.console.openAgain"), ButtonVariant::Ghost)
-            .on_press_tx(|s: &mut H, tx: &mut Tx| open_url(s, "https://apibrother.com/console", tx))
+            .on_press_tx(|s: &mut H, tx: &mut Tx| open_url(s, "https://apibrother.com/dashboard", tx))
             .build(kit(p))
     });
     let refresh = ui::button(opencode_i18n::t!("provider.connect.console.refresh"), ButtonVariant::Submit)

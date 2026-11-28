@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use crate::client::encode_component;
 
-pub const CONSOLE_URL: &str = "https://apibrother.com/console";
+pub const CONSOLE_URL: &str = "https://apibrother.com/dashboard";
 const GATEWAY_MARKER: &str = "/api/integration-gateway/";
 const GATEWAY_SUFFIX: &str = "/mcp";
 const BUILTIN_CONSOLE_SKILLS: [&str; 3] = ["opencode", "report", "browser"];
