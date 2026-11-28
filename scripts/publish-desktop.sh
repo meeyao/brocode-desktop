@@ -30,6 +30,7 @@ done
 
 files=(
     "windows-x64|brocode-desktop-win-x64.exe|application/x-msdownload"
+    "linux-x64|brocode-desktop-linux-x64.tar.gz|application/gzip"
     "darwin-arm64|brocode-desktop-darwin-arm64.zip|application/zip"
     "darwin-x64|brocode-desktop-darwin-x64.zip|application/zip"
 )
@@ -119,6 +120,7 @@ while IFS='|' read -r file type; do
     printf '%s -> %s\n' "${file}" "${file}"
 done <<'EOF'
 brocode-desktop-win-x64.exe|application/x-msdownload
+brocode-desktop-linux-x64.tar.gz|application/gzip
 brocode-desktop-darwin-arm64.zip|application/zip
 brocode-desktop-darwin-x64.zip|application/zip
 brocode-desktop-latest.json|application/json

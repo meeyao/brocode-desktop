@@ -211,8 +211,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p pub
-          cp dist/brocode-desktop-windows-x64/brocode-desktop-win-x64.exe pub/
+          cp dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64-setup.exe pub/brocode-desktop-win-x64.exe
           cp dist/brocode-desktop-windows-x64/brocode-desktop-windows-x64.zip pub/
+          cp dist/brocode-desktop-linux-x64/brocode-desktop-linux-x64.tar.gz pub/
           for arch in arm64 x64; do
             if [ -f "dist/brocode-desktop-macos-$arch/brocode-desktop-macos-$arch.zip" ]; then
               cp "dist/brocode-desktop-macos-$arch/brocode-desktop-macos-$arch.zip" pub/brocode-desktop-darwin-$arch.zip
