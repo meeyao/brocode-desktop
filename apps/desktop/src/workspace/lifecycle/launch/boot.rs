@@ -150,14 +150,21 @@ pub fn unwind_check_if_asked() {
     .ok();
     std::process::exit(if caught && alone && dropped == 34 { 0 } else { 1 });
 }
-/// Window title (`"Brocode"` on `main`, `"Brocode · <branch>"` on PR builds).
+/// Window title, with the build's version: `Brocode Desktop 0.3.1`, so a window says which of
+/// the two Brocode apps it is (the legacy Electron app is also called BROcode), and a PR build
+/// `Brocode · <branch> 0.3.1`.
 pub fn window_title() -> &'static str {
-    // Stable and beta builds name themselves after their channel (`win_install::default_name`).
-    #[cfg(not(target_arch = "wasm32"))]
-    let fallback = win_install::default_name(option_env!("OPENCODE_RUNE_BUILD_CHANNEL"));
-    #[cfg(target_arch = "wasm32")]
-    let fallback = "Brocode";
-    option_env!("OPENCODE_RUNE_WINDOW_TITLE").unwrap_or(fallback)
+    static TITLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    TITLE.get_or_init(|| {
+        // Stable and beta builds name themselves after their channel (`win_install::default_name`).
+        #[cfg(not(target_arch = "wasm32"))]
+        let base = win_install::default_name(option_env!("OPENCODE_RUNE_BUILD_CHANNEL"));
+        #[cfg(target_arch = "wasm32")]
+        let base = "Brocode";
+        let name = option_env!("OPENCODE_RUNE_WINDOW_TITLE").unwrap_or(base);
+        let version = crate::updater::build_version();
+        if name.contains(version) { name.to_owned() } else { format!("{name} {version}") }
+    })
 }
 
 /// The build's identity: its name, its app id (the Windows AppUserModelID, the uninstall
