@@ -232,6 +232,8 @@
   "rune.home.noServer.checking": "Checking for server",
   "rune.home.noServer.copyCommand": "Copy command",
   "rune.home.noServer.description": "Start Brocode Desktop, or run:",
+  "rune.home.noServer.download": "Download brocode",
+  "rune.home.noServer.install": "Brocode's background service didn't start. Install the brocode CLI, then retry:",
   "rune.home.noServer.remoteDescription": "Nothing answered at {{address}}.",
   "rune.home.noServer.remoteTitle": "Can't reach Brocode",
   "rune.home.noServer.retry": "Retry connection",
@@ -451,5 +453,6 @@
   "rune.web.stay.title": "Stay signed in on this device?",
   "rune.web.stay.yes": "Stay signed in",
   "session.markRead": "Mark as read",
-  "session.markUnread": "Mark as unread"
+  "session.markUnread": "Mark as unread",
+  "rune.connect.brocode.getKey": "Get a key at apibrother.com/dashboard"
 }
