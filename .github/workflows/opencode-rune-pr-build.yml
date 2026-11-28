@@ -7,24 +7,9 @@ name: Brocode PR Build
 # (opencode-rune-linux-build.yml, as release.yml builds them), kept as workflow artifacts for
 # 7 days. Nothing is published as a GitHub release.
 
+# brocode: upstream builds on Blacksmith runners this fork lacks; run by hand only.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [dev]
-    paths:
-      - "apps/desktop/**"
-      - "apps/installer/**"
-      - "crates/**"
-      - "features/**"
-      - "scripts/**"
-      - "plugins/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - ".cargo/**"
-      - ".github/workflows/opencode-rune-pr-build.yml"
-      - ".github/workflows/opencode-rune-linux-build.yml"
-      - ".github/release/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
